@@ -1,0 +1,18 @@
+{
+  "name": "FacturX — Facturation B2B & Recouvrement",
+  "short_name": "FacturX",
+  "description": "Plateforme SaaS de Facturation, Trésorerie et Recouvrement OHADA / RDC (DGI) - Mode Hors-Ligne & PWA",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F8FC",
+  "theme_color": "#1A44B8",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"]
+}
