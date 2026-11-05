@@ -162,7 +162,7 @@ export default function LoginScreen({
           setIsLoading(false);
           return;
         }
-        console.warn("Auth fallback vers table team_members:", authErr?.message);
+        throw new Error("Identifiants incorrects. Veuillez vérifier votre adresse email et votre mot de passe.");
       }
 
       // Résoudre le profil depuis team_members ou les métadonnées auth
@@ -303,6 +303,9 @@ export default function LoginScreen({
       } catch (otpErr) {
         console.warn("Échec verifyOtp Supabase:", otpErr);
         // Si le code est un code de confirmation numérique valide (ex: 6 chiffres saisis)
+        if (otpErr) {
+          throw new Error("Code de vérification invalide ou expiré. Veuillez vérifier le code reçu par email.");
+        }
         if (code.length < 4) {
           throw new Error("Le code d'authentification saisi est trop court.");
         }

@@ -420,11 +420,10 @@ export default function AuthModal({
                   Rôle Attribué
                 </label>
                 <select
-                  value={role}
+                  value={role === "admin" ? "comptable" : role}
                   onChange={(e) => setRole(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 focus:bg-white focus:border-blue-600 outline-none transition-all cursor-pointer"
                 >
-                  <option value="admin">Administrateur (Tous droits sur l&apos;organisation)</option>
                   <option value="comptable">Responsable Comptable (Factures, Règlements, Fiscal)</option>
                   <option value="commercial">Commercial (Devis, Estimations, Clients)</option>
                 </select>

@@ -560,13 +560,13 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
+    if (!["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(file.type)) {
       showToast("Veuillez sélectionner un fichier image valide (PNG, JPG, SVG, WebP).", "error");
       return;
     }
 
     // Limite de taille : 5 Mo
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > 500 * 1024) {
       showToast("L'image sélectionnée est trop volumineuse (maximum 5 Mo).", "error");
       return;
     }
@@ -823,6 +823,44 @@ export default function App() {
 
   // Mark invoice as paid
   const handleMarkAsPaid = async (invoiceId) => {
+    const targetInv = invoices.find((i) => i.id === invoiceId);
+    if (targetInv) {
+      const { total } = calculateInvoiceTotals(targetInv.items, targetInv.vatRate);
+      const alreadyPaid = payments
+        .filter((p) => p.invoiceId === invoiceId)
+        .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+      const remaining = Math.max(0, total - alreadyPaid);
+      if (remaining > 0) {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, "0");
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const yyyy = now.getFullYear();
+        const autoPayment = {
+          id: `PAY-${invoiceId.replace("FAC-", "")}-${Date.now().toString().slice(-4)}`,
+          receiptNumber: `REC-${invoiceId.replace("FAC-", "")}`,
+          invoiceId: invoiceId,
+          clientName: targetInv.clientName,
+          contactPerson: targetInv.contactPerson || "",
+          clientEmail: targetInv.clientEmail || "",
+          clientPhone: targetInv.clientPhone || "",
+          clientTaxId: targetInv.taxId || "",
+          amount: remaining,
+          currency: companyInfo?.currencySymbol || "FC",
+          paymentDate: `${dd}/${mm}/${yyyy}`,
+          paymentTime: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+          paymentMethod: "Règlement Direct (1-Clic)",
+          channel: "virement",
+          bankName: companyInfo?.bankName || "Rawbank",
+          transactionRef: `REG-${Date.now().toString().slice(-6)}`,
+          beneficiaryAccount: companyInfo?.iban || "",
+          status: "valide",
+          note: `Règlement intégral validé en 1 clic pour la facture ${invoiceId}`,
+          recordedBy: userProfile?.fullName || "Administrateur",
+        };
+        setPayments((prev) => [autoPayment, ...prev]);
+        apiCreatePayment(autoPayment, userProfile?.companyId).catch(() => {});
+      }
+    }
     setInvoices((prev) =>
       prev.map((inv) =>
         inv.id === invoiceId ? { ...inv, status: "payee" } : inv
@@ -1225,6 +1263,14 @@ export default function App() {
 
   // 4. Conversion magique d'un devis en facture officielle
   const handleConvertQuoteToInvoice = async (quote) => {
+    if (!quote) return;
+    if (
+      quote.convertedToInvoiceId ||
+      invoices.some((inv) => inv.convertedFromQuoteId === quote.id)
+    ) {
+      showToast(`Le devis ${quote.id} a déjà été converti en facture.`, "info");
+      return;
+    }
     const invoiceNumbers = invoices
       .map((inv) => {
         const match = inv.id && inv.id.match(/FAC-2026-(\d+)/);
@@ -1243,7 +1289,7 @@ export default function App() {
       address: quote.address || "",
       location: quote.location || "",
       taxId: quote.taxId || "",
-      issueDate: "24/10/2026",
+      issueDate: new Date().toLocaleDateString("fr-FR"),
       dueDate: "07/11/2026",
       status: "envoyee",
       items: quote.items.map((it) => ({ ...it })),
@@ -1342,7 +1388,17 @@ export default function App() {
       console.warn("Sign out:", e);
     }
     if (typeof window !== "undefined") {
-      localStorage.removeItem(STORAGE_KEY_USER_PROFILE);
+      [
+        STORAGE_KEY_USER_PROFILE,
+        STORAGE_KEY_INVOICES,
+        STORAGE_KEY_CLIENTS,
+        STORAGE_KEY_QUOTES,
+        STORAGE_KEY_PAYMENTS,
+        STORAGE_KEY_COMPANY,
+        STORAGE_KEY_ACCOUNT_BASELINE,
+        "facturx_settings_v3",
+        "facturx_team_v3",
+      ].forEach((k) => localStorage.removeItem(k));
     }
     setUserProfile(null);
     showToast("Session déconnectée. Veuillez vous identifier pour continuer.", "info");
@@ -1931,7 +1987,7 @@ export default function App() {
                               type="file"
                               ref={logoFileInputRef}
                               onChange={handleLogoUpload}
-                              accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml"
+                              accept="image/png, image/jpeg, image/jpg, image/webp"
                               className="hidden"
                               id="company-logo-input"
                             />

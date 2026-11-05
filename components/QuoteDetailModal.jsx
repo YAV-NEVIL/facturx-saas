@@ -32,7 +32,7 @@ export default function QuoteDetailModal({
   if (!isOpen || !quote) return null;
 
   const activeCompany = companyInfo || defaultCompanyInfo;
-  const { subtotal, vat, total } = calculateInvoiceTotals(quote.items, quote.vatRate);
+  const { subtotal, vatAmount, total } = calculateInvoiceTotals(quote.items, quote.vatRate);
 
   const cleanPhone = (quote.clientPhone || "").replace(/[^0-9]/g, "");
   const whatsappMessage = `Bonjour ${quote.contactPerson || quote.clientName}, voici notre proposition chiffrée N° ${
@@ -332,7 +332,7 @@ export default function QuoteDetailModal({
               <div className="flex justify-between text-xs text-slate-600">
                 <span>TVA légale ({Math.round(quote.vatRate * 100)}%) :</span>
                 <span className="font-bold font-mono">
-                  {formatAmount(vat, activeCompany.defaultCurrency)}
+                  {formatAmount(vatAmount, activeCompany.defaultCurrency)}
                 </span>
               </div>
               <div className="pt-3 border-t border-slate-200 flex justify-between items-baseline">

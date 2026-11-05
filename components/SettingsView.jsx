@@ -397,32 +397,96 @@ export default function SettingsView({
     }
   };
 
-  // Import de sauvegarde JSON
+  // Import de sauvegarde JSON sécurisé et complet
   const handleImportBackup = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // 1. Limite de taille : 5 Mo max
+    if (file.size > 5 * 1024 * 1024) {
+      if (onToast) onToast("Fichier de sauvegarde trop volumineux (maximum 5 Mo).", "error");
+      event.target.value = "";
+      return;
+    }
+
+    // 2. Confirmation explicite avant écrasement
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Attention : la restauration remplacera vos données actuelles par celles du fichier JSON. Voulez-vous continuer ?"
+      )
+    ) {
+      event.target.value = "";
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const content = JSON.parse(e.target.result);
-        if (content.settings) {
+        // 3. Parse sécurisé filtrant la pollution de prototype (__proto__, constructor, prototype)
+        const content = JSON.parse(String(e.target?.result || ""), (key, val) =>
+          key === "__proto__" || key === "constructor" || key === "prototype" ? undefined : val
+        );
+
+        if (!content || typeof content !== "object" || Array.isArray(content)) {
+          throw new Error("Format de sauvegarde invalide.");
+        }
+
+        // 4. Copie de secours automatique de l'état précédent avant écrasement
+        try {
+          localStorage.setItem(
+            "facturx_pre_restore_backup_v3",
+            JSON.stringify({
+              timestamp: new Date().toISOString(),
+              invoices: localStorage.getItem("facturx_invoices_v3"),
+              clients: localStorage.getItem("facturx_clients_v3"),
+              quotes: localStorage.getItem("facturx_quotes_v3"),
+              payments: localStorage.getItem("facturx_payments_v3"),
+              companyInfo: localStorage.getItem("facturx_company_info_v3"),
+            })
+          );
+        } catch (_) {}
+
+        // 5. Restauration complète des entités financières et paramètres
+        if (Array.isArray(content.invoices)) {
+          localStorage.setItem("facturx_invoices_v3", JSON.stringify(content.invoices));
+        }
+        if (Array.isArray(content.quotes)) {
+          localStorage.setItem("facturx_quotes_v3", JSON.stringify(content.quotes));
+        }
+        if (Array.isArray(content.clients)) {
+          localStorage.setItem("facturx_clients_v3", JSON.stringify(content.clients));
+        }
+        if (Array.isArray(content.payments)) {
+          localStorage.setItem("facturx_payments_v3", JSON.stringify(content.payments));
+        }
+        if (content.settings && typeof content.settings === "object") {
           setSettings(content.settings);
           localStorage.setItem("facturx_settings_v3", JSON.stringify(content.settings));
           if (content.settings.theme && onApplyTheme) {
             onApplyTheme(content.settings.theme);
           }
         }
-        if (content.companyInfo && setCompanyInfo) {
+        if (content.companyInfo && typeof content.companyInfo === "object" && setCompanyInfo) {
+          // Vérifier que logoUrl est uniquement une image bitmap sûre (PNG/JPEG/WebP)
+          if (
+            content.companyInfo.logoUrl &&
+            !/^data:image\/(png|jpeg|jpg|webp);base64,/.test(String(content.companyInfo.logoUrl))
+          ) {
+            content.companyInfo.logoUrl = null;
+          }
           setCompanyInfo(content.companyInfo);
           localStorage.setItem("facturx_company_info_v3", JSON.stringify(content.companyInfo));
         }
-        if (content.userProfile && setUserProfile) {
+        if (content.userProfile && typeof content.userProfile === "object" && setUserProfile) {
           setUserProfile(content.userProfile);
           setProfileForm(content.userProfile);
           localStorage.setItem("facturx_user_profile_v3", JSON.stringify(content.userProfile));
         }
-        if (onToast) onToast("Sauvegarde importée et restaurée avec succès !", "success");
+        if (onToast) onToast("Sauvegarde importée et restaurée avec succès ! Rechargement...", "success");
+        setTimeout(() => {
+          if (typeof window !== "undefined") window.location.reload();
+        }, 800);
       } catch (err) {
         if (onToast) onToast("Fichier JSON de sauvegarde corrompu ou invalide.", "error");
       }
