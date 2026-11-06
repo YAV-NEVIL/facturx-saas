@@ -67,29 +67,29 @@ export default function Header({
   const quickFilters = ["Payée", "En retard", "Kinshasa", "Lubumbashi"];
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm px-4 lg:px-8 py-3.5 transition-all">
-      <div className="flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 transition-all">
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
         {/* Left Side: Mobile Menu Button + Search Input avec animation et focus glow */}
-        <div className="flex items-center gap-3 flex-1 max-w-lg">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-lg min-w-0">
           <button
             onClick={onOpenMobileMenu}
-            className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
             aria-label="Ouvrir le menu"
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
 
           {/* Search bar avec animations et interactions riches */}
-          <div className="relative w-full group">
+          <div className="relative w-full min-w-0 group">
             <div
               className={`relative flex items-center w-full transition-all duration-300 rounded-xl border ${
                 isSearchFocused
-                  ? "bg-white border-[#183BB0] ring-4 ring-blue-500/10 shadow-lg shadow-blue-500/5 scale-[1.01]"
+                  ? "bg-white border-[#183BB0] ring-4 ring-blue-500/10 shadow-lg shadow-blue-500/5"
                   : "bg-slate-50 hover:bg-slate-100/80 border-slate-200/90"
               }`}
             >
               <Search
-                className={`w-4 h-4 ml-3.5 transition-all duration-200 shrink-0 ${
+                className={`w-4 h-4 ml-3 transition-all duration-200 shrink-0 ${
                   isSearchFocused
                     ? "text-[#183BB0] scale-110"
                     : "text-slate-400 group-hover:text-slate-600"
@@ -103,8 +103,8 @@ export default function Header({
                 onFocus={() => setIsSearchFocused(true)}
                 onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                 onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
-                placeholder="Rechercher factures, clients, montants en FC..."
-                className="w-full pl-3 pr-20 py-2 bg-transparent text-slate-800 placeholder-slate-400 text-sm focus:outline-none"
+                placeholder="Rechercher factures, clients..."
+                className="w-full pl-2.5 pr-3 sm:pr-20 py-2 bg-transparent text-slate-800 placeholder-slate-400 text-xs sm:text-sm focus:outline-none min-w-0"
               />
 
               {/* Bouton d'effacement rapide si du texte est saisi */}
@@ -115,7 +115,7 @@ export default function Header({
                     if (setSearchQuery) setSearchQuery("");
                     searchInputRef.current?.focus();
                   }}
-                  className="p-1 mr-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 rounded-md transition-colors"
+                  className="p-1 mr-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 rounded-md transition-colors shrink-0"
                   title="Effacer la recherche"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -148,13 +148,13 @@ export default function Header({
 
             {/* Menu suggestions animées au focus */}
             {isSearchFocused && !searchQuery && (
-              <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 animate-in fade-in slide-in-from-top-1 text-xs space-y-2">
+              <div className="absolute top-full left-0 right-0 min-w-[250px] sm:min-w-0 mt-2 p-3 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 animate-in fade-in slide-in-from-top-1 text-xs space-y-2">
                 <div className="flex items-center justify-between text-slate-400 text-[11px] font-semibold">
                   <span className="flex items-center gap-1.5">
                     <Sparkles className="w-3 h-3 text-[#183BB0]" />
-                    Filtres rapides recommandés :
+                    Filtres rapides :
                   </span>
-                  <span>Échap pour fermer</span>
+                  <span className="hidden sm:inline">Échap pour fermer</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {quickFilters.map((tag) => (
@@ -176,8 +176,8 @@ export default function Header({
           </div>
         </div>
 
-        {/* Right Side: Supabase Badge, Date Selector, Notifications, Profile */}
-        <div className="flex items-center gap-3 lg:gap-5">
+        {/* Right Side: Cloud Badge, Date Selector, Notifications, Profile */}
+        <div className="flex items-center gap-1.5 sm:gap-3 lg:gap-5 shrink-0">
           {/* Badge Statut Supabase Full-Stack & Mode Hors-Ligne */}
           <div className="hidden sm:flex items-center gap-2">
             {isOffline ? (
@@ -267,81 +267,101 @@ export default function Header({
                 setShowNotifications(!showNotifications);
                 setShowProfileMenu(false);
               }}
-              className="relative p-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className="relative p-2 sm:p-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
               aria-label="Notifications"
             >
               <Bell className="w-5 h-5" />
-              {/* Red dot badge matching screenshot */}
-              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full"></span>
+              {notifications.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full"></span>
+              )}
             </button>
 
-            {/* Notification Popover */}
+            {/* Notification Popover (Mobile-safe fixed inset-x-3 on small screens) */}
             {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-100 rounded-2xl shadow-xl py-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 bg-white border border-slate-100 rounded-2xl shadow-xl py-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-sm text-slate-800">Notifications</h3>
                     <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      3 nouvelles
+                      {notifications.length} nouvelle{notifications.length > 1 ? "s" : ""}
                     </span>
                   </div>
-                  <button className="text-xs text-blue-600 hover:underline font-medium">
-                    Tout marquer lu
+                  <button
+                    onClick={() => setShowNotifications(false)}
+                    className="text-xs text-blue-600 hover:underline font-medium"
+                  >
+                    Fermer
                   </button>
                 </div>
 
-                <div className="divide-y divide-slate-50 max-h-80 overflow-y-auto">
-                  {notifications.map((item) => (
-                    <div
-                      key={item.id}
-                      className="px-4 py-3 hover:bg-slate-50/80 transition-colors flex items-start gap-3 cursor-pointer"
-                    >
-                      <div className="mt-0.5">
-                        {item.type === "success" && (
-                          <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                            <CheckCircle2 className="w-4 h-4" />
-                          </div>
-                        )}
-                        {item.type === "warning" && (
-                          <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                            <AlertTriangle className="w-4 h-4" />
-                          </div>
-                        )}
-                        {item.type === "info" && (
-                          <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                            <FileText className="w-4 h-4" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-slate-900">{item.title}</p>
-                        <p className="text-xs text-slate-500 truncate">{item.desc}</p>
-                        <span className="text-[10px] text-slate-400 mt-1 block">{item.time}</span>
-                      </div>
+                <div className="divide-y divide-slate-50 max-h-72 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                      <Bell className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-slate-600">Aucune nouvelle notification</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Vos alertes de règlements et relances apparaîtront ici.</p>
                     </div>
-                  ))}
+                  ) : (
+                    notifications.map((item) => (
+                      <div
+                        key={item.id}
+                        className="px-4 py-3 hover:bg-slate-50/80 transition-colors flex items-start gap-3 cursor-pointer"
+                      >
+                        <div className="mt-0.5 shrink-0">
+                          {item.type === "success" && (
+                            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                              <CheckCircle2 className="w-4 h-4" />
+                            </div>
+                          )}
+                          {item.type === "warning" && (
+                            <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                              <AlertTriangle className="w-4 h-4" />
+                            </div>
+                          )}
+                          {item.type === "info" && (
+                            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-900">{item.title}</p>
+                          <p className="text-xs text-slate-500 truncate">{item.desc}</p>
+                          <span className="text-[10px] text-slate-400 mt-1 block">{item.time}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
 
-                <div className="px-4 pt-2 border-t border-slate-100 text-center">
-                  <button className="text-xs font-semibold text-blue-600 hover:text-blue-700">
-                    Voir tout le journal d&apos;activité →
-                  </button>
-                </div>
+                {notifications.length > 0 && (
+                  <div className="px-4 pt-2 border-t border-slate-100 text-center">
+                    <button
+                      onClick={() => {
+                        setShowNotifications(false);
+                        if (onNavigate) onNavigate("invoices");
+                      }}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                      Voir toutes les factures →
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* User Profile Pill matching screenshot */}
+          {/* User Profile Pill */}
           <div className="relative">
             <button
               onClick={() => {
                 setShowProfileMenu(!showProfileMenu);
                 setShowNotifications(false);
               }}
-              className="flex items-center gap-2.5 p-1 sm:px-2 sm:py-1 rounded-xl hover:bg-slate-100 transition-colors text-left"
+              className="flex items-center gap-2 p-1 sm:px-2 sm:py-1 rounded-xl hover:bg-slate-100 transition-colors text-left"
             >
               <div className="relative">
-                <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr ${
                   userProfile?.role === "commercial"
                     ? "from-emerald-600 to-teal-500"
                     : userProfile?.role === "comptable"
@@ -350,9 +370,8 @@ export default function Header({
                     ? "from-amber-600 to-orange-500"
                     : "from-purple-600 to-indigo-700"
                 } border-2 border-white shadow-sm flex items-center justify-center text-white font-bold text-xs overflow-hidden`}>
-                  <span className="text-sm">{userProfile?.initials || "FX"}</span>
+                  <span className="text-xs sm:text-sm">{userProfile?.initials || "FX"}</span>
                 </div>
-                {/* Active green dot from screenshot */}
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
               </div>
 
@@ -363,9 +382,9 @@ export default function Header({
                 <div className="flex items-center gap-1">
                   <p className="text-[11px] text-slate-500 font-medium">
                     {userProfile?.role === "admin"
-                      ? "Head Admin"
+                      ? "Propriétaire"
                       : userProfile?.role === "comptable"
-                      ? "Comptable en Chef"
+                      ? "Comptabilité"
                       : userProfile?.role === "commercial"
                       ? "Commercial"
                       : userProfile?.role === "gestionnaire_stock"
@@ -380,7 +399,7 @@ export default function Header({
 
             {/* Profile Dropdown */}
             {showProfileMenu && (
-              <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-1.5rem)] bg-white border border-slate-100 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/50">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-slate-800">{userProfile?.fullName || "Administrateur"}</p>

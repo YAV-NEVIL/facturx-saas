@@ -340,15 +340,15 @@ export default function InvoiceTable({
         <table className="w-full text-left border-collapse">
           {/* Header Row matching screenshot light blue-gray bar (#EEF4FD) */}
           <thead>
-            <tr className="bg-[#EEF4FD] text-slate-600 text-xs font-bold uppercase tracking-wider">
-              <th className="py-3.5 px-6">N° Facture</th>
-              <th className="py-3.5 px-6">Client</th>
-              <th className="py-3.5 px-6">Localisation</th>
-              <th className="py-3.5 px-6">Date Émission</th>
-              <th className="py-3.5 px-6">Échéance</th>
-              <th className="py-3.5 px-6">Montant Total</th>
-              <th className="py-3.5 px-6">Statut</th>
-              <th className="py-3.5 px-6 text-center">Actions</th>
+            <tr className="bg-[#EEF4FD] text-slate-600 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
+              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">N° Facture</th>
+              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Client</th>
+              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Localisation</th>
+              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Date Émission</th>
+              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Échéance</th>
+              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Montant Total</th>
+              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Statut</th>
+              <th className="py-3 px-3.5 sm:px-6 text-center whitespace-nowrap">Actions</th>
             </tr>
           </thead>
 
@@ -376,7 +376,7 @@ export default function InvoiceTable({
                     }`}
                   >
                     {/* Invoice ID */}
-                    <td className="py-4 px-6 whitespace-nowrap font-bold text-blue-600">
+                    <td className="py-3 sm:py-4 px-3.5 sm:px-6 whitespace-nowrap font-bold text-blue-600">
                       <button
                         onClick={() => onSelectInvoice(inv)}
                         className="hover:underline flex items-center gap-1.5 focus:outline-none"
@@ -386,7 +386,7 @@ export default function InvoiceTable({
                     </td>
 
                     {/* Client Name & Coordinates */}
-                    <td className="py-4 px-6 whitespace-nowrap">
+                    <td className="py-3 sm:py-4 px-3.5 sm:px-6 whitespace-nowrap">
                       <div className="font-bold text-slate-800">{inv.clientName}</div>
                       <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                         <Mail className="w-3 h-3 text-slate-400 shrink-0" />
@@ -401,7 +401,7 @@ export default function InvoiceTable({
                     </td>
 
                     {/* Location with Pin */}
-                    <td className="py-4 px-6 whitespace-nowrap">
+                    <td className="py-3 sm:py-4 px-3.5 sm:px-6 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
                         <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                         <span>{inv.location}</span>
@@ -409,27 +409,27 @@ export default function InvoiceTable({
                     </td>
 
                     {/* Issue Date JJ/MM/AAAA */}
-                    <td className="py-4 px-6 whitespace-nowrap text-xs font-medium text-slate-600">
+                    <td className="py-3 sm:py-4 px-3.5 sm:px-6 whitespace-nowrap text-xs font-medium text-slate-600">
                       {inv.issueDate}
                     </td>
 
                     {/* Due Date JJ/MM/AAAA */}
-                    <td className="py-4 px-6 whitespace-nowrap text-xs font-medium text-slate-600">
+                    <td className="py-3 sm:py-4 px-3.5 sm:px-6 whitespace-nowrap text-xs font-medium text-slate-600">
                       {inv.dueDate}
                     </td>
 
                     {/* Total Amount in FCFA */}
-                    <td className="py-4 px-6 whitespace-nowrap font-extrabold text-slate-900">
+                    <td className="py-3 sm:py-4 px-3.5 sm:px-6 whitespace-nowrap font-extrabold text-slate-900">
                       {formatFCFA(total)}
                     </td>
 
                     {/* Status Badge */}
-                    <td className="py-4 px-6 whitespace-nowrap">
+                    <td className="py-3 sm:py-4 px-3.5 sm:px-6 whitespace-nowrap">
                       {getStatusBadge(inv.status)}
                     </td>
 
                     {/* Actions Menu */}
-                    <td className="py-4 px-6 whitespace-nowrap text-center relative">
+                    <td className="py-3 sm:py-4 px-3.5 sm:px-6 whitespace-nowrap text-center relative">
                       {/* Backdrop invisible couvrant tout l'écran pour fermer dès un clic n'importe où */}
                       {activeMenuId === inv.id && (
                         <div

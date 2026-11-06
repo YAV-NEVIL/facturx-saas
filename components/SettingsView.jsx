@@ -257,16 +257,31 @@ export default function SettingsView({
     }
   };
 
-  // Changement de couleur d'accentuation
+  // Changement de couleur d'accentuation dynamique (Clair & Sombre haut contraste)
+  const mapHexToAccentSlug = (hex) => {
+    const normalized = String(hex || "").toUpperCase();
+    if (normalized === "#059669") return "emerald";
+    if (normalized === "#7C3AED") return "violet";
+    if (normalized === "#4F46E5") return "indigo";
+    if (normalized === "#D97706") return "amber";
+    if (normalized === "#0F172A") return "slate";
+    return "blue";
+  };
+
   const handleAccentChange = (hex) => {
     const updated = { ...settings, accentColor: hex };
     setSettings(updated);
+    const accentSlug = mapHexToAccentSlug(hex);
     try {
+      if (typeof document !== "undefined") {
+        document.documentElement.dataset.accent = accentSlug;
+      }
+      localStorage.setItem("facturx_accent", accentSlug);
       localStorage.setItem("facturx_settings_v3", JSON.stringify(updated));
     } catch (e) {
       console.error(e);
     }
-    if (onToast) onToast("Couleur d'accentuation mise à jour !", "info");
+    if (onToast) onToast("Couleur d'accentuation appliquée en direct !", "info");
   };
 
   // Test du synthétiseur sonore Web Audio
@@ -564,31 +579,31 @@ export default function SettingsView({
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12 animate-in fade-in duration-300">
       {/* 1. Header principal haute fidélité */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 sm:p-8 rounded-3xl border border-slate-100 shadow-xs">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-100 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              Panneau d&apos;Administration Haute Fidélité
+              <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              Configuration Entreprise
             </span>
-            <span className="text-xs text-slate-400 font-medium">FacturX v1.0 Enterprise</span>
+            <span className="text-xs text-slate-400 font-medium">FacturX v1.0 Pro</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-2">
+          <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-2">
             Paramètres & Configuration Système
           </h1>
-          <p className="text-sm text-slate-500 mt-1 max-w-3xl">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl">
             Pilotez votre solution comptable : basculez en mode sombre, ajustez les règles fiscales OHADA, activez les passerelles Mobile Money et personnalisez vos modèles.
           </p>
         </div>
 
         {/* Boutons d'actions rapides en haut */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
           <button
             type="button"
             onClick={handleExportFullBackup}
-            className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl flex items-center gap-2 transition-all shadow-2xs cursor-pointer"
+            className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-2xs cursor-pointer"
           >
-            <Download className="w-4 h-4 text-slate-600" />
+            <Download className="w-4 h-4 text-slate-600 shrink-0" />
             <span>Sauvegarde (.JSON)</span>
           </button>
 
@@ -596,16 +611,16 @@ export default function SettingsView({
             type="button"
             onClick={handleSaveAll}
             disabled={isSaving}
-            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95 cursor-pointer disabled:opacity-50"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/20 active:scale-95 cursor-pointer disabled:opacity-50"
           >
-            {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {isSaving ? <RefreshCw className="w-4 h-4 animate-spin shrink-0" /> : <Save className="w-4 h-4 shrink-0" />}
             <span>{isSaving ? "Enregistrement..." : "Enregistrer les modifications"}</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Barre d'onglets professionnelle */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-slate-200/80">
+      {/* 2. Barre d'onglets professionnelle Mobile-First (Grille 2 colonnes sur mobile, barre fluide sur tablette/desktop) */}
+      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:overflow-x-auto pb-3 border-b border-slate-200/80">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSettingsTab === tab.id;
@@ -613,14 +628,14 @@ export default function SettingsView({
             <button
               key={tab.id}
               onClick={() => setActiveSettingsTab(tab.id)}
-              className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0 cursor-pointer ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold transition-all sm:shrink-0 cursor-pointer min-w-0 ${
                 isActive
                   ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
                   : "bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/60"
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-500"}`} />
-              <span>{tab.label}</span>
+              <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-slate-500"}`} />
+              <span className="truncate">{tab.label}</span>
             </button>
           );
         })}

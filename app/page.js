@@ -201,6 +201,10 @@ export default function App() {
       try {
         const savedTheme = localStorage.getItem("facturx_theme") || "light";
         applyTheme(savedTheme);
+        const savedAccent = localStorage.getItem("facturx_accent");
+        if (savedAccent) {
+          document.documentElement.dataset.accent = savedAccent;
+        }
 
         // Initialiser ou charger le profil utilisateur
         const savedProfile = localStorage.getItem(STORAGE_KEY_USER_PROFILE);
@@ -1636,10 +1640,10 @@ export default function App() {
         )}
 
         {/* Main Body */}
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8 max-w-7xl w-full mx-auto">
+        <main className="p-3.5 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 lg:space-y-8 max-w-7xl w-full mx-auto">
           {/* ÉCRAN DE RESTRICTION D'ACCÈS RBAC (SI MODULE NON AUTORISÉ POUR CE RÔLE) */}
           {isTabRestrictedForRole(activeTab) && (
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 sm:p-12 text-center max-w-xl mx-auto my-12 space-y-5 animate-fadeIn">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-12 text-center max-w-xl mx-auto my-8 sm:my-12 space-y-5 animate-fadeIn">
               <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center mx-auto border border-amber-200 shadow-sm">
                 <Shield className="w-8 h-8 text-amber-500" />
               </div>
@@ -1656,15 +1660,8 @@ export default function App() {
               </div>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
                 <button
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>Changer de Profil / Se Connecter en Admin</span>
-                </button>
-                <button
                   onClick={() => setActiveTab(userProfile?.role === "commercial" ? "quotes" : "dashboard")}
-                  className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
                 >
                   Retourner au {userProfile?.role === "commercial" ? "Pipeline Devis" : "Tableau de bord"}
                 </button>
@@ -1673,40 +1670,41 @@ export default function App() {
           )}
           {/* TAB: DASHBOARD (SYNTHÈSE FINANCIÈRE & PRÉVISIONS) */}
           {activeTab === "dashboard" && (
-            <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-200">
+            <div className="space-y-5 sm:space-y-6 lg:space-y-8 animate-in fade-in duration-200">
               {/* BANNIÈRE DE BIENVENUE PERSONNALISÉE SELON LE PROFIL CONNECTÉ */}
-              <div className="bg-gradient-to-r from-[#1A44B8] via-[#163DA9] to-[#2D60FF] rounded-2xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-lg font-extrabold shadow-inner shrink-0">
+              <div className="bg-gradient-to-r from-[#1A44B8] via-[#163DA9] to-[#2D60FF] rounded-2xl p-4 sm:p-6 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 min-w-0">
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-base sm:text-lg font-extrabold shadow-inner shrink-0">
                     {userProfile?.initials || "FX"}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-lg sm:text-2xl font-extrabold tracking-tight">
                         Bonjour, {userProfile?.fullName || "Collaborateur"} 👋
                       </h2>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        Connecté en direct
+                        En ligne
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm text-blue-100/90 mt-1">
+                    <p className="text-xs sm:text-sm text-blue-100/90 mt-1 break-words">
                       Espace <strong>{userProfile?.badge || userProfile?.role}</strong> chez{" "}
-                      <span className="underline decoration-blue-300 font-bold">{companyInfo?.name || userProfile?.companyName || "Mon Entreprise"}</span>{" "}
-                      — ({userProfile?.email})
+                      <span className="underline decoration-blue-300 font-bold">{companyInfo?.name || userProfile?.companyName || "Mon Entreprise"}</span>
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-start md:self-auto">
-                  <button
-                    onClick={() => setIsAuthModalOpen(true)}
-                    className="px-3.5 py-2 bg-white/15 hover:bg-white/25 active:scale-95 text-white border border-white/20 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                    Changer de profil
-                  </button>
-                </div>
+                {userProfile?.role === "admin" && (
+                  <div className="flex items-center gap-2 self-start md:self-auto">
+                    <button
+                      onClick={() => setActiveTab("company")}
+                      className="px-3.5 py-2 bg-white/15 hover:bg-white/25 active:scale-95 text-white border border-white/20 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Building2 className="w-3.5 h-3.5 text-blue-200" />
+                      Mon Entreprise
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* En-tête Tableau de Bord */}
@@ -1909,11 +1907,11 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                   <button
                     type="button"
                     onClick={() => setIsResetModalOpen(true)}
-                    className="group px-4 py-2 bg-white text-slate-700 hover:bg-black hover:text-white border border-slate-300 hover:border-black text-xs font-bold rounded-xl transition-all duration-200 flex items-center gap-2 shadow-xs hover:shadow-md cursor-pointer active:scale-95"
+                    className="group px-4 py-2 bg-white text-slate-700 hover:bg-black hover:text-white border border-slate-300 hover:border-black text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-xs hover:shadow-md cursor-pointer active:scale-95"
                     title="Rétablir les coordonnées d'origine associées au compte"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-slate-500 group-hover:text-white group-hover:-rotate-90 transition-all duration-300" />
@@ -1923,7 +1921,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleSaveCompany}
-                    className="px-5 py-2.5 bg-[#183BB0] hover:bg-[#122F8C] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-blue-900/25 transition-all hover:scale-[1.02] cursor-pointer"
+                    className="px-5 py-2.5 bg-[#183BB0] hover:bg-[#122F8C] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-900/25 transition-all hover:scale-[1.02] cursor-pointer"
                   >
                     <Save className="w-4 h-4" />
                     <span>Enregistrer les coordonnées</span>
@@ -1932,12 +1930,12 @@ export default function App() {
               </div>
 
               {/* 1. Carte de Prévisualisation en direct de l'en-tête de facture */}
-              <div className="bg-gradient-to-r from-blue-900 via-[#183BB0] to-[#2D60FF] text-white p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-900 via-[#183BB0] to-[#2D60FF] text-white p-5 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden">
                 <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-6 border-b border-white/20">
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-5 sm:gap-6 pb-6 border-b border-white/20">
                   <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-white text-[#183BB0] font-black text-2xl flex items-center justify-center shadow-lg tracking-wider shrink-0 overflow-hidden border-2 border-white/30">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white text-[#183BB0] font-black text-xl sm:text-2xl flex items-center justify-center shadow-lg tracking-wider shrink-0 overflow-hidden border-2 border-white/30">
                       {companyForm.logoUrl ? (
                         <img
                           src={companyForm.logoUrl}
@@ -1945,7 +1943,7 @@ export default function App() {
                           className="w-full h-full object-contain p-1"
                         />
                       ) : (
-                        <span>{companyForm.initials || "HG"}</span>
+                        <span>{companyForm.initials || "FX"}</span>
                       )}
                     </div>
                     <div>
@@ -1962,35 +1960,35 @@ export default function App() {
                         {companyForm.name || userProfile?.companyName || "Mon Entreprise"}
                       </h2>
                       <p className="text-xs text-blue-100">
-                        {companyForm.subtitle || "Solutions Digitales & Facturation OHADA / RDC"}
+                        {companyForm.subtitle || "Gestion Commerciale & Facturation B2B"}
                       </p>
                     </div>
                   </div>
 
                   {/* Identifiants légaux en RDC */}
-                  <div className="text-xs space-y-1 text-blue-100/90 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/15 min-w-[240px]">
+                  <div className="text-xs space-y-1 text-blue-100/90 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/15 w-full md:w-auto md:min-w-[240px]">
                     <p className="font-bold text-white text-[11px] uppercase tracking-wider">
-                      Identifiants Officiels (RDC) :
+                      Identifiants Officiels :
                     </p>
                     <p className="font-mono text-[11px]">
-                      RCCM : <span className="font-bold text-white">{companyForm.rccm || "CD/KIN/RCCM/24-B-01420"}</span>
+                      RCCM : <span className="font-bold text-white">{companyForm.rccm || "À compléter"}</span>
                     </p>
                     <p className="font-mono text-[11px]">
-                      Id. Nat. : <span className="font-bold text-white">{companyForm.idNat || "01-G4701-B89201"}</span>
+                      Id. Nat. : <span className="font-bold text-white">{companyForm.idNat || "À compléter"}</span>
                     </p>
                     <p className="font-mono text-[11px]">
-                      N° Impôt : <span className="font-bold text-white">{companyForm.nif || companyForm.ninea || "A2408912Z"}</span>
+                      N° Impôt : <span className="font-bold text-white">{companyForm.nif || companyForm.ninea || "À compléter"}</span>
                     </p>
                   </div>
                 </div>
 
                 {/* Coordonnées rapides bas de bannière */}
-                <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-xs text-blue-100">
-                  <div className="flex items-center gap-2">
+                <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 pt-4 text-xs text-blue-100">
+                  <div className="flex items-center gap-2 min-w-0">
                     <MapPin className="w-4 h-4 text-blue-200 shrink-0" />
                     <span className="truncate">
                       {companyForm.address ? `${companyForm.address}, ` : ""}
-                      {companyForm.city}, {companyForm.country}
+                      {companyForm.city || "Kinshasa"}, {companyForm.country || "RDC"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1998,27 +1996,27 @@ export default function App() {
                     <span>
                       {companyForm.phoneDigits
                         ? `${companyForm.phoneCountryCode || "+243"} ${companyForm.phoneDigits}`
-                        : (companyForm.phone || companyForm.mobile)}
+                        : (companyForm.phone || companyForm.mobile || "Non renseigné")}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <Mail className="w-4 h-4 text-blue-200 shrink-0" />
-                    <span className="truncate">{companyForm.email}</span>
+                    <span className="truncate">{companyForm.email || userProfile?.email || "Non renseigné"}</span>
                   </div>
                 </div>
 
                 {/* Paiement en direct */}
-                <div className="relative z-10 pt-3 mt-3 border-t border-white/10 flex flex-wrap items-center gap-4 text-[11px] text-blue-200/90">
+                <div className="relative z-10 pt-3 mt-3 border-t border-white/10 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-blue-200/90">
                   <span className="flex items-center gap-1 font-semibold text-white">
                     <CreditCard className="w-3.5 h-3.5 text-blue-300" />
                     {companyForm.bankName === "Autre banque (saisie manuelle)"
                       ? (companyForm.bankCustomName || "Autre banque")
-                      : (companyForm.bankName || "Rawbank")}
+                      : (companyForm.bankName || "Banque non renseignée")}
                   </span>
                   <span>•</span>
-                  <span>Airtel Money : <strong className="text-white">{companyForm.airtelDigits ? `${companyForm.airtelCountryCode || "+243"} ${companyForm.airtelDigits}` : (companyForm.airtelMoneyNumber || companyForm.waveNumber || "+243 99 820 40 50")}</strong></span>
+                  <span>Airtel Money : <strong className="text-white">{companyForm.airtelDigits ? `${companyForm.airtelCountryCode || "+243"} ${companyForm.airtelDigits}` : (companyForm.airtelMoneyNumber || "Non configuré")}</strong></span>
                   <span>•</span>
-                  <span>Orange Money RDC : <strong className="text-white">{companyForm.orangeDigits ? `${companyForm.orangeCountryCode || "+243"} ${companyForm.orangeDigits}` : (companyForm.orangeMoneyNumber || "+243 89 820 40 50")}</strong></span>
+                  <span>Orange Money : <strong className="text-white">{companyForm.orangeDigits ? `${companyForm.orangeCountryCode || "+243"} ${companyForm.orangeDigits}` : (companyForm.orangeMoneyNumber || "Non configuré")}</strong></span>
                   <span>•</span>
                   <span>Devise : <strong className="text-amber-300 font-bold">{companyForm.defaultCurrency || "Franc Congolais (CDF / FC)"}</strong></span>
                 </div>
