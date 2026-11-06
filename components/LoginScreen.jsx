@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Lock,
   Mail,
@@ -30,6 +30,8 @@ import {
   syncAuthUserWithTeamMember,
   updateMemberOnlineStatus,
   completeAdminOnboardingAfterOtp,
+  getCurrentSession,
+  onAuthStateChange,
 } from "@/lib/supabaseService";
 import { Building2, Globe } from "lucide-react";
 
@@ -64,6 +66,92 @@ export default function LoginScreen({
   const [pendingProfile, setPendingProfile] = useState(null);
   const [otpCode, setOtpCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
+  const autoLoginHandledRef = useRef(false);
+
+  // Détection automatique du retour depuis le lien de confirmation email Supabase (#access_token=...)
+  useEffect(() => {
+    let isActive = true;
+
+    const finalizeConfirmedSession = async (session) => {
+      if (!session?.user || !session.user.email_confirmed_at || autoLoginHandledRef.current) {
+        return;
+      }
+      // Ne déclencher automatiquement que si un retour d'authentification (hash URL) ou un onboarding en attente est présent
+      const hasAuthHash =
+        typeof window !== "undefined" &&
+        (window.location.hash.includes("access_token") ||
+          window.location.search.includes("code="));
+      let savedPending = null;
+      if (typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem("facturx_pending_onboarding_v3");
+          if (raw) savedPending = JSON.parse(raw);
+        } catch (e) {
+          console.warn("Lecture onboarding en attente:", e);
+        }
+      }
+
+      if (!hasAuthHash && !savedPending) return;
+
+      autoLoginHandledRef.current = true;
+      setIsLoading(true);
+      try {
+        const authEmail = (session.user.email || "").toLowerCase().trim();
+        let finalProfile = null;
+
+        if (savedPending && savedPending.email === authEmail) {
+          finalProfile = await completeAdminOnboardingAfterOtp({
+            ...savedPending,
+            authUser: session.user,
+          });
+        } else {
+          finalProfile = await syncAuthUserWithTeamMember(session.user, {
+            email: authEmail,
+            allowAdmin: session.user.user_metadata?.role === "admin",
+          });
+        }
+
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("facturx_pending_onboarding_v3");
+          if (window.location.hash.includes("access_token")) {
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+        }
+
+        if (isActive && finalProfile) {
+          await updateMemberOnlineStatus(finalProfile.email, true);
+          onLoginSuccess(finalProfile);
+        }
+      } catch (err) {
+        console.warn("Erreur finalisation automatique après lien email:", err);
+        autoLoginHandledRef.current = false;
+      } finally {
+        if (isActive) setIsLoading(false);
+      }
+    };
+
+    getCurrentSession().then((session) => {
+      if (session) finalizeConfirmedSession(session);
+    });
+
+    const { data: listener } = onAuthStateChange((event, session) => {
+      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session) {
+        finalizeConfirmedSession(session);
+      }
+    });
+
+    return () => {
+      isActive = false;
+      listener?.subscription?.unsubscribe?.();
+    };
+  }, [onLoginSuccess]);
+
+  // Compte à rebours renvoi OTP
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((prev) => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   // États UI
   const [showPassword, setShowPassword] = useState(false);
@@ -165,18 +253,42 @@ export default function LoginScreen({
         throw new Error("Identifiants incorrects. Veuillez vérifier votre adresse email et votre mot de passe.");
       }
 
-      // Résoudre le profil depuis Supabase team_members ou les métadonnées auth
-      const syncedMember = await syncAuthUserWithTeamMember(authUser, {
-        email: loginEmail.trim().toLowerCase(),
-      });
+      // Résoudre le profil depuis Supabase team_members ou finaliser l'onboarding si l'email vient d'être confirmé par lien
+      let savedPending = null;
+      if (typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem("facturx_pending_onboarding_v3");
+          if (raw) savedPending = JSON.parse(raw);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      const cleanLoginEmail = loginEmail.trim().toLowerCase();
+      let syncedMember = null;
+      if (savedPending && savedPending.email === cleanLoginEmail) {
+        syncedMember = await completeAdminOnboardingAfterOtp({
+          ...savedPending,
+          authUser,
+        });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("facturx_pending_onboarding_v3");
+        }
+      } else {
+        syncedMember = await syncAuthUserWithTeamMember(authUser, {
+          email: cleanLoginEmail,
+          allowAdmin: userMeta.role === "admin",
+        });
+      }
+
       const matchedMember =
         syncedMember ||
         teamMembers.find(
-          (m) => m.email.toLowerCase() === loginEmail.trim().toLowerCase()
+          (m) => m.email.toLowerCase() === cleanLoginEmail
         );
 
       const resolvedName =
-        matchedMember?.name || userMeta.full_name || loginEmail.split("@")[0];
+        matchedMember?.fullName || matchedMember?.name || userMeta.full_name || cleanLoginEmail.split("@")[0];
       const resolvedRole = matchedMember?.role || userMeta.role || "comptable";
 
       const roleBadge =
@@ -197,12 +309,19 @@ export default function LoginScreen({
 
       const profile = {
         fullName: resolvedName,
-        email: loginEmail.trim().toLowerCase(),
+        email: cleanLoginEmail,
         role: resolvedRole,
         badge: roleBadge,
         initials: initials || "FX",
-        phone: matchedMember?.phone || "",
+        phone: matchedMember?.phone || userMeta.phone || "",
         companyId: matchedMember?.companyId || matchedMember?.company_id || null,
+        companyName: matchedMember?.companyName || userMeta.company_name || undefined,
+        currency: matchedMember?.currency || userMeta.currency || undefined,
+        currencySymbol: matchedMember?.currencySymbol || userMeta.currency_symbol || undefined,
+        city: matchedMember?.city || userMeta.city || undefined,
+        country: matchedMember?.country || userMeta.country || undefined,
+        countryCode: matchedMember?.countryCode || userMeta.country_code || undefined,
+        isNewOrganization: Boolean(matchedMember?.isNewOrganization),
       };
 
       // Mettre à jour le statut "En ligne" sur Supabase
@@ -245,15 +364,6 @@ export default function LoginScreen({
     setIsLoading(true);
 
     try {
-      // Enregistrement Auth auprès de Supabase
-      await signUpWithEmail(
-        signupEmail.trim().toLowerCase(),
-        signupPassword,
-        fullName.trim(),
-        "admin",
-        phone.trim()
-      );
-
       const onboardingData = {
         adminName: fullName.trim(),
         companyName: companyName.trim(),
@@ -265,6 +375,41 @@ export default function LoginScreen({
         country: country.trim() || "RDC",
         countryCode: countryCode || "CD",
       };
+
+      // Enregistrement Auth auprès de Supabase avec métadonnées complètes d'organisation
+      const signUpRes = await signUpWithEmail(
+        signupEmail.trim().toLowerCase(),
+        signupPassword,
+        fullName.trim(),
+        "admin",
+        phone.trim(),
+        {
+          company_name: onboardingData.companyName,
+          currency: onboardingData.currency,
+          currency_symbol: onboardingData.currencySymbol,
+          city: onboardingData.city,
+          country: onboardingData.country,
+          country_code: onboardingData.countryCode,
+        }
+      );
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("facturx_pending_onboarding_v3", JSON.stringify(onboardingData));
+      }
+
+      // Si la confirmation d'email est désactivée dans Supabase, connecter immédiatement
+      if (signUpRes?.session?.user) {
+        const finalProfile = await completeAdminOnboardingAfterOtp({
+          ...onboardingData,
+          authUser: signUpRes.session.user,
+        });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("facturx_pending_onboarding_v3");
+        }
+        await updateMemberOnlineStatus(finalProfile.email, true);
+        onLoginSuccess(finalProfile);
+        return;
+      }
 
       setPendingEmail(signupEmail.trim().toLowerCase());
       setPendingOnboardingData(onboardingData);
@@ -341,6 +486,9 @@ export default function LoginScreen({
       // Mettre à jour le statut en ligne
       await updateMemberOnlineStatus(finalProfile.email, true);
 
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("facturx_pending_onboarding_v3");
+      }
       // Donner accès à l'application
       onLoginSuccess(finalProfile);
     } catch (err) {
@@ -348,6 +496,59 @@ export default function LoginScreen({
       setErrorMessage(
         err.message ||
         "Code d'authentification invalide ou expiré. Veuillez vérifier votre boîte de réception ou renvoyer un code."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Continuer si l'utilisateur a validé son email en cliquant sur le lien reçu dans sa boîte mail
+  const handleConfirmedByEmailLink = async () => {
+    setErrorMessage("");
+    setSuccessNotice("");
+    setIsLoading(true);
+    try {
+      let verifiedUser = null;
+      const currentSess = await getCurrentSession();
+      if (currentSess?.user?.email?.toLowerCase() === pendingEmail.toLowerCase()) {
+        verifiedUser = currentSess.user;
+      } else if (signupPassword) {
+        const authData = await signInWithEmail(pendingEmail, signupPassword);
+        verifiedUser = authData?.user;
+      } else {
+        setActiveTab("signin");
+        setLoginEmail(pendingEmail);
+        setSuccessNotice("Votre email est confirmé ! Saisissez votre mot de passe pour accéder à FacturX.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (!verifiedUser) {
+        throw new Error("Cliquez d'abord sur le lien « Confirm email address » dans votre boîte mail avant de continuer.");
+      }
+
+      let finalProfile = null;
+      if (pendingOnboardingData) {
+        finalProfile = await completeAdminOnboardingAfterOtp({
+          ...pendingOnboardingData,
+          authUser: verifiedUser,
+        });
+      } else {
+        finalProfile = await syncAuthUserWithTeamMember(verifiedUser, {
+          email: pendingEmail,
+          allowAdmin: verifiedUser.user_metadata?.role === "admin",
+        });
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("facturx_pending_onboarding_v3");
+      }
+      await updateMemberOnlineStatus(finalProfile.email, true);
+      onLoginSuccess(finalProfile);
+    } catch (err) {
+      console.warn("Vérification par lien non finalisée:", err);
+      setErrorMessage(
+        "Email pas encore confirmé : cliquez d'abord sur le lien reçu dans votre email (ou saisissez le code à 6 chiffres ci-dessus)."
       );
     } finally {
       setIsLoading(false);
@@ -812,6 +1013,19 @@ export default function LoginScreen({
                     )}
                   </button>
                 </form>
+
+                {/* Bouton alternatif si l'utilisateur a reçu et cliqué sur un lien de confirmation Supabase */}
+                <div className="max-w-sm mx-auto pt-1">
+                  <button
+                    type="button"
+                    onClick={handleConfirmedByEmailLink}
+                    disabled={isLoading}
+                    className="w-full py-3 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>J&apos;ai cliqué sur le lien reçu par email ➔ Accéder</span>
+                  </button>
+                </div>
 
                 {/* Options de renvoi et retour */}
                 <div className="pt-2 flex flex-col items-center gap-2 text-xs">
