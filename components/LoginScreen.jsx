@@ -165,10 +165,15 @@ export default function LoginScreen({
         throw new Error("Identifiants incorrects. Veuillez vérifier votre adresse email et votre mot de passe.");
       }
 
-      // Résoudre le profil depuis team_members ou les métadonnées auth
-      const matchedMember = teamMembers.find(
-        (m) => m.email.toLowerCase() === loginEmail.trim().toLowerCase()
-      );
+      // Résoudre le profil depuis Supabase team_members ou les métadonnées auth
+      const syncedMember = await syncAuthUserWithTeamMember(authUser, {
+        email: loginEmail.trim().toLowerCase(),
+      });
+      const matchedMember =
+        syncedMember ||
+        teamMembers.find(
+          (m) => m.email.toLowerCase() === loginEmail.trim().toLowerCase()
+        );
 
       const resolvedName =
         matchedMember?.name || userMeta.full_name || loginEmail.split("@")[0];
@@ -178,10 +183,10 @@ export default function LoginScreen({
         resolvedRole === "admin"
           ? "Propriétaire"
           : resolvedRole === "comptable"
-          ? "Comptabilité"
-          : resolvedRole === "commercial"
-          ? "Commercial"
-          : "Gestionnaire Stock";
+            ? "Comptabilité"
+            : resolvedRole === "commercial"
+              ? "Commercial"
+              : "Gestionnaire Stock";
 
       const initials = resolvedName
         .split(" ")
@@ -342,7 +347,7 @@ export default function LoginScreen({
       console.error("Erreur validation OTP:", err);
       setErrorMessage(
         err.message ||
-          "Code d'authentification invalide ou expiré. Veuillez vérifier votre boîte de réception ou renvoyer un code."
+        "Code d'authentification invalide ou expiré. Veuillez vérifier votre boîte de réception ou renvoyer un code."
       );
     } finally {
       setIsLoading(false);
@@ -410,11 +415,10 @@ export default function LoginScreen({
                     setErrorMessage("");
                     setSuccessNotice("");
                   }}
-                  className={`py-3 px-4 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                    activeTab === "signin"
+                  className={`py-3 px-4 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${activeTab === "signin"
                       ? "bg-white text-blue-600 shadow-sm border border-slate-200/60"
                       : "text-slate-500 hover:text-slate-800"
-                  }`}
+                    }`}
                 >
                   <Lock className="w-4 h-4" />
                   <span>Se Connecter</span>
@@ -427,11 +431,10 @@ export default function LoginScreen({
                     setErrorMessage("");
                     setSuccessNotice("");
                   }}
-                  className={`py-3 px-4 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                    activeTab === "signup"
+                  className={`py-3 px-4 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${activeTab === "signup"
                       ? "bg-white text-blue-600 shadow-sm border border-slate-200/60"
                       : "text-slate-500 hover:text-slate-800"
-                  }`}
+                    }`}
                 >
                   <User className="w-4 h-4" />
                   <span>Créer un Compte</span>

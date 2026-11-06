@@ -243,28 +243,28 @@ export default function App() {
         const savedInvoices = localStorage.getItem(STORAGE_KEY_INVOICES);
         if (savedInvoices) {
           const parsedInvoices = JSON.parse(savedInvoices);
-          if (Array.isArray(parsedInvoices) && parsedInvoices.length > 0) {
+          if (Array.isArray(parsedInvoices) && (Boolean(localStorage.getItem(STORAGE_KEY_USER_PROFILE)) || parsedInvoices.length > 0)) {
             setInvoices(parsedInvoices);
           }
         }
         const savedClients = localStorage.getItem(STORAGE_KEY_CLIENTS);
         if (savedClients) {
           const parsedClients = JSON.parse(savedClients);
-          if (Array.isArray(parsedClients) && parsedClients.length > 0) {
+          if (Array.isArray(parsedClients) && (Boolean(localStorage.getItem(STORAGE_KEY_USER_PROFILE)) || parsedClients.length > 0)) {
             setClients(parsedClients);
           }
         }
         const savedQuotes = localStorage.getItem(STORAGE_KEY_QUOTES);
         if (savedQuotes) {
           const parsedQuotes = JSON.parse(savedQuotes);
-          if (Array.isArray(parsedQuotes) && parsedQuotes.length > 0) {
+          if (Array.isArray(parsedQuotes) && (Boolean(localStorage.getItem(STORAGE_KEY_USER_PROFILE)) || parsedQuotes.length > 0)) {
             setQuotes(parsedQuotes);
           }
         }
         const savedPayments = localStorage.getItem(STORAGE_KEY_PAYMENTS);
         if (savedPayments) {
           const parsedPayments = JSON.parse(savedPayments);
-          if (Array.isArray(parsedPayments) && parsedPayments.length > 0) {
+          if (Array.isArray(parsedPayments) && (Boolean(localStorage.getItem(STORAGE_KEY_USER_PROFILE)) || parsedPayments.length > 0)) {
             setPayments(parsedPayments);
           }
         }
@@ -1453,7 +1453,73 @@ export default function App() {
                 currencySymbol: profile.currencySymbol || prev.currencySymbol,
               }));
             }
-            // Réinitialiser les données pour la nouvelle organisation
+            // Mode « Compte Vierge » pour toute nouvelle organisation créée, ou chargement cloud immédiat
+            if (profile.isNewOrganization) {
+              const cleanCompany = {
+                ...defaultCompanyInfo,
+                id: profile.companyId,
+                name: profile.companyName || "Mon Entreprise",
+                initials:
+                  (profile.companyName || "FX")
+                    .split(" ")
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2) || "FX",
+                subtitle: "Entreprise gérée sous FacturX",
+                tagline: "Facturation & Recouvrement certifié",
+                rccm: "",
+                idNat: "",
+                nif: "",
+                ninea: "",
+                address: "",
+                bp: "",
+                city: profile.city || "Kinshasa",
+                country: profile.country || "RDC",
+                countryCode: profile.countryCode || "CD",
+                phone: profile.phone || "",
+                mobile: profile.phone || "",
+                email: profile.email || "",
+                website: "",
+                bankName: "Rawbank",
+                iban: "",
+                airtelMoneyNumber: "",
+                orangeMoneyNumber: "",
+                waveNumber: "",
+                logoUrl: null,
+                defaultCurrency: profile.currency || "Franc Congolais (CDF / FC)",
+                currencySymbol: profile.currencySymbol || "FC",
+              };
+              setCompanyInfo(cleanCompany);
+              setCompanyForm(cleanCompany);
+              if (typeof window !== "undefined") {
+                localStorage.setItem(STORAGE_KEY_COMPANY, JSON.stringify(cleanCompany));
+                localStorage.setItem(STORAGE_KEY_ACCOUNT_BASELINE, JSON.stringify(cleanCompany));
+                localStorage.setItem(STORAGE_KEY_CLIENTS, "[]");
+                localStorage.setItem(STORAGE_KEY_INVOICES, "[]");
+                localStorage.setItem(STORAGE_KEY_QUOTES, "[]");
+                localStorage.setItem(STORAGE_KEY_PAYMENTS, "[]");
+              }
+            } else {
+              Promise.all([
+                fetchCompanyProfile(profile.companyId).catch(() => null),
+                fetchClients(profile.companyId).catch(() => []),
+                fetchInvoices(profile.companyId).catch(() => []),
+                fetchQuotes(profile.companyId).catch(() => []),
+                fetchPayments(profile.companyId).catch(() => []),
+                fetchTeamMembers(profile.companyId).catch(() => []),
+              ]).then(([comp, clis, invs, qts, pays, tms]) => {
+                if (comp) {
+                  setCompanyInfo((prev) => ({ ...prev, ...comp }));
+                  setCompanyForm((prev) => ({ ...prev, ...comp }));
+                }
+                if (Array.isArray(clis)) setClients(clis);
+                if (Array.isArray(invs)) setInvoices(invs);
+                if (Array.isArray(qts)) setQuotes(qts);
+                if (Array.isArray(pays)) setPayments(pays);
+                if (Array.isArray(tms) && tms.length > 0) setTeamMembers(tms);
+              });
+            }
             setClients([]);
             setInvoices([]);
             setQuotes([]);
