@@ -678,7 +678,7 @@ export default function AnalyticsView({
               </div>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                 Pilotage en temps réel des encaissements, vagues prévisionnelles et aide décisionnelle pour{" "}
-                <span className="font-bold text-slate-700">{companyInfo.name || "HORIZON GROUPE"}</span>
+                <span className="font-bold text-slate-700">{companyInfo?.name || "Mon Entreprise"}</span>
               </p>
             </div>
           </div>
@@ -2191,7 +2191,7 @@ export default function AnalyticsView({
                 <strong>
                   {formatAmount(calculateInvoiceTotals(reminderModalInvoice.items, reminderModalInvoice.vatRate).total, currencySymbol)}
                 </strong>{" "}
-                arrivée à échéance le <strong>{reminderModalInvoice.dueDate}</strong> est toujours en attente de règlement. Pourriez-vous nous transmettre la preuve de virement ? Nos coordonnées : {companyInfo.bankName || "Rawbank"} {companyInfo.iban || "CD00 RAWB ..."}. Bien cordialement, La Direction {companyInfo.name || "HORIZON GROUPE"}. »
+                arrivée à échéance le <strong>{reminderModalInvoice.dueDate}</strong> est toujours en attente de règlement. Pourriez-vous nous transmettre la preuve de virement ? Nos coordonnées : {companyInfo.bankName || "Rawbank"} {companyInfo.iban || "CD00 RAWB ..."}. Bien cordialement, La Direction {companyInfo?.name || "Mon Entreprise"}. »
               </p>
             </div>
 

@@ -28,7 +28,7 @@ export default function CreateInvoiceModal({
   isOpen,
   onClose,
   onCreateInvoice,
-  clients = defaultClients,
+  clients = [],
   onAddNewClient,
   initialSelectedClient = null,
   companyInfo = defaultCompanyInfo,
@@ -497,7 +497,7 @@ export default function CreateInvoiceModal({
                   required
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  placeholder="Ex: Sahel Logix SARL"
+                  placeholder="Nom de la société cliente"
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
                 />
               </div>

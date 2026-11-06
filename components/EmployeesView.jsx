@@ -44,6 +44,7 @@ export default function EmployeesView({
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberPhone, setNewMemberPhone] = useState("+243 ");
   const [newMemberRole, setNewMemberRole] = useState("comptable");
+  const [newMemberPassword, setNewMemberPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Vérification stricte du rôle Administrateur
@@ -116,17 +117,19 @@ export default function EmployeesView({
         name: newMemberName.trim(),
         email: newMemberEmail.trim().toLowerCase(),
         phone: newMemberPhone.trim(),
+        password: newMemberPassword.trim(),
         role: newMemberRole,
         badge: badge,
-        status: "Hors ligne",
+        status: "Invité",
       });
 
       setIsCreateModalOpen(false);
       setNewMemberName("");
       setNewMemberEmail("");
       setNewMemberPhone("+243 ");
+      setNewMemberPassword("");
       setNewMemberRole("comptable");
-      if (onToast) onToast("Nouveau collaborateur enregistré sur Supabase !", "success");
+      if (onToast) onToast("Collaborateur créé et ajouté à votre organisation !", "success");
     } catch (err) {
       console.error("Erreur création employé:", err);
       if (onToast) onToast(err.message || "Erreur lors de la création de l'employé.", "error");
@@ -181,7 +184,7 @@ export default function EmployeesView({
           <p className="text-sm font-medium text-slate-500 mt-1">
             Supervisez les présences en direct, les habilitations hiérarchiques et les accès de{" "}
             <span className="font-bold text-slate-700">
-              {companyInfo?.name || "HORIZON GROUPE"}
+              {companyInfo?.name || currentUser?.companyName || "votre entreprise"}
             </span>
             .
           </p>
@@ -207,7 +210,7 @@ export default function EmployeesView({
             <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
               {totalEmployees}
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">Enregistrés dans Supabase</p>
+            <p className="text-xs text-slate-400 mt-0.5">Membres de votre organisation</p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
             <Users className="w-6 h-6" />
@@ -479,7 +482,7 @@ export default function EmployeesView({
                   type="text"
                   value={newMemberName}
                   onChange={(e) => setNewMemberName(e.target.value)}
-                  placeholder="Ex: Alain Mutombo"
+                  placeholder="Ex: Prénom & Nom du collaborateur"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/30"
                   required
                 />
@@ -493,7 +496,7 @@ export default function EmployeesView({
                   type="email"
                   value={newMemberEmail}
                   onChange={(e) => setNewMemberEmail(e.target.value)}
-                  placeholder="alain.m@horizon-groupe.cd"
+                  placeholder="collaborateur@votre-entreprise.com"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/30"
                   required
                 />
@@ -509,6 +512,21 @@ export default function EmployeesView({
                   onChange={(e) => setNewMemberPhone(e.target.value)}
                   placeholder="+243 85 333 44 55"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                  Mot de passe provisoire du collaborateur * (min 6 caractères)
+                </label>
+                <input
+                  type="password"
+                  value={newMemberPassword}
+                  onChange={(e) => setNewMemberPassword(e.target.value)}
+                  placeholder="Définir son mot de passe de connexion"
+                  minLength={6}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+                  required
                 />
               </div>
 
@@ -588,7 +606,7 @@ export default function EmployeesView({
             </h3>
             <p className="text-sm text-slate-500 mt-2 leading-relaxed">
               Ce collaborateur ne pourra plus se connecter à l&apos;application FacturX. Ses données
-              seront retirées de la table des employés de Supabase.
+              seront retirées des collaborateurs autorisés de votre entreprise.
             </p>
 
             <div className="flex items-center justify-end gap-3 mt-6">

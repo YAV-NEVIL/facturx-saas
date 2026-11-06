@@ -92,7 +92,7 @@ export default function CreateClientModal({ isOpen, onClose, onCreateClient }) {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Sahel Logix SARL"
+                placeholder="Nom de la société cliente"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
               />
             </div>
@@ -138,7 +138,7 @@ export default function CreateClientModal({ isOpen, onClose, onCreateClient }) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Ex: direction@sahellogix.ml"
+                placeholder="contact@client.com"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
               />
             </div>

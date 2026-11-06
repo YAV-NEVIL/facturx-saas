@@ -23,7 +23,7 @@ export default function CreateQuoteModal({
   isOpen,
   onClose,
   onCreateQuote,
-  clients = defaultClients,
+  clients = [],
   companyInfo = defaultCompanyInfo,
   initialQuoteCount = 5,
   initialSelectedClient = null,

@@ -32,6 +32,7 @@ export default function RecordPaymentModal({
   onSavePayment,
   preselectedInvoiceId = null,
   payments = [],
+  userProfile = null,
 }) {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [amount, setAmount] = useState("");
@@ -185,7 +186,7 @@ export default function RecordPaymentModal({
       beneficiaryAccount: beneficiaryAccount,
       status: "valide",
       note: note || `Encaissement facture ${selectedInvoiceId}`,
-      recordedBy: "Koyinsola Adeyemi (Directeur Administratif)",
+      recordedBy: userProfile?.fullName || "Service Comptabilité",
     };
 
     onSavePayment(newPayment, { autoOpenReceipt });

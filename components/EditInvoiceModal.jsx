@@ -23,7 +23,7 @@ export default function EditInvoiceModal({
   onClose,
   invoice,
   onSave,
-  clients = defaultClients,
+  clients = [],
   companyInfo = null,
 }) {
   const [clientId, setClientId] = useState(null);

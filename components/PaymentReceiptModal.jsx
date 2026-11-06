@@ -254,7 +254,7 @@ export default function PaymentReceiptModal({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500 font-medium">Enregistré par :</span>
-                  <span className="font-bold text-slate-800">{payment.recordedBy || "Koyinsola Adeyemi"}</span>
+                  <span className="font-bold text-slate-800">{payment.recordedBy || "Direction Financière"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500 font-medium">Rapprochement bancaire :</span>
@@ -286,7 +286,7 @@ export default function PaymentReceiptModal({
               <div className="h-14 flex items-center justify-center sm:justify-end">
                 <div className="w-24 h-12 border-2 border-emerald-600 text-emerald-700 rounded-xl flex flex-col items-center justify-center rotate-[-4deg] opacity-90 shadow-sm font-black text-[9px] uppercase tracking-wider bg-emerald-50/60 p-1">
                   <span>PAYÉ & ENCAISSÉ</span>
-                  <span className="text-[7px] font-bold text-emerald-800">DGI / HORIZON</span>
+                  <span className="text-[7px] font-bold text-emerald-800">QUITTANCE CERTIFIÉE</span>
                 </div>
               </div>
               <p className="text-[10px] font-bold text-slate-700 mt-1">

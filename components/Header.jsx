@@ -41,29 +41,7 @@ export default function Header({
   userProfile = null,
   onOpenAuthModal = null,
   onSignOut = null,
-  notifications = [
-    {
-      id: 1,
-      title: "Paiement reçu",
-      desc: "OmniTech Solutions a réglé 2 596 000 FCFA",
-      time: "Il y a 15 min",
-      type: "success",
-    },
-    {
-      id: 2,
-      title: "Échéance dépassée",
-      desc: "Facture FAC-2026-087 (Sahel Logix) en retard",
-      time: "Il y a 2 heures",
-      type: "warning",
-    },
-    {
-      id: 3,
-      title: "Facture envoyée",
-      desc: "FAC-2026-088 transmise à Koffi & Associés",
-      time: "Aujourd'hui",
-      type: "info",
-    },
-  ],
+  notifications = [],
 }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -224,7 +202,7 @@ export default function Header({
             ) : isSyncing ? (
               <div
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs"
-                title="Synchronisation des actions hors-ligne avec Supabase en cours..."
+                title="Synchronisation de vos données en cours..."
               >
                 <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin" />
                 <span className="text-[11px] font-bold tracking-tight">
@@ -236,7 +214,7 @@ export default function Header({
                 type="button"
                 onClick={onTriggerSync}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/90 shadow-2xs hover:bg-amber-100 transition-all cursor-pointer"
-                title={`${pendingSyncCount} action(s) en attente de synchronisation. Cliquez pour rejouer vers Supabase.`}
+                title={`${pendingSyncCount} action(s) en attente de synchronisation. Cliquez pour synchroniser.`}
               >
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
                 <span className="text-[11px] font-bold tracking-tight">
@@ -253,7 +231,7 @@ export default function Header({
                 }`}
                 title={
                   isSupabaseConnected
-                    ? "Base de données Supabase connectée en direct"
+                    ? "Synchronisation cloud active en direct"
                     : "Mode local activé"
                 }
               >
@@ -263,7 +241,7 @@ export default function Header({
                   }`}
                 />
                 <span className="text-[11px] font-bold tracking-tight">
-                  {isSupabaseConnected ? "Supabase Live" : "Mode Local"}
+                  {isSupabaseConnected ? "Synchronisé" : "Mode Local"}
                 </span>
               </div>
             )}
@@ -372,7 +350,7 @@ export default function Header({
                     ? "from-amber-600 to-orange-500"
                     : "from-purple-600 to-indigo-700"
                 } border-2 border-white shadow-sm flex items-center justify-center text-white font-bold text-xs overflow-hidden`}>
-                  <span className="text-sm">{userProfile?.initials || "KA"}</span>
+                  <span className="text-sm">{userProfile?.initials || "FX"}</span>
                 </div>
                 {/* Active green dot from screenshot */}
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
@@ -380,7 +358,7 @@ export default function Header({
 
               <div className="hidden sm:block">
                 <p className="text-xs font-bold text-slate-800 leading-tight">
-                  {userProfile?.fullName || "Koyinsola Adeyemi"}
+                  {userProfile?.fullName || "Administrateur"}
                 </p>
                 <div className="flex items-center gap-1">
                   <p className="text-[11px] text-slate-500 font-medium">
@@ -405,7 +383,7 @@ export default function Header({
               <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/50">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-slate-800">{userProfile?.fullName || "Koyinsola Adeyemi"}</p>
+                    <p className="text-xs font-bold text-slate-800">{userProfile?.fullName || "Administrateur"}</p>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                       userProfile?.role === "commercial"
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -426,19 +404,21 @@ export default function Header({
                         : "Membre"}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{userProfile?.email || "koyinsola@facturx.africa"}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{userProfile?.email || ""}</p>
                 </div>
                 <div className="py-1">
-                  <button
-                    onClick={() => {
-                      if (onOpenAuthModal) onOpenAuthModal();
-                      setShowProfileMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-xs text-blue-700 hover:bg-blue-50 flex items-center gap-2.5 font-bold transition-colors"
-                  >
-                    <Sparkles className="w-4 h-4 text-blue-600" />
-                    <span>Changer de Rôle / Connexion</span>
-                  </button>
+                  {userProfile?.role === "admin" && (
+                    <button
+                      onClick={() => {
+                        if (onNavigate) onNavigate("employees");
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-xs text-blue-700 hover:bg-blue-50 flex items-center gap-2.5 font-bold transition-colors cursor-pointer"
+                    >
+                      <User className="w-4 h-4 text-blue-600" />
+                      <span>Gérer mes Collaborateurs</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       if (onNavigate) onNavigate("settings");

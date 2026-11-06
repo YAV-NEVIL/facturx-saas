@@ -178,57 +178,34 @@ export default function SettingsView({
 
   // Profil Administrateur
   const [profileForm, setProfileForm] = useState({
-    fullName: userProfile?.fullName || "Koyinsola Adeyemi",
-    email: userProfile?.email || "koyinsola@facturx.africa",
-    role: userProfile?.role || "Head Admin",
-    phone: userProfile?.phone || "+243 81 000 40 50",
+    fullName: userProfile?.fullName || "",
+    email: userProfile?.email || "",
+    role: userProfile?.role || "admin",
+    phone: userProfile?.phone || "",
   });
 
-  // Équipe & Collaborateurs
-  const [localTeamMembers, setLocalTeamMembers] = useState([
-    {
-      id: "admin-1",
-      name: "Koyinsola Adeyemi",
-      email: "koyinsola@facturx.africa",
-      role: "admin",
-      badge: "Propriétaire",
-      status: "Actif",
-      initials: "KA",
-      lastLogin: "Aujourd'hui à 22:40",
-    },
-    {
-      id: "comptable-2",
-      name: "Marcelle Tshimanga",
-      email: "marcelle.t@horizon-groupe.cd",
-      role: "comptable",
-      badge: "Comptabilité",
-      status: "Actif",
-      initials: "MT",
-      lastLogin: "Hier à 18:15",
-    },
-    {
-      id: "commercial-3",
-      name: "Patrick Bakari",
-      email: "patrick.b@horizon-groupe.cd",
-      role: "commercial",
-      badge: "Commercial",
-      status: "Actif",
-      initials: "PB",
-      lastLogin: "Il y a 3 jours",
-    },
-    {
-      id: "audit-4",
-      name: "Cabinet Audit KPMG RDC",
-      email: "audit-externe@kpmg.cd",
-      role: "comptable",
-      badge: "Lecture Seule",
-      status: "Invité",
-      initials: "KP",
-      lastLogin: "15/10/2026",
-    },
-  ]);
+  // Équipe & Collaborateurs (uniquement le propriétaire connecté et les membres créés par son entreprise)
+  const [localTeamMembers, setLocalTeamMembers] = useState(() =>
+    userProfile?.email
+      ? [
+          {
+            id: "owner-self",
+            name: userProfile.fullName || userProfile.email.split("@")[0],
+            email: userProfile.email,
+            role: userProfile.role || "admin",
+            badge: userProfile.badge || "Propriétaire",
+            status: "En ligne",
+            initials: userProfile.initials || "AD",
+            lastLogin: "Session active",
+          },
+        ]
+      : []
+  );
 
-  const teamMembers = (propTeamMembers && propTeamMembers.length > 0) ? propTeamMembers : localTeamMembers;
+  const teamMembers =
+    Array.isArray(propTeamMembers) && propTeamMembers.length > 0
+      ? propTeamMembers
+      : localTeamMembers;
   const setTeamMembers = propSetTeamMembers || setLocalTeamMembers;
 
   // Nouveau membre modal form
@@ -238,39 +215,15 @@ export default function SettingsView({
     role: "Responsable Comptable",
   });
 
-  // Journal d'audit d'activité (Audit Trail de conformité)
-  const [auditLogs, setAuditLogs] = useState([
+  // Journal d'audit d'activité de l'organisation connectée
+  const [auditLogs, setAuditLogs] = useState(() => [
     {
       id: 1,
-      timestamp: "Aujourd'hui à 22:35",
-      user: "Koyinsola Adeyemi",
-      action: "Modification du thème d'affichage",
-      details: "Bascule en Mode Sombre",
-      badge: "Interface",
-    },
-    {
-      id: 2,
-      timestamp: "Aujourd'hui à 21:14",
-      user: "Marcelle Tshimanga",
-      action: "Validation de paiement bancaire",
-      details: "18 500 000 FC enregistrés sur FAC-2026-0042",
-      badge: "Finances",
-    },
-    {
-      id: 3,
-      timestamp: "Hier à 17:42",
-      user: "Patrick Bakari",
-      action: "Conversion de devis en facture",
-      details: "DEV-2026-0019 -> FAC-2026-0089",
-      badge: "Ventes",
-    },
-    {
-      id: 4,
-      timestamp: "21/10/2026 à 14:00",
-      user: "Koyinsola Adeyemi",
-      action: "Export comptable certifié",
-      details: "Téléchargement de la balance mensuelle Excel",
-      badge: "Audit",
+      timestamp: "Session active",
+      user: userProfile?.fullName || "Administrateur",
+      action: "Ouverture de session sécurisée",
+      details: companyInfo?.name || userProfile?.companyName || "Espace Entreprise",
+      badge: "Sécurité",
     },
   ]);
 
@@ -538,19 +491,22 @@ export default function SettingsView({
         : "Gestionnaire Stock";
 
     try {
-      const created = await createTeamMember({
-        name: newMemberForm.name,
-        email: newMemberForm.email,
-        role: roleSlug,
-        badge: roleBadge,
-        initials,
-        status: "Invité",
-      });
+      const created = await createTeamMember(
+        {
+          name: newMemberForm.name,
+          email: newMemberForm.email,
+          role: roleSlug,
+          badge: roleBadge,
+          initials,
+          status: "Invité",
+        },
+        userProfile?.companyId
+      );
 
       setTeamMembers([...teamMembers, created]);
       setShowInviteModal(false);
       setNewMemberForm({ name: "", email: "", role: "Responsable Comptable" });
-      if (onToast) onToast(`Collaborateur ${newMemberForm.name} ajouté sur Supabase !`, "success");
+      if (onToast) onToast(`Collaborateur ${newMemberForm.name} ajouté à votre équipe !`, "success");
     } catch (err) {
       console.warn("Ajout Supabase teamMember:", err);
       const newMember = {
@@ -576,7 +532,7 @@ export default function SettingsView({
       try {
         await deleteTeamMember(memberId);
         setTeamMembers(teamMembers.filter((m) => m.id !== memberId));
-        if (onToast) onToast(`Accès révoqué pour ${memberName} sur Supabase.`, "info");
+        if (onToast) onToast(`Accès révoqué pour ${memberName}.`, "info");
       } catch (err) {
         setTeamMembers(teamMembers.filter((m) => m.id !== memberId));
         if (onToast) onToast(`Accès révoqué pour ${memberName}.`, "info");
@@ -1452,7 +1408,7 @@ export default function SettingsView({
                         .replace("{montant_total}", "18 500 000 FC")
                         .replace("{date_echeance}", "21/11/2026")
                         .replace("{lien_paiement}", "https://pay.facturx.cd/fac-0042")
-                        .replace("{nom_entreprise}", companyInfo.name || "HORIZON GROUPE")}
+                        .replace("{nom_entreprise}", companyInfo?.name || userProfile?.companyName || "Votre Entreprise")}
                     </p>
                     <div className="text-[9px] text-emerald-100 text-right flex items-center justify-end gap-1">
                       <span>22:42</span>

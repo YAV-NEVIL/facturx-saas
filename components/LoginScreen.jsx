@@ -159,58 +159,6 @@ export default function LoginScreen({
   const [errorMessage, setErrorMessage] = useState("");
   const [successNotice, setSuccessNotice] = useState("");
 
-  // Rôles démo pour tests rapides
-  const quickProfiles = [
-    {
-      id: "admin-koyinsola",
-      fullName: "Koyinsola Adeyemi",
-      email: "koyinsola@facturx.africa",
-      role: "admin",
-      roleTitle: "Administrateur Général",
-      badge: "Propriétaire",
-      initials: "KA",
-      description: "Accès illimité : Factures, Trésorerie, Fiscalité, Paramètres & Employés.",
-      badgeColor: "bg-purple-100 text-purple-800 border-purple-200",
-      avatarGradient: "from-amber-600 to-orange-500",
-    },
-    {
-      id: "comptable-marcelle",
-      fullName: "Marcelle Tshimanga",
-      email: "marcelle.t@horizon-groupe.cd",
-      role: "comptable",
-      roleTitle: "Responsable Comptable",
-      badge: "Comptabilité",
-      initials: "MT",
-      description: "Accès financier : Facturation, Devis, Règlements, Déclarations TVA & Rapports.",
-      badgeColor: "bg-blue-100 text-blue-800 border-blue-200",
-      avatarGradient: "from-blue-600 to-indigo-600",
-    },
-    {
-      id: "commercial-patrick",
-      fullName: "Patrick Bakari",
-      email: "patrick.b@horizon-groupe.cd",
-      role: "commercial",
-      roleTitle: "Chargé d'Affaires Commercial",
-      badge: "Commercial",
-      initials: "PB",
-      description: "Accès commercial : Pipeline de Devis, Portefeuille Clients & Facturation.",
-      badgeColor: "bg-emerald-100 text-emerald-800 border-emerald-200",
-      avatarGradient: "from-emerald-600 to-teal-600",
-    },
-    {
-      id: "stock-alain",
-      fullName: "Alain Mutombo",
-      email: "alain.m@horizon-groupe.cd",
-      role: "gestionnaire_stock",
-      roleTitle: "Gestionnaire de Stock & Articles",
-      badge: "Gestionnaire Stock",
-      initials: "AM",
-      description: "Accès logistique : Articles, prestations, devis & facturation opérationnelle.",
-      badgeColor: "bg-amber-100 text-amber-800 border-amber-200",
-      avatarGradient: "from-amber-500 to-orange-600",
-    },
-  ];
-
   // 1. GESTION DE LA CONNEXION (Sign In)
   const handleSignIn = async (e) => {
     e.preventDefault();
@@ -417,7 +365,7 @@ export default function LoginScreen({
       // Basculer vers l'écran de vérification OTP
       setActiveTab("otp_verify");
       setSuccessNotice(
-        `Code d'authentification expédié avec succès à ${signupEmail.trim().toLowerCase()} !`
+        `Email de vérification envoyé avec succès à ${signupEmail.trim().toLowerCase()} !`
       );
       setResendCooldown(60);
     } catch (err) {
@@ -573,20 +521,6 @@ export default function LoginScreen({
     }
   };
 
-  // Accès direct profil test
-  const handleQuickSelect = async (profile) => {
-    const selected = {
-      fullName: profile.fullName,
-      email: profile.email,
-      role: profile.role,
-      badge: profile.badge,
-      initials: profile.initials,
-      phone: "+243 81 000 40 50",
-    };
-    await updateMemberOnlineStatus(profile.email, true);
-    onLoginSuccess(selected);
-  };
-
   return (
     <div className="min-h-screen bg-[#F6F8FC] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 font-sans selection:bg-blue-600 selection:text-white">
       <div className="max-w-xl w-full">
@@ -599,7 +533,7 @@ export default function LoginScreen({
             Factur<span className="text-blue-600">X</span>
           </h1>
           <p className="text-xs sm:text-sm font-semibold text-slate-500 uppercase tracking-wider mt-1">
-            {companyInfo?.name || "HORIZON GROUPE"} — Facturation & Recouvrement B2B
+            Plateforme de Facturation, Devis & Recouvrement B2B
           </p>
         </div>
 
@@ -710,7 +644,7 @@ export default function LoginScreen({
                       type="email"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="nom.prenom@horizon-groupe.cd"
+                      placeholder="prenom.nom@entreprise.com"
                       className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 transition-all placeholder:text-slate-400"
                       required
                     />
@@ -841,7 +775,7 @@ export default function LoginScreen({
                         type="email"
                         value={signupEmail}
                         onChange={(e) => setSignupEmail(e.target.value)}
-                        placeholder="admin@organisation.cd"
+                        placeholder="direction@votre-entreprise.com"
                         className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 transition-all placeholder:text-slate-400"
                         required
                       />
@@ -933,9 +867,9 @@ export default function LoginScreen({
                 <div className="p-3 bg-blue-50/80 rounded-xl border border-blue-100 text-xs text-blue-900 flex items-start gap-2">
                   <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    <strong>Sécurité renforcée :</strong> Dès votre inscription, Supabase vous
-                    enverra un <strong>code d&apos;authentification par email</strong> afin de
-                    valider votre adresse avant de vous autoriser l&apos;accès.
+                    <strong>Protection du compte :</strong> Un email de vérification vous sera
+                    immédiatement envoyé pour confirmer votre adresse et activer l&apos;espace
+                    privé de votre entreprise.
                   </p>
                 </div>
 
@@ -948,7 +882,7 @@ export default function LoginScreen({
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>Envoyer le Code de Vérification</span>
+                      <span>Créer mon Espace Entreprise</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -967,13 +901,13 @@ export default function LoginScreen({
 
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100/70 px-3 py-1 rounded-full border border-blue-200">
-                    Contrôle de Sécurité Supabase
+                    Vérification de Sécurité
                   </span>
                   <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-2.5">
                     Vérification de votre Adresse Email
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
-                    Un code d&apos;authentification a été envoyé à l&apos;adresse :
+                    Un email de confirmation vient d&apos;être envoyé à l&apos;adresse :
                     <br />
                     <span className="font-extrabold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md mt-1 inline-block">
                       {pendingEmail || "votre adresse email"}
@@ -1060,58 +994,11 @@ export default function LoginScreen({
             )}
           </div>
 
-          {/* FOOTER DE LA CARTE : RAPIDE ACCÈS DÉMO EN BAS (DISCRET POUR LES TESTS) */}
-          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-            <span className="flex items-center gap-1.5 text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              Base Supabase PostgreSQL active
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab(activeTab === "quick" ? "signin" : "quick")}
-              className="text-blue-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>{activeTab === "quick" ? "Masquer profils tests" : "Accès rapide démo"}</span>
-            </button>
+          {/* PIED DE CARTE SÉCURISÉ */}
+          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-slate-500">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Connexion chiffrée TLS • Espace entreprise privé &amp; isolé</span>
           </div>
-
-          {/* ACCÈS DÉMO 1-CLIC DÉROULANT SI DEMANDÉ */}
-          {activeTab === "quick" && (
-            <div className="p-6 bg-slate-50/80 border-t border-slate-200/60 space-y-2.5 animate-fadeIn">
-              <p className="text-xs font-semibold text-slate-600 mb-2">
-                Sélectionnez un rôle pour tester immédiatement l&apos;application :
-              </p>
-              {quickProfiles.map((p) => (
-                <div
-                  key={p.id}
-                  onClick={() => handleQuickSelect(p)}
-                  className="p-3 bg-white rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${p.avatarGradient} flex items-center justify-center text-white font-extrabold text-xs`}
-                    >
-                      {p.initials}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600">
-                          {p.fullName}
-                        </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.2 rounded-full border ${p.badgeColor}`}>
-                          {p.badge}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-400">{p.email}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>

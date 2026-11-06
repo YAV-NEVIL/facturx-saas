@@ -57,7 +57,7 @@ export default function ReportPreviewModal({
 
   if (!isOpen) return null;
 
-  const compName = companyInfo.name || "HORIZON GROUPE";
+  const compName = companyInfo?.name || "Mon Entreprise";
   const compRccm = companyInfo.rccm || "CD/KIN/RCCM/24-B-01420";
   const compIdNat = companyInfo.idNat || "01-G4701-B89201";
   const compNif = companyInfo.nif || companyInfo.ninea || "A2408912Z";
@@ -501,7 +501,7 @@ Tél : ${compPhone} • Email : ${compEmail}`;
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  {companyInfo.name || "HORIZON GROUPE"} — Service Recouvrement
+                  {companyInfo?.name || "Mon Entreprise"} — Service Recouvrement
                 </p>
               </div>
             </div>

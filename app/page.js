@@ -134,10 +134,10 @@ const STORAGE_KEY_PAYMENTS = "facturx_payments_v3";
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [invoices, setInvoices] = useState(initialInvoices);
-  const [clients, setClients] = useState(defaultClients);
-  const [quotes, setQuotes] = useState(initialQuotes);
-  const [payments, setPayments] = useState(initialPayments);
+  const [invoices, setInvoices] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [quotes, setQuotes] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [companyInfo, setCompanyInfo] = useState(defaultCompanyInfo);
   const [searchQuery, setSearchQuery] = useState("");
   const [clientSearchQuery, setClientSearchQuery] = useState("");
@@ -326,6 +326,21 @@ export default function App() {
         }
         if (Array.isArray(tms) && tms.length > 0) {
           setTeamMembers(tms);
+        } else if (parsedUser?.email) {
+          setTeamMembers([
+            {
+              id: "owner-self",
+              name: parsedUser.fullName || parsedUser.email.split("@")[0],
+              email: parsedUser.email,
+              role: parsedUser.role || "admin",
+              badge: parsedUser.badge || "Propriétaire",
+              status: "En ligne",
+              initials: parsedUser.initials || "AD",
+              phone: parsedUser.phone || "",
+              lastLogin: "Session active",
+              companyId: activeCompId,
+            },
+          ]);
         }
         setIsSupabaseConnected(true);
       } catch (err) {
@@ -339,10 +354,14 @@ export default function App() {
     let parsedUser = null;
     const rawSaved = localStorage.getItem(STORAGE_KEY_USER_PROFILE);
     if (rawSaved) {
-      try { parsedUser = JSON.parse(rawSaved); } catch(e){}
+      try {
+        parsedUser = JSON.parse(rawSaved);
+      } catch (e) {}
     }
 
-    syncFromSupabase(parsedUser?.companyId);
+    if (parsedUser?.companyId) {
+      syncFromSupabase(parsedUser.companyId);
+    }
 
     return () => {
       isMounted = false;
@@ -392,7 +411,7 @@ export default function App() {
       return;
     }
     setIsSyncing(true);
-    showToast("Synchronisation des actions en attente vers Supabase...", "info");
+    showToast("Synchronisation des actions en attente...", "info");
     try {
       const offlineServices = {
         apiCreateClient,
@@ -414,11 +433,11 @@ export default function App() {
       const res = await processSyncQueue(offlineServices);
       setIsSyncing(false);
       if (res.processedCount > 0) {
-        showToast(`${res.processedCount} action(s) synchronisée(s) avec succès sur Supabase !`, "success");
+        showToast(`${res.processedCount} action(s) synchronisée(s) avec succès !`, "success");
       } else if (res.errors.length > 0) {
         showToast("Certaines actions nécessitent une réévaluation réseau.", "warning");
       } else {
-        showToast("Toutes vos données locales sont déjà à jour avec Supabase.", "info");
+        showToast("Toutes vos données locales sont déjà à jour.", "info");
       }
     } catch (err) {
       setIsSyncing(false);
@@ -544,10 +563,10 @@ export default function App() {
     }
 
     // Sauvegarde en direct sur Supabase
-    showToast(`Enregistrement sur Supabase...`, "info");
+    showToast(`Enregistrement...`, "info");
     try {
       await upsertCompanyProfile(finalData);
-      showToast(`Coordonnées de l'entreprise "${finalData.name}" sauvegardées sur Supabase !`, "success");
+      showToast(`Coordonnées de l'entreprise "${finalData.name}" sauvegardées !`, "success");
     } catch (err) {
       console.warn("Erreur sauvegarde Supabase company, mise en attente hors-ligne:", err);
       enqueueOfflineAction("UPSERT_COMPANY", finalData, userProfile?.companyId);
@@ -625,7 +644,7 @@ export default function App() {
 
     setIsResetModalOpen(false);
     showToast(
-      `Coordonnées de l'entreprise rétablies aux paramètres par défaut de votre compte (${baseline.name || "HORIZON GROUPE"}).`,
+      `Coordonnées de l'entreprise rétablies aux paramètres par défaut de votre compte (${baseline.name || userProfile?.companyName || "Mon Entreprise"}).`,
       "success"
     );
   };
@@ -685,7 +704,7 @@ export default function App() {
       return;
     }
 
-    showToast(`Enregistrement du client sur Supabase...`, "info");
+    showToast(`Enregistrement du client...`, "info");
     try {
       const saved = await apiCreateClient(newClient, userProfile?.companyId);
       if (saved && saved.id) {
@@ -693,7 +712,7 @@ export default function App() {
           prev.map((c) => (c.name === newClient.name ? { ...c, id: saved.id } : c))
         );
       }
-      showToast(`Client "${newClient.name}" enregistré sur Supabase !`, "success");
+      showToast(`Client "${newClient.name}" enregistré !`, "success");
     } catch (err) {
       console.warn("Erreur sauvegarde client Supabase, mise en file d'attente hors-ligne:", err);
       enqueueOfflineAction("CREATE_CLIENT", newClient, userProfile?.companyId);
@@ -750,7 +769,7 @@ export default function App() {
       return;
     }
 
-    showToast(`Synchronisation de "${updatedClient.name}" sur Supabase...`, "info");
+    showToast(`Synchronisation de "${updatedClient.name}"...`, "info");
     try {
       const targetId = updatedClient.id || oldClientName;
       const saved = await apiUpdateClient(targetId, updatedClient);
@@ -759,7 +778,7 @@ export default function App() {
           prev.map((c) => (c.name === updatedClient.name ? { ...c, id: saved.id } : c))
         );
       }
-      showToast(`Entreprise cliente "${updatedClient.name}" mise à jour sur Supabase !`, "success");
+      showToast(`Entreprise cliente "${updatedClient.name}" mise à jour !`, "success");
     } catch (err) {
       console.warn("Erreur updateClient Supabase, mise en file d'attente hors-ligne:", err);
       enqueueOfflineAction("UPDATE_CLIENT", updatedClient, userProfile?.companyId);
@@ -792,7 +811,7 @@ export default function App() {
     showToast(`Suppression de "${clientNameToDelete}"...`, "info");
     try {
       await apiDeleteClient(target?.id || clientNameToDelete);
-      showToast(`Client "${clientNameToDelete}" supprimé de Supabase.`, "success");
+      showToast(`Client "${clientNameToDelete}" supprimé.`, "success");
     } catch (err) {
       console.warn("Erreur deleteClient Supabase, mise en file d'attente hors-ligne:", err);
       enqueueOfflineAction("DELETE_CLIENT", { id: target?.id || clientNameToDelete, name: clientNameToDelete }, userProfile?.companyId);
@@ -810,10 +829,10 @@ export default function App() {
       return;
     }
 
-    showToast(`Enregistrement de la facture ${newInvoice.id} sur Supabase...`, "info");
+    showToast(`Enregistrement de la facture ${newInvoice.id}...`, "info");
     try {
       await apiCreateInvoice(newInvoice, userProfile?.companyId);
-      showToast(`La facture ${newInvoice.id} a été enregistrée sur Supabase !`, "success");
+      showToast(`La facture ${newInvoice.id} a été enregistrée !`, "success");
     } catch (err) {
       console.warn("Erreur sauvegarde facture Supabase, mise en file d'attente hors-ligne:", err);
       enqueueOfflineAction("CREATE_INVOICE", newInvoice, userProfile?.companyId);
@@ -932,10 +951,10 @@ export default function App() {
       return;
     }
 
-    showToast(`Mise à jour de la facture sur Supabase...`, "info");
+    showToast(`Mise à jour de la facture...`, "info");
     try {
       await apiUpdateInvoice(updatedInvoice);
-      showToast(`La facture ${updatedInvoice.id} a été mise à jour sur Supabase !`, "success");
+      showToast(`La facture ${updatedInvoice.id} a été mise à jour !`, "success");
     } catch (err) {
       console.warn("Erreur updateInvoice Supabase, mise en file d'attente hors-ligne:", err);
       enqueueOfflineAction("UPDATE_INVOICE", updatedInvoice, userProfile?.companyId);
@@ -1003,14 +1022,14 @@ export default function App() {
       return;
     }
 
-    showToast(`Enregistrement du règlement sur Supabase...`, "info");
+    showToast(`Enregistrement du règlement...`, "info");
     try {
       await apiCreatePayment(newPayment, userProfile?.companyId);
       if (newPayment.invoiceId && isFullySettled) {
         await apiUpdateInvoiceStatus(newPayment.invoiceId, "payee");
       }
       showToast(
-        `Règlement ${newPayment.receiptNumber || newPayment.id} (${formatAmount(newPayment.amount, "FC")}) enregistré sur Supabase !${
+        `Règlement ${newPayment.receiptNumber || newPayment.id} (${formatAmount(newPayment.amount, "FC")}) enregistré !${
           isFullySettled ? " 🎉 Facture 100% soldée." : ""
         }`,
         "success"
@@ -1036,10 +1055,10 @@ export default function App() {
       return;
     }
 
-    showToast(`Mise à jour du règlement sur Supabase...`, "info");
+    showToast(`Mise à jour du règlement...`, "info");
     try {
       await apiUpdatePayment(updatedPayment);
-      showToast(`Règlement ${updatedPayment.receiptNumber || updatedPayment.id} mis à jour sur Supabase !`, "success");
+      showToast(`Règlement ${updatedPayment.receiptNumber || updatedPayment.id} mis à jour !`, "success");
     } catch (err) {
       console.warn("Erreur updatePayment Supabase, mise en attente hors-ligne:", err);
       enqueueOfflineAction("UPDATE_PAYMENT", updatedPayment, userProfile?.companyId);
@@ -1198,7 +1217,7 @@ export default function App() {
       return;
     }
 
-    showToast(`Enregistrement du devis sur Supabase...`, "info");
+    showToast(`Enregistrement du devis...`, "info");
     try {
       await apiCreateQuote(quoteWithValidity, userProfile?.companyId);
       showToast(`Devis ${quoteWithValidity.id} créé avec succès sur Supabase pour ${quoteWithValidity.clientName} !`, "success");
@@ -1315,11 +1334,11 @@ export default function App() {
     setSelectedQuote(null);
     setSelectedInvoice(newInvoice);
 
-    showToast(`✨ Conversion du devis en facture sur Supabase...`, "info");
+    showToast(`✨ Conversion du devis en facture...`, "info");
     try {
       await apiCreateInvoice(newInvoice, userProfile?.companyId);
       await apiUpdateQuoteStatus(quote.id, "accepte", nextInvoiceId);
-      showToast(`✨ Devis ${quote.id} converti en Facture ${nextInvoiceId} sur Supabase !`, "success");
+      showToast(`✨ Devis ${quote.id} converti en Facture ${nextInvoiceId} !`, "success");
     } catch (err) {
       console.error("Erreur conversion devis Supabase:", err);
       showToast(`✨ Devis ${quote.id} converti en Facture officielle ${nextInvoiceId} !`, "success");
@@ -1520,12 +1539,25 @@ export default function App() {
                 if (Array.isArray(tms) && tms.length > 0) setTeamMembers(tms);
               });
             }
+            const ownerEntry = {
+              id: "owner-self",
+              name: profile.fullName || profile.email.split("@")[0],
+              email: profile.email,
+              role: profile.role || "admin",
+              badge: profile.badge || "Propriétaire",
+              status: "En ligne",
+              initials: profile.initials || "AD",
+              phone: profile.phone || "",
+              lastLogin: "En direct",
+              companyId: profile.companyId,
+            };
+            setTeamMembers([ownerEntry]);
             setClients([]);
             setInvoices([]);
             setQuotes([]);
             setPayments([]);
           }
-          showToast(`Bienvenue, ${profile.fullName} ! Accès ${profile.badge || profile.role}`, "success");
+          showToast(`Bienvenue, ${profile.fullName} !`, "success");
         }}
         teamMembers={teamMembers}
         companyInfo={companyInfo}
@@ -1660,7 +1692,7 @@ export default function App() {
                     </div>
                     <p className="text-xs sm:text-sm text-blue-100/90 mt-1">
                       Espace <strong>{userProfile?.badge || userProfile?.role}</strong> chez{" "}
-                      <span className="underline decoration-blue-300 font-bold">{companyInfo?.name || "HORIZON GROUPE"}</span>{" "}
+                      <span className="underline decoration-blue-300 font-bold">{companyInfo?.name || userProfile?.companyName || "Mon Entreprise"}</span>{" "}
                       — ({userProfile?.email})
                     </p>
                   </div>
@@ -1927,7 +1959,7 @@ export default function App() {
                         </span>
                       </div>
                       <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1 text-white">
-                        {companyForm.name || "HORIZON GROUPE"}
+                        {companyForm.name || userProfile?.companyName || "Mon Entreprise"}
                       </h2>
                       <p className="text-xs text-blue-100">
                         {companyForm.subtitle || "Solutions Digitales & Facturation OHADA / RDC"}
@@ -2096,7 +2128,7 @@ export default function App() {
                         required
                         value={companyForm.name}
                         onChange={(e) => handleCompanyFieldChange("name", e.target.value)}
-                        placeholder="Ex: HORIZON GROUPE"
+                        placeholder="Nom officiel de votre entreprise"
                         className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
                       />
                     </div>
@@ -3498,7 +3530,7 @@ export default function App() {
         onConfirm={handleConfirmResetCompany}
         title="Rétablir les coordonnées par défaut ?"
         message="Êtes-vous sûr de vouloir réinitialiser toutes les coordonnées de l'entreprise ?"
-        subtitle={`Cette opération restaurera l'identité, le logo et les coordonnées d'origine enregistrées lors de la création de votre compte (${companyInfo.name || "HORIZON GROUPE"}). Toutes vos modifications non enregistrées seront remplacées.`}
+        subtitle={`Cette opération restaurera l'identité, le logo et les coordonnées d'origine enregistrées lors de la création de votre compte (${companyInfo?.name || userProfile?.companyName || "Mon Entreprise"}). Toutes vos modifications non enregistrées seront remplacées.`}
         confirmLabel="Oui, rétablir par défaut"
         cancelLabel="Annuler"
         type="dark"
