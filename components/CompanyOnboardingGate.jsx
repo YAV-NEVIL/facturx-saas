@@ -67,23 +67,19 @@ export default function CompanyOnboardingGate({
   userProfile,
   companyInfo,
   onOnboardingSubmitted,
-  onRefreshStatus,
   onSignOut,
   isPreviewMode = false,
   onExitPreview = null,
+  isDocumentRevisionMode = false,
+  onCloseRevision = null,
 }) {
-  const isPendingReview =
-    Boolean(companyInfo?.onboardingCompleted) && companyInfo?.kybStatus === "pending_review";
   const isRejected = companyInfo?.kybStatus === "rejected";
-  const isAdmin = !userProfile?.role || userProfile?.role === "admin";
 
-  const [isEditingFromPending, setIsEditingFromPending] = useState(false);
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(isDocumentRevisionMode ? 3 : 1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [uploadingSlot, setUploadingSlot] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [certifiedHonour, setCertifiedHonour] = useState(false);
+  const [certifiedHonour, setCertifiedHonour] = useState(Boolean(isDocumentRevisionMode));
 
   const [form, setForm] = useState({
     name: companyInfo?.name || userProfile?.companyName || "",
@@ -237,7 +233,6 @@ export default function CompanyOnboardingGate({
         docsList,
         userProfile
       );
-      setIsEditingFromPending(false);
       if (onOnboardingSubmitted) {
         onOnboardingSubmitted(updatedCompany);
       }
@@ -252,230 +247,15 @@ export default function CompanyOnboardingGate({
     }
   };
 
-  const handleManualRefresh = async () => {
-    if (!onRefreshStatus) return;
-    setIsRefreshing(true);
-    try {
-      await onRefreshStatus();
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 500);
-    }
-  };
-
-  // Calcul du temps écoulé et de la fenêtre de validation 24h-48h
-  const submittedDate = companyInfo?.kybSubmittedAt
-    ? new Date(companyInfo.kybSubmittedAt)
-    : new Date();
-  const elapsedHours = Math.max(
-    0,
-    Math.floor((Date.now() - submittedDate.getTime()) / (1000 * 60 * 60))
-  );
-  const etaMinDate = new Date(submittedDate.getTime() + 24 * 3600 * 1000);
-  const etaMaxDate = new Date(submittedDate.getTime() + 48 * 3600 * 1000);
-
-  // ============================================================================
-  // VUE SALLE D'ATTENTE DE VALIDATION LÉGALE (24H À 48H)
-  // ============================================================================
-  if ((isPendingReview && !isEditingFromPending) || (!isAdmin && companyInfo?.kybStatus !== "approved")) {
-    const docsSubmitted = Array.isArray(companyInfo?.kybDocuments)
-      ? companyInfo.kybDocuments
-      : Object.values(uploadedDocs);
-
-    return (
-      <div className="min-h-screen bg-[#F6F8FC] flex flex-col justify-between p-4 sm:p-6 lg:p-10">
-        {/* Top Bar */}
-        <div className="max-w-3xl w-full mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-[#183BB0] text-white flex items-center justify-center font-black shadow-md">
-              FX
-            </div>
-            <div>
-              <span className="font-extrabold text-lg text-slate-900 tracking-tight">
-                Factur<span className="text-blue-600">X</span>
-              </span>
-              <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">
-                Conformité Légale & KYB
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {isPreviewMode && onExitPreview && (
-              <button
-                type="button"
-                onClick={onExitPreview}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-sm cursor-pointer"
-              >
-                Quitter l&apos;aperçu
-              </button>
-            )}
-            {onSignOut && (
-              <button
-                type="button"
-                onClick={onSignOut}
-                className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5 text-rose-500" />
-                <span>Déconnexion</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Main Card */}
-        <div className="max-w-3xl w-full mx-auto my-6 bg-white rounded-3xl border border-slate-200/80 shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-[#1A44B8] via-[#183BB0] to-[#2D60FF] p-6 sm:p-8 text-white">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-300/40 text-amber-200 text-xs font-bold mb-3">
-              <Clock className="w-3.5 h-3.5 animate-pulse" />
-              <span>Validation Gouvernementale & Légale : 24h à 48h</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-              Dossier de {companyInfo?.name || form.name || "votre entreprise"} en cours d&apos;examen
-            </h1>
-            <p className="text-xs sm:text-sm text-blue-100 mt-2 leading-relaxed">
-              Vos paramètres d&apos;entreprise et vos pièces justificatives officielles ont bien été transmis. Conformément à nos procédures de conformité B2B, la vérification des documents approuvés par l&apos;État prend entre <strong>24 heures et 48 heures</strong> avant l&apos;ouverture de votre espace de facturation.
-            </p>
-          </div>
-
-          <div className="p-5 sm:p-8 space-y-6">
-            {/* Progression en 4 jalons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                <div>
-                  <p className="text-xs font-extrabold text-slate-900">1. Compte Administrateur</p>
-                  <p className="text-[11px] text-emerald-700 font-semibold">Créé et authentifié</p>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                <div>
-                  <p className="text-xs font-extrabold text-slate-900">2. Paramétrage Entreprise</p>
-                  <p className="text-[11px] text-emerald-700 font-semibold">Coordonnées & fiscalité enregistrées</p>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-3">
-                <Clock className="w-5 h-5 text-amber-600 shrink-0 animate-pulse" />
-                <div>
-                  <p className="text-xs font-extrabold text-slate-900">3. Contrôle des Actes d&apos;État</p>
-                  <p className="text-[11px] text-amber-700 font-semibold">
-                    En cours ({elapsedHours}h écoulées • délai 24h–48h)
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-                <Lock className="w-5 h-5 text-slate-400 shrink-0" />
-                <div>
-                  <p className="text-xs font-extrabold text-slate-700">4. Accès Espace FacturX</p>
-                  <p className="text-[11px] text-slate-500">Déverrouillage automatique après validation</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Détails d'horodatage */}
-            <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-xs space-y-1.5">
-              <p className="font-bold text-slate-900">
-                Horodatage officiel de votre dépôt :{" "}
-                <span className="text-blue-700">
-                  {submittedDate.toLocaleDateString("fr-FR")} à{" "}
-                  {submittedDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </p>
-              <p className="text-slate-600">
-                Fenêtre d&apos;activation prévue : entre le{" "}
-                <strong>{etaMinDate.toLocaleDateString("fr-FR")}</strong> et le{" "}
-                <strong>{etaMaxDate.toLocaleDateString("fr-FR")}</strong>.
-              </p>
-              <p className="text-slate-600">
-                Identifiants déclarés : <strong>RCCM {companyInfo?.rccm || form.rccm || "—"}</strong> •{" "}
-                <strong>N° Impôt / Id.Nat {companyInfo?.nif || companyInfo?.idNat || form.nif || "—"}</strong>
-              </p>
-            </div>
-
-            {/* Liste des documents soumis */}
-            {docsSubmitted.length > 0 && (
-              <div className="space-y-2.5">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                  Pièces légales transmises ({docsSubmitted.length})
-                </h3>
-                <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden">
-                  {docsSubmitted.map((doc, idx) => (
-                    <div
-                      key={doc.id || idx}
-                      className="px-4 py-3 bg-white flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <FileCheck2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-800 truncate">{doc.label}</p>
-                          <p className="text-[11px] text-slate-500 truncate">{doc.fileName}</p>
-                        </div>
-                      </div>
-                      {doc.storagePath && (
-                        <button
-                          type="button"
-                          onClick={() => handlePreviewDocument(doc)}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center gap-1 shrink-0 cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Voir</span>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingFromPending(true);
-                    setStep(1);
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  <span>Modifier mes informations / documents</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={handleManualRefresh}
-                disabled={isRefreshing}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-60"
-              >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                <span>
-                  {isRefreshing ? "Vérification en cours..." : "Actualiser le statut de validation"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <p className="text-center text-[11px] text-slate-400">
-          FacturX Conformité & Sécurité • Protection des données d&apos;entreprise chiffrée
-        </p>
-      </div>
-    );
-  }
-
   // ============================================================================
   // VUE ASSISTANT OBLIGATOIRE DE PARAMÉTRAGE D'ENTREPRISE & DÉPÔT LÉGAL (3 ÉTAPES)
+  // Sans blocage d'accès après soumission : l'utilisateur accède immédiatement à FacturX
   // ============================================================================
   return (
     <div className="min-h-screen bg-[#F6F8FC] py-5 px-3.5 sm:px-6 lg:px-10">
       <div className="max-w-4xl mx-auto space-y-5">
         {/* Top Header */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-2xl bg-[#183BB0] text-white flex items-center justify-center font-black shadow-md shrink-0">
               FX
@@ -485,12 +265,24 @@ export default function CompanyOnboardingGate({
                 Factur<span className="text-blue-600">X</span>
               </span>
               <p className="text-[11px] text-slate-500 font-semibold">
-                Configuration Obligatoire de votre Entreprise
+                {isDocumentRevisionMode
+                  ? "Mise à jour de vos Documents Légaux"
+                  : "Configuration de votre Entreprise"}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {isDocumentRevisionMode && onCloseRevision && (
+              <button
+                type="button"
+                onClick={onCloseRevision}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Retour au Tableau de bord</span>
+              </button>
+            )}
             {isPreviewMode && onExitPreview && (
               <button
                 type="button"
@@ -500,7 +292,7 @@ export default function CompanyOnboardingGate({
                 Quitter l&apos;aperçu
               </button>
             )}
-            {onSignOut && (
+            {onSignOut && !isDocumentRevisionMode && (
               <button
                 type="button"
                 onClick={onSignOut}
@@ -513,17 +305,17 @@ export default function CompanyOnboardingGate({
           </div>
         </div>
 
-        {/* Bannière si dossier rejeté précédemment */}
+        {/* Bannière si dossier signalé non conforme (sans blocage d'accès) */}
         {isRejected && (
           <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-xs">
             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div>
               <p className="font-extrabold text-rose-900">
-                Action requise sur vos documents légaux
+                Vos documents ne sont pas conformes — Veuillez encore revoir votre dossier
               </p>
               <p className="text-rose-700 mt-0.5">
                 {companyInfo?.kybRejectionReason ||
-                  "Un ou plusieurs documents officiels nécessitent une mise à jour. Veuillez téléverser des pièces lisibles et valides."}
+                  "Un ou plusieurs documents officiels nécessitent une mise à jour. Votre accès à l'application reste actif, veuillez simplement remplacer les pièces ci-dessous."}
               </p>
             </div>
           </div>
@@ -535,13 +327,17 @@ export default function CompanyOnboardingGate({
           <div className="bg-gradient-to-r from-[#1A44B8] via-[#183BB0] to-[#2D60FF] p-5 sm:p-8 text-white">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-blue-100 text-[11px] font-bold mb-2.5">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-              <span>Étape obligatoire avant l&apos;accès à l&apos;espace de travail</span>
+              <span>
+                {isDocumentRevisionMode
+                  ? "Révision de vos pièces officielles • Accès application conservé"
+                  : "Accès immédiat à l'application après ce paramétrage"}
+              </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
               Paramétrage de votre Entreprise & Documents d&apos;État
             </h1>
             <p className="text-xs sm:text-sm text-blue-100 mt-1.5">
-              Bienvenue {userProfile?.fullName || "Administrateur"}. Configurez toutes les informations de votre interface de travail et déposez vos actes légaux officiels (délai de vérification : 24h à 48h).
+              Bienvenue {userProfile?.fullName || "Administrateur"}. Renseignez les coordonnées de votre entreprise et joignez vos documents officiels : vous accédez immédiatement à FacturX pendant que nos équipes vérifient vos pièces sous 24h à 48h.
             </p>
 
             {/* Stepper Mobile-First */}
@@ -558,12 +354,12 @@ export default function CompanyOnboardingGate({
                     key={s.num}
                     type="button"
                     onClick={() => {
-                      if (s.num < step) setStep(s.num);
+                      if (isDocumentRevisionMode || s.num < step) setStep(s.num);
                     }}
                     className={`p-2.5 rounded-xl border text-left transition-all ${
                       active
                         ? "bg-white text-[#183BB0] border-white shadow-md"
-                        : done
+                        : done || isDocumentRevisionMode
                         ? "bg-emerald-500/25 text-white border-emerald-300/40 cursor-pointer"
                         : "bg-white/10 text-blue-100 border-white/15"
                     }`}
@@ -937,7 +733,7 @@ export default function CompanyOnboardingGate({
               </div>
             )}
 
-            {/* ==================== ÉTAPE 3 : DOCUMENTS LÉGAUX D'ÉTAT (VALIDATION 24H-48H) ==================== */}
+            {/* ==================== ÉTAPE 3 : DOCUMENTS LÉGAUX D'ÉTAT (VALIDATION 24H-48H SANS BLOCAGE) ==================== */}
             {step === 3 && (
               <div className="space-y-5">
                 <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
@@ -947,20 +743,20 @@ export default function CompanyOnboardingGate({
                       3. Documents Légaux Approuvés par l&apos;État / Gouvernement
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Déposez vos justificatifs officiels. Leur validation prend <strong>entre 24 heures et 48 heures</strong> avant l&apos;ouverture de votre espace de facturation.
+                      Déposez vos pièces justificatives officielles. Votre accès à FacturX est <strong>ouvert immédiatement</strong> pendant que nous vérifions vos documents sous <strong>24h à 48h</strong>.
                     </p>
                   </div>
                 </div>
 
-                {/* Bandeau délai 24h-48h */}
-                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3 text-xs">
-                  <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                {/* Bandeau rassurant : Accès immédiat + Vérification 24h-48h par email */}
+                <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex items-start gap-3 text-xs">
+                  <Clock className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                   <div className="space-y-1">
                     <p className="font-extrabold text-slate-900">
-                      Procédure de Vérification Légale Obligatoire (24h – 48h)
+                      Accès immédiat à votre espace • Vérification en arrière-plan (24h – 48h)
                     </p>
                     <p className="text-slate-700 leading-relaxed">
-                      Afin de garantir la légalité des factures émises sur FacturX et prévenir toute usurpation d&apos;entreprise, chaque dossier est examiné sous <strong>24h à 48h</strong>. Formats acceptés : <strong>PDF, JPG, PNG</strong> (max 10 Mo par fichier).
+                      Dès validation de cette étape, vous entrez directement dans votre tableau de bord FacturX sans aucun blocage. Sous <strong>24h à 48h</strong>, vous recevrez un email vous informant de l&apos;état de conformité de vos documents (PDF, JPG, PNG — max 10 Mo).
                     </p>
                   </div>
                 </div>
@@ -1007,32 +803,44 @@ export default function CompanyOnboardingGate({
                           )}
                         </div>
 
-                        <label
-                          className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-all ${
-                            existingDoc
-                              ? "bg-white hover:bg-slate-100 text-slate-800 border border-slate-200"
-                              : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                          }`}
-                        >
-                          {isUploadingThis ? (
-                            <>
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                              <span>Envoi...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="w-3.5 h-3.5" />
-                              <span>{existingDoc ? "Remplacer" : "Téléverser"}</span>
-                            </>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {existingDoc?.storagePath && (
+                            <button
+                              type="button"
+                              onClick={() => handlePreviewDocument(existingDoc)}
+                              className="px-3 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Voir</span>
+                            </button>
                           )}
-                          <input
-                            type="file"
-                            accept=".pdf,image/jpeg,image/png,image/webp"
-                            disabled={isUploadingThis}
-                            onChange={(e) => handleDocumentUpload(slot, e.target.files?.[0])}
-                            className="hidden"
-                          />
-                        </label>
+                          <label
+                            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-all ${
+                              existingDoc
+                                ? "bg-white hover:bg-slate-100 text-slate-800 border border-slate-200"
+                                : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                            }`}
+                          >
+                            {isUploadingThis ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>Envoi...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>{existingDoc ? "Remplacer" : "Téléverser"}</span>
+                              </>
+                            )}
+                            <input
+                              type="file"
+                              accept=".pdf,image/jpeg,image/png,image/webp"
+                              disabled={isUploadingThis}
+                              onChange={(e) => handleDocumentUpload(slot, e.target.files?.[0])}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
                       </div>
                     );
                   })}
@@ -1070,12 +878,16 @@ export default function CompanyOnboardingGate({
                     {isSubmitting ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Transmission sécurisée du dossier...</span>
+                        <span>Enregistrement sécurisé...</span>
                       </>
                     ) : (
                       <>
                         <ShieldCheck className="w-4 h-4" />
-                        <span>Soumettre mon Entreprise pour Validation (24h–48h)</span>
+                        <span>
+                          {isDocumentRevisionMode
+                            ? "Enregistrer mes documents & Retourner au Tableau de bord"
+                            : "Finaliser & Accéder immédiatement à FacturX"}
+                        </span>
                       </>
                     )}
                   </button>
@@ -1088,3 +900,4 @@ export default function CompanyOnboardingGate({
     </div>
   );
 }
+

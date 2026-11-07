@@ -18,6 +18,8 @@ import {
   Wifi,
   WifiOff,
   RefreshCw,
+  Clock,
+  ShieldCheck,
 } from "lucide-react";
 
 import CalendarDropdown from "./CalendarDropdown";
@@ -42,6 +44,8 @@ export default function Header({
   onOpenAuthModal = null,
   onSignOut = null,
   notifications = [],
+  kybStatus = null,
+  onOpenKybDocuments = null,
 }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -176,8 +180,40 @@ export default function Header({
           </div>
         </div>
 
-        {/* Right Side: Cloud Badge, Date Selector, Notifications, Profile */}
-        <div className="flex items-center gap-1.5 sm:gap-3 lg:gap-5 shrink-0">
+        {/* Right Side: KYB Sign, Cloud Badge, Date Selector, Notifications, Profile */}
+        <div className="flex items-center gap-1.5 sm:gap-3 lg:gap-4 shrink-0">
+          {/* Signe d'état de vérification des documents d'entreprise (KYB) */}
+          {kybStatus === "pending_review" && (
+            <button
+              type="button"
+              onClick={onOpenKybDocuments}
+              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+              title="Vos documents sont en cours de vérification. Dans 48 heures, vous serez informé par email."
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse shrink-0" />
+              <span>Vérification documents (48h)</span>
+            </button>
+          )}
+          {kybStatus === "rejected" && (
+            <button
+              type="button"
+              onClick={onOpenKybDocuments}
+              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
+              title="Vos documents ne sont pas conformes — Cliquez pour les revoir"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+              <span>Documents à revoir</span>
+            </button>
+          )}
+          {kybStatus === "approved" && (
+            <div
+              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+              title="Documents légaux d'entreprise vérifiés et conformes"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Entreprise vérifiée</span>
+            </div>
+          )}
           {/* Badge Statut Supabase Full-Stack & Mode Hors-Ligne */}
           <div className="hidden sm:flex items-center gap-2">
             {isOffline ? (

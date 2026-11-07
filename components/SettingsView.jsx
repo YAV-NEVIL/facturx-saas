@@ -117,16 +117,34 @@ export default function SettingsView({
   const handleReviewDossier = async (compId, decision) => {
     setKybActionId(compId);
     try {
-      const reason = rejectDrafts[compId] || "Document officiel incomplet ou illisible. Veuillez téléverser une copie lisible.";
-      await reviewCompanyKybDossier(compId, decision, reason);
+      const reason =
+        rejectDrafts[compId] ||
+        "Vos documents ne sont pas conformes. Veuillez encore revoir et téléverser une copie lisible.";
+      const result = await reviewCompanyKybDossier(compId, decision, reason);
+      const emailNotif = result?.emailNotification;
       await loadKybDossiers();
-      if (onToast) {
-        onToast(
-          decision === "approved"
-            ? "Entreprise validée et espace client déverrouillé !"
-            : "Dossier rejeté avec demande de correction envoyée au client.",
-          decision === "approved" ? "success" : "info"
-        );
+
+      if (emailNotif?.sentAutomatically) {
+        if (onToast) {
+          onToast(
+            decision === "approved"
+              ? "Documents validés et email de confirmation envoyé automatiquement au client !"
+              : "Documents signalés non conformes (sans blocage d'accès) et email envoyé au client !",
+            decision === "approved" ? "success" : "info"
+          );
+        }
+      } else {
+        if (emailNotif?.mailtoUrl && typeof window !== "undefined") {
+          window.location.href = emailNotif.mailtoUrl;
+        }
+        if (onToast) {
+          onToast(
+            decision === "approved"
+              ? "Documents validés ! L'email de confirmation est prêt à être envoyé."
+              : "Documents marqués non conformes (accès maintenu) ! L'email d'information est prêt.",
+            decision === "approved" ? "success" : "info"
+          );
+        }
       }
     } catch (err) {
       console.error("Erreur révision KYB:", err);
@@ -1926,7 +1944,7 @@ export default function SettingsView({
                   Validation Légale des Entreprises &amp; Documents d&apos;État
                 </h2>
                 <p className="text-xs text-slate-500 mt-1 max-w-2xl">
-                  Vérifiez les documents officiels téléversés (RCCM / GUCE, NIF / DGI, Pièce d&apos;identité du gérant). Tout nouveau compte est bloqué sur l&apos;interface de paramétrage et de contrôle pendant 24h à 48h tant qu&apos;il n&apos;est pas validé.
+                  Vérifiez les documents officiels téléversés sous 24h–48h. Les clients conservent un accès total à l&apos;application : s&apos;ils sont conformes ou non conformes, informez-les en un clic par email et sur leur tableau de bord sans jamais bloquer leur utilisation.
                 </p>
               </div>
 
@@ -2136,9 +2154,10 @@ export default function SettingsView({
                                 type="button"
                                 disabled={kybActionId === dossier.id}
                                 onClick={() => handleReviewDossier(dossier.id, "rejected")}
-                                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                               >
-                                Demander correction
+                                <Mail className="w-3.5 h-3.5 shrink-0" />
+                                <span>Non conforme (Informer par mail)</span>
                               </button>
                               <button
                                 type="button"
@@ -2147,7 +2166,7 @@ export default function SettingsView({
                                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                                <span>Approuver l&apos;entreprise</span>
+                                <span>Conforme (Valider &amp; Informer)</span>
                               </button>
                             </div>
                           </div>
