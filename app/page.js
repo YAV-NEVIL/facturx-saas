@@ -28,6 +28,7 @@ import ReportsView from "@/components/ReportsView";
 import SettingsView from "@/components/SettingsView";
 import AuthModal from "@/components/AuthModal";
 import LoginScreen from "@/components/LoginScreen";
+import CompanyOnboardingGate from "@/components/CompanyOnboardingGate";
 import EmployeesView from "@/components/EmployeesView";
 import {
   fetchCompanyProfile,
@@ -187,6 +188,7 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [teamMembers, setTeamMembers] = useState([]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isOnboardingPreviewOpen, setIsOnboardingPreviewOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
@@ -313,8 +315,29 @@ export default function App() {
         if (!isMounted) return;
 
         if (comp) {
-          setCompanyInfo((prev) => ({ ...prev, ...comp }));
+          setCompanyInfo((prev) => {
+            const merged = { ...prev, ...comp };
+            if (typeof window !== "undefined") {
+              localStorage.setItem(STORAGE_KEY_COMPANY, JSON.stringify(merged));
+            }
+            return merged;
+          });
           setCompanyForm((prev) => ({ ...prev, ...comp }));
+          setUserProfile((prev) => {
+            if (!prev) return prev;
+            const updatedProf = {
+              ...prev,
+              companyId: comp.id || prev.companyId,
+              companyName: comp.name || prev.companyName,
+              onboardingCompleted: Boolean(comp.onboardingCompleted),
+              kybStatus: comp.kybStatus || "not_submitted",
+              kybSubmittedAt: comp.kybSubmittedAt || null,
+            };
+            if (typeof window !== "undefined") {
+              localStorage.setItem(STORAGE_KEY_USER_PROFILE, JSON.stringify(updatedProf));
+            }
+            return updatedProf;
+          });
         }
         if (Array.isArray(clis)) {
           setClients(clis);
@@ -1467,15 +1490,19 @@ export default function App() {
             localStorage.setItem(STORAGE_KEY_USER_PROFILE, JSON.stringify(profile));
           }
           if (profile.companyId) {
-            if (profile.companyName) {
-              setCompanyInfo((prev) => ({
-                ...prev,
-                id: profile.companyId,
-                name: profile.companyName,
-                defaultCurrency: profile.currency || prev.defaultCurrency,
-                currencySymbol: profile.currencySymbol || prev.currencySymbol,
-              }));
-            }
+            setCompanyInfo((prev) => ({
+              ...prev,
+              id: profile.companyId,
+              name: profile.companyName || prev.name,
+              defaultCurrency: profile.currency || prev.defaultCurrency,
+              currencySymbol: profile.currencySymbol || prev.currencySymbol,
+              onboardingCompleted:
+                typeof profile.onboardingCompleted === "boolean"
+                  ? profile.onboardingCompleted
+                  : Boolean(prev.onboardingCompleted ?? false),
+              kybStatus: profile.kybStatus || prev.kybStatus || "not_submitted",
+              kybSubmittedAt: profile.kybSubmittedAt ?? prev.kybSubmittedAt ?? null,
+            }));
             // Mode « Compte Vierge » pour toute nouvelle organisation créée, ou chargement cloud immédiat
             if (profile.isNewOrganization) {
               const cleanCompany = {
@@ -1512,6 +1539,10 @@ export default function App() {
                 logoUrl: null,
                 defaultCurrency: profile.currency || "Franc Congolais (CDF / FC)",
                 currencySymbol: profile.currencySymbol || "FC",
+                onboardingCompleted: Boolean(profile.onboardingCompleted ?? false),
+                kybStatus: profile.kybStatus || "not_submitted",
+                kybSubmittedAt: profile.kybSubmittedAt || null,
+                kybDocuments: [],
               };
               setCompanyInfo(cleanCompany);
               setCompanyForm(cleanCompany);
@@ -1533,8 +1564,29 @@ export default function App() {
                 fetchTeamMembers(profile.companyId).catch(() => []),
               ]).then(([comp, clis, invs, qts, pays, tms]) => {
                 if (comp) {
-                  setCompanyInfo((prev) => ({ ...prev, ...comp }));
+                  setCompanyInfo((prev) => {
+                    const merged = { ...prev, ...comp };
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem(STORAGE_KEY_COMPANY, JSON.stringify(merged));
+                    }
+                    return merged;
+                  });
                   setCompanyForm((prev) => ({ ...prev, ...comp }));
+                  setUserProfile((prev) => {
+                    if (!prev) return prev;
+                    const updatedProf = {
+                      ...prev,
+                      companyId: comp.id || prev.companyId,
+                      companyName: comp.name || prev.companyName,
+                      onboardingCompleted: Boolean(comp.onboardingCompleted),
+                      kybStatus: comp.kybStatus || "not_submitted",
+                      kybSubmittedAt: comp.kybSubmittedAt || null,
+                    };
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem(STORAGE_KEY_USER_PROFILE, JSON.stringify(updatedProf));
+                    }
+                    return updatedProf;
+                  });
                 }
                 if (Array.isArray(clis)) setClients(clis);
                 if (Array.isArray(invs)) setInvoices(invs);
@@ -1560,11 +1612,112 @@ export default function App() {
             setInvoices([]);
             setQuotes([]);
             setPayments([]);
+          } else {
+            const blankSetupCompany = {
+              ...defaultCompanyInfo,
+              id: null,
+              name: profile.companyName || "",
+              city: profile.city || "Kinshasa",
+              country: profile.country || "République Démocratique du Congo",
+              countryCode: profile.countryCode || "CD",
+              phone: profile.phone || "",
+              email: profile.email || "",
+              defaultCurrency: profile.currency || "Franc Congolais (CDF / FC)",
+              currencySymbol: profile.currencySymbol || "FC",
+              onboardingCompleted: false,
+              kybStatus: "not_submitted",
+              kybSubmittedAt: null,
+              kybDocuments: [],
+            };
+            setCompanyInfo(blankSetupCompany);
+            setCompanyForm(blankSetupCompany);
+            setClients([]);
+            setInvoices([]);
+            setQuotes([]);
+            setPayments([]);
           }
           showToast(`Bienvenue, ${profile.fullName} !`, "success");
         }}
         teamMembers={teamMembers}
         companyInfo={companyInfo}
+      />
+    );
+  }
+
+  // Portail obligatoire de Paramétrage d'Entreprise & Validation Légale d'État (KYB 24h–48h)
+  // Jamais d'accès direct à l'interface principale tant que le paramétrage et la validation KYB ne sont pas approuvés
+  const isPlatformSuperAdmin = userProfile?.email?.toLowerCase() === "loumalabs@gmail.com";
+  const effectiveOnboardingCompleted =
+    typeof companyInfo?.onboardingCompleted === "boolean"
+      ? companyInfo.onboardingCompleted
+      : Boolean(userProfile?.onboardingCompleted ?? false);
+  const effectiveKybStatus =
+    companyInfo?.kybStatus ||
+    userProfile?.kybStatus ||
+    (isPlatformSuperAdmin ? "approved" : "not_submitted");
+
+  if (
+    isOnboardingPreviewOpen ||
+    (!isPlatformSuperAdmin && (!effectiveOnboardingCompleted || effectiveKybStatus !== "approved"))
+  ) {
+    return (
+      <CompanyOnboardingGate
+        userProfile={userProfile}
+        companyInfo={companyInfo}
+        isPreviewMode={isOnboardingPreviewOpen}
+        onExitPreview={() => setIsOnboardingPreviewOpen(false)}
+        onOnboardingSubmitted={(updatedComp) => {
+          setCompanyInfo((prev) => ({ ...prev, ...updatedComp }));
+          setCompanyForm((prev) => ({ ...prev, ...updatedComp }));
+          const updatedProfile = {
+            ...userProfile,
+            companyId: updatedComp.id,
+            companyName: updatedComp.name,
+            onboardingCompleted: updatedComp.onboardingCompleted,
+            kybStatus: updatedComp.kybStatus,
+            kybSubmittedAt: updatedComp.kybSubmittedAt,
+          };
+          setUserProfile(updatedProfile);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(STORAGE_KEY_COMPANY, JSON.stringify(updatedComp));
+            localStorage.setItem(STORAGE_KEY_USER_PROFILE, JSON.stringify(updatedProfile));
+          }
+          showToast(
+            "Dossier d'entreprise soumis ! Vérification légale (24h à 48h) lancée.",
+            "success"
+          );
+        }}
+        onRefreshStatus={async () => {
+          const cId = companyInfo?.id || userProfile?.companyId;
+          if (!cId) return;
+          const fresh = await fetchCompanyProfile(cId);
+          if (fresh) {
+            setCompanyInfo((prev) => ({ ...prev, ...fresh }));
+            setCompanyForm((prev) => ({ ...prev, ...fresh }));
+            const refreshedProfile = {
+              ...userProfile,
+              companyId: fresh.id || userProfile.companyId,
+              companyName: fresh.name || userProfile.companyName,
+              onboardingCompleted: Boolean(fresh.onboardingCompleted),
+              kybStatus: fresh.kybStatus || "not_submitted",
+              kybSubmittedAt: fresh.kybSubmittedAt || null,
+            };
+            setUserProfile(refreshedProfile);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(STORAGE_KEY_COMPANY, JSON.stringify(fresh));
+              localStorage.setItem(STORAGE_KEY_USER_PROFILE, JSON.stringify(refreshedProfile));
+            }
+            if (fresh.kybStatus === "approved") {
+              showToast("Félicitations ! Votre entreprise est validée et activée.", "success");
+            } else {
+              showToast(
+                "Votre dossier est toujours en cours de vérification légale (délai 24h à 48h).",
+                "info"
+              );
+            }
+          }
+        }}
+        onSignOut={handleSignOut}
       />
     );
   }
@@ -3347,6 +3500,7 @@ export default function App() {
               onToast={showToast}
               onApplyTheme={applyTheme}
               currentTheme={currentTheme}
+              onOpenOnboardingPreview={() => setIsOnboardingPreviewOpen(true)}
               onResetAllData={() => {
                 if (typeof window !== "undefined") {
                   localStorage.clear();

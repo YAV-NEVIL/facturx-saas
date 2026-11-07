@@ -53,7 +53,13 @@ import {
   History,
 } from "lucide-react";
 import { formatFCFA, formatAmount, getCurrencySymbol } from "@/lib/mock-data";
-import { createTeamMember, deleteTeamMember } from "@/lib/supabaseService";
+import {
+  createTeamMember,
+  deleteTeamMember,
+  fetchAllKybDossiersForSuperAdmin,
+  reviewCompanyKybDossier,
+  getKybDocumentSignedUrl,
+} from "@/lib/supabaseService";
 
 export default function SettingsView({
   companyInfo = {},
@@ -70,14 +76,76 @@ export default function SettingsView({
   onResetAllData,
   onApplyTheme,
   currentTheme = "light",
+  onOpenOnboardingPreview = null,
 }) {
-  // Navigation entre les 8 sous-onglets des paramètres
+  // Navigation entre les sous-onglets des paramètres
   const [activeSettingsTab, setActiveSettingsTab] = useState("appearance");
   const [copiedKey, setCopiedKey] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Console Super-Admin de validation légale KYB (24h-48h)
+  const isPlatformSuperAdmin = userProfile?.email?.toLowerCase() === "loumalabs@gmail.com";
+  const [kybDossiers, setKybDossiers] = useState([]);
+  const [isLoadingKyb, setIsLoadingKyb] = useState(false);
+  const [kybFilter, setKybFilter] = useState("all");
+  const [kybActionId, setKybActionId] = useState(null);
+  const [rejectDrafts, setRejectDrafts] = useState({});
+
+  const loadKybDossiers = async () => {
+    if (!isPlatformSuperAdmin) return;
+    setIsLoadingKyb(true);
+    try {
+      const list = await fetchAllKybDossiersForSuperAdmin();
+      setKybDossiers(list);
+    } catch (err) {
+      console.warn("Chargement dossiers KYB:", err);
+      if (onToast) onToast("Impossible de charger les dossiers KYB.", "error");
+    } finally {
+      setIsLoadingKyb(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSettingsTab === "kyb_admin" && isPlatformSuperAdmin) {
+      loadKybDossiers();
+    }
+  }, [activeSettingsTab, isPlatformSuperAdmin]);
+
+  const handleReviewDossier = async (compId, decision) => {
+    setKybActionId(compId);
+    try {
+      const reason = rejectDrafts[compId] || "Document officiel incomplet ou illisible. Veuillez téléverser une copie lisible.";
+      await reviewCompanyKybDossier(compId, decision, reason);
+      await loadKybDossiers();
+      if (onToast) {
+        onToast(
+          decision === "approved"
+            ? "Entreprise validée et espace client déverrouillé !"
+            : "Dossier rejeté avec demande de correction envoyée au client.",
+          decision === "approved" ? "success" : "info"
+        );
+      }
+    } catch (err) {
+      console.error("Erreur révision KYB:", err);
+      if (onToast) onToast("Erreur lors de la mise à jour du statut KYB.", "error");
+    } finally {
+      setKybActionId(null);
+    }
+  };
+
+  const handleOpenKybFile = async (storagePath) => {
+    try {
+      const signedUrl = await getKybDocumentSignedUrl(storagePath);
+      if (signedUrl && typeof window !== "undefined") {
+        window.open(signedUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      if (onToast) onToast("Impossible d'ouvrir ce document légal.", "error");
+    }
+  };
 
   // Logo file input ref
   const logoInputRef = useRef(null);
@@ -564,7 +632,7 @@ export default function SettingsView({
     { name: "Ambre Prestige", hex: "#D97706", bg: "bg-amber-600" },
   ];
 
-  // Les 8 onglets professionnels de haut de gamme
+  // Les onglets professionnels de haut de gamme (+ Console Super-Admin KYB)
   const tabs = [
     { id: "appearance", label: "Apparence & Thème", icon: Moon, desc: "Dark mode & immersion" },
     { id: "billing", label: "Fiscalité & Devises", icon: Landmark, desc: "TVA, OHADA & conversion" },
@@ -574,6 +642,16 @@ export default function SettingsView({
     { id: "pdf", label: "Design Documents", icon: Palette, desc: "Gabarits PDF & logo" },
     { id: "team", label: "Équipe & Accès", icon: Users, desc: "Rôles, RBAC & sécurité" },
     { id: "audit_data", label: "Audit & Sauvegardes", icon: Database, desc: "Traçabilité & exports" },
+    ...(isPlatformSuperAdmin
+      ? [
+          {
+            id: "kyb_admin",
+            label: "Validation Légale (KYB)",
+            icon: ShieldCheck,
+            desc: "Dossiers d'État 24h-48h",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -1830,6 +1908,255 @@ export default function SettingsView({
                 <span>Réinitialiser aux Données d&apos;Usine</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ONGLET 9 (SUPER-ADMIN PLATEFORME) : VALIDATION LÉGALE KYB 24H-48H */}
+      {activeSettingsTab === "kyb_admin" && isPlatformSuperAdmin && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-xs p-5 sm:p-7 space-y-5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold mb-2">
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span>Console Propriétaire Plateforme • Contrôle KYB (24h – 48h)</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                  Validation Légale des Entreprises &amp; Documents d&apos;État
+                </h2>
+                <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+                  Vérifiez les documents officiels téléversés (RCCM / GUCE, NIF / DGI, Pièce d&apos;identité du gérant). Tout nouveau compte est bloqué sur l&apos;interface de paramétrage et de contrôle pendant 24h à 48h tant qu&apos;il n&apos;est pas validé.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                {onOpenOnboardingPreview && (
+                  <button
+                    type="button"
+                    onClick={onOpenOnboardingPreview}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Eye className="w-4 h-4 shrink-0" />
+                    <span>Prévisualiser l&apos;écran Client</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={loadKybDossiers}
+                  disabled={isLoadingKyb}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 shrink-0 ${isLoadingKyb ? "animate-spin" : ""}`} />
+                  <span>Actualiser les dossiers</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filtres rapides */}
+            <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
+              {[
+                { id: "all", label: `Toutes (${kybDossiers.length})` },
+                {
+                  id: "pending_review",
+                  label: `En attente 24h–48h (${kybDossiers.filter((d) => d.kybStatus === "pending_review").length})`,
+                },
+                {
+                  id: "not_submitted",
+                  label: `Paramétrage non soumis (${kybDossiers.filter((d) => d.kybStatus === "not_submitted").length})`,
+                },
+                {
+                  id: "approved",
+                  label: `Validées (${kybDossiers.filter((d) => d.kybStatus === "approved").length})`,
+                },
+                {
+                  id: "rejected",
+                  label: `Rejetées (${kybDossiers.filter((d) => d.kybStatus === "rejected").length})`,
+                },
+              ].map((flt) => (
+                <button
+                  key={flt.id}
+                  type="button"
+                  onClick={() => setKybFilter(flt.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                    kybFilter === flt.id
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  {flt.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Liste des dossiers d'entreprises */}
+            {isLoadingKyb ? (
+              <div className="py-10 text-center text-xs font-bold text-slate-500">
+                Chargement sécurisé des dossiers d&apos;entreprises...
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {kybDossiers
+                  .filter((d) => (kybFilter === "all" ? true : d.kybStatus === kybFilter))
+                  .map((dossier) => {
+                    const elapsedHours = dossier.kybSubmittedAt
+                      ? Math.max(
+                          0,
+                          Math.round(
+                            (Date.now() - new Date(dossier.kybSubmittedAt).getTime()) / 3600000
+                          )
+                        )
+                      : null;
+
+                    const badgeStyle =
+                      dossier.kybStatus === "approved"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : dossier.kybStatus === "pending_review"
+                        ? "bg-amber-50 text-amber-800 border-amber-200"
+                        : dossier.kybStatus === "rejected"
+                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                        : "bg-slate-100 text-slate-600 border-slate-200";
+
+                    const badgeLabel =
+                      dossier.kybStatus === "approved"
+                        ? "Validée & Active"
+                        : dossier.kybStatus === "pending_review"
+                        ? `En vérification (${elapsedHours ?? 0}h / 24h–48h)`
+                        : dossier.kybStatus === "rejected"
+                        ? "Correction demandée"
+                        : "En attente de paramétrage client";
+
+                    return (
+                      <div
+                        key={dossier.id}
+                        className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-4"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                                {dossier.name}
+                              </h3>
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-600">
+                                {dossier.legalForm}
+                              </span>
+                              <span
+                                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${badgeStyle}`}
+                              >
+                                {badgeLabel}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1 break-words">
+                              {dossier.email || "Email non renseigné"} • {dossier.phone || "Tél. non renseigné"} •{" "}
+                              {dossier.city || "—"}, {dossier.country || "—"}
+                            </p>
+                          </div>
+
+                          <div className="text-[11px] text-slate-500 font-medium shrink-0">
+                            {dossier.kybSubmittedAt
+                              ? `Soumis le ${new Date(dossier.kybSubmittedAt).toLocaleString("fr-FR")}`
+                              : `Créé le ${new Date(dossier.createdAt).toLocaleDateString("fr-FR")}`}
+                          </div>
+                        </div>
+
+                        {/* Identifiants légaux */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                          <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                              RCCM / GUCE
+                            </span>
+                            <span className="font-mono font-bold text-slate-800 break-all">
+                              {dossier.rccm || "Non renseigné"}
+                            </span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                              N° Impôt (NIF / DGI)
+                            </span>
+                            <span className="font-mono font-bold text-slate-800 break-all">
+                              {dossier.nif || "Non renseigné"}
+                            </span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                            <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                              Identification Nationale
+                            </span>
+                            <span className="font-mono font-bold text-slate-800 break-all">
+                              {dossier.idNat || "Non renseigné"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Pièces justificatives d'État téléversées */}
+                        <div>
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                            Documents officiels téléversés ({dossier.kybDocuments.length})
+                          </p>
+                          {dossier.kybDocuments.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">
+                              Aucun document officiel téléversé pour le moment.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {dossier.kybDocuments.map((doc, idx) => (
+                                <button
+                                  key={doc.id || idx}
+                                  type="button"
+                                  onClick={() => handleOpenKybFile(doc.storagePath)}
+                                  className="px-3 py-2 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-xs font-bold text-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+                                >
+                                  <FileCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                  <span className="truncate max-w-[200px]">
+                                    {doc.label || doc.fileName}
+                                  </span>
+                                  <ExternalLink className="w-3 h-3 text-slate-400 shrink-0" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions d'approbation / rejet */}
+                        {dossier.email?.toLowerCase() !== "loumalabs@gmail.com" && (
+                          <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                            <input
+                              type="text"
+                              value={rejectDrafts[dossier.id] || ""}
+                              onChange={(e) =>
+                                setRejectDrafts((prev) => ({
+                                  ...prev,
+                                  [dossier.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="Motif éventuel en cas de rejet (ex: Extrait RCCM expiré ou flou)..."
+                              className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-blue-600"
+                            />
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={kybActionId === dossier.id}
+                                onClick={() => handleReviewDossier(dossier.id, "rejected")}
+                                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                Demander correction
+                              </button>
+                              <button
+                                type="button"
+                                disabled={kybActionId === dossier.id}
+                                onClick={() => handleReviewDossier(dossier.id, "approved")}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                <span>Approuver l&apos;entreprise</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         </div>
       )}

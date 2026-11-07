@@ -269,6 +269,12 @@ export default function LoginScreen({
         city: matchedMember?.city || userMeta.city || undefined,
         country: matchedMember?.country || userMeta.country || undefined,
         countryCode: matchedMember?.countryCode || userMeta.country_code || undefined,
+        onboardingCompleted:
+          typeof matchedMember?.onboardingCompleted === "boolean"
+            ? matchedMember.onboardingCompleted
+            : undefined,
+        kybStatus: matchedMember?.kybStatus || undefined,
+        kybSubmittedAt: matchedMember?.kybSubmittedAt || null,
         isNewOrganization: Boolean(matchedMember?.isNewOrganization),
       };
 
@@ -286,11 +292,14 @@ export default function LoginScreen({
     }
   };
 
-  // 2. GESTION DE LA CRÉATION D'ENTREPRISE & COMPTE ADMIN (SaaS Multi-Tenant avec OTP Supabase)
+  // 2. GESTION DE LA CRÉATION D'ENTREPRISE & COMPTE ADMIN (SaaS Multi-Tenant)
   const handleSignUpSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage("");
     setSuccessNotice("");
+
+    const cleanSignupEmail = signupEmail.trim().toLowerCase();
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
     if (!fullName.trim()) {
       setErrorMessage("Veuillez renseigner le nom complet de l'administrateur.");
@@ -300,8 +309,10 @@ export default function LoginScreen({
       setErrorMessage("Veuillez renseigner le nom de votre organisation / entreprise.");
       return;
     }
-    if (!signupEmail.trim() || !signupEmail.includes("@")) {
-      setErrorMessage("Veuillez renseigner une adresse email professionnelle valide.");
+    if (!cleanSignupEmail || !emailRegex.test(cleanSignupEmail)) {
+      setErrorMessage(
+        "Adresse email invalide. Vérifiez qu'elle ne contient pas d'apostrophe, d'accent ni d'espace (ex: contact@entreprise.com)."
+      );
       return;
     }
     if (!signupPassword || signupPassword.length < 6) {
@@ -315,7 +326,7 @@ export default function LoginScreen({
       const onboardingData = {
         adminName: fullName.trim(),
         companyName: companyName.trim(),
-        email: signupEmail.trim().toLowerCase(),
+        email: cleanSignupEmail,
         phone: phone.trim(),
         currency: currency,
         currencySymbol: currencySymbol,
@@ -324,9 +335,9 @@ export default function LoginScreen({
         countryCode: countryCode || "CD",
       };
 
-      // Enregistrement Auth auprès de Supabase avec métadonnées complètes d'organisation
+      // Enregistrement Auth avec métadonnées complètes d'organisation
       const signUpRes = await signUpWithEmail(
-        signupEmail.trim().toLowerCase(),
+        cleanSignupEmail,
         signupPassword,
         fullName.trim(),
         "admin",
@@ -345,7 +356,7 @@ export default function LoginScreen({
         localStorage.setItem("facturx_pending_onboarding_v3", JSON.stringify(onboardingData));
       }
 
-      // Si la confirmation d'email est désactivée dans Supabase, connecter immédiatement
+      // Si la confirmation d'email est désactivée, diriger immédiatement vers le Paramétrage d'Entreprise & KYB (24h-48h)
       if (signUpRes?.session?.user) {
         const finalProfile = await completeAdminOnboardingAfterOtp({
           ...onboardingData,
@@ -359,20 +370,31 @@ export default function LoginScreen({
         return;
       }
 
-      setPendingEmail(signupEmail.trim().toLowerCase());
+      setPendingEmail(cleanSignupEmail);
       setPendingOnboardingData(onboardingData);
 
-      // Basculer vers l'écran de vérification OTP
+      // Basculer vers l'écran de confirmation d'email
       setActiveTab("otp_verify");
       setSuccessNotice(
-        `Email de vérification envoyé avec succès à ${signupEmail.trim().toLowerCase()} !`
+        `Un email de confirmation a été envoyé à ${cleanSignupEmail} (pensez à vérifier vos Spams / Indésirables).`
       );
       setResendCooldown(60);
     } catch (err) {
       console.error("Erreur inscription:", err);
-      setErrorMessage(
-        err.message || "Impossible d'initier l'inscription. Vérifiez l'adresse email saisie."
-      );
+      const rawMsg = String(err?.message || "");
+      if (rawMsg.toLowerCase().includes("rate limit") || err?.status === 429) {
+        setErrorMessage(
+          "Limite horaire d'envoi d'emails atteinte sur le serveur d'authentification (quota sécurité par heure dépassé). Veuillez patienter ou désactiver « Confirm email » / configurer un SMTP dédié."
+        );
+      } else if (rawMsg.toLowerCase().includes("already registered")) {
+        setErrorMessage(
+          "Cette adresse email possède déjà un compte. Passez sur l'onglet « Se connecter »."
+        );
+      } else {
+        setErrorMessage(
+          rawMsg || "Impossible d'initier l'inscription. Vérifiez l'adresse email saisie."
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -503,18 +525,28 @@ export default function LoginScreen({
     }
   };
 
-  // Renvoyer un code OTP
+  // Renvoyer l'email de confirmation / code OTP
   const handleResendOtp = async () => {
     if (resendCooldown > 0) return;
     setIsLoading(true);
     setErrorMessage("");
+    setSuccessNotice("");
     try {
       await resendVerificationOtp(pendingEmail, "signup");
-      setSuccessNotice(`Un nouveau code a été expédié à ${pendingEmail}`);
+      setSuccessNotice(`Un nouvel email de confirmation a été expédié à ${pendingEmail}.`);
       setResendCooldown(60);
     } catch (err) {
-      console.warn("Erreur renvoi code:", err);
-      setSuccessNotice(`Nouveau code généré pour ${pendingEmail}.`);
+      console.warn("Erreur renvoi confirmation:", err);
+      const rawMsg = String(err?.message || "");
+      if (rawMsg.toLowerCase().includes("rate limit") || err?.status === 429) {
+        setErrorMessage(
+          "Quota horaire d'envoi d'emails atteint (limite Supabase gratuite : 2 emails/heure). Veuillez patienter ou utiliser le lien déjà reçu dans vos emails / spams."
+        );
+      } else {
+        setErrorMessage(
+          rawMsg || "Impossible de renvoyer l'email pour le moment. Réessayez dans quelques instants."
+        );
+      }
       setResendCooldown(30);
     } finally {
       setIsLoading(false);
@@ -891,78 +923,75 @@ export default function LoginScreen({
             )}
 
             {/* ============================================================== */}
-            {/* 3. VUE : VÉRIFICATION DU CODE OTP DE SÉCURITÉ PAR EMAIL */}
+            {/* 3. VUE : CONFIRMATION D'EMAIL AVANT PARAMÉTRAGE D'ENTREPRISE   */}
             {/* ============================================================== */}
             {activeTab === "otp_verify" && (
-              <div className="space-y-6 animate-fadeIn text-center">
+              <div className="space-y-5 animate-fadeIn text-center">
                 <div className="w-16 h-16 rounded-3xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center mx-auto shadow-inner">
                   <KeyRound className="w-8 h-8" />
                 </div>
 
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100/70 px-3 py-1 rounded-full border border-blue-200">
-                    Vérification de Sécurité
+                    Étape 1/2 : Confirmation Email
                   </span>
                   <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-2.5">
-                    Vérification de votre Adresse Email
+                    Confirmez votre Adresse Email
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
-                    Un email de confirmation vient d&apos;être envoyé à l&apos;adresse :
+                    Une confirmation a été envoyée à :
                     <br />
-                    <span className="font-extrabold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md mt-1 inline-block">
+                    <span className="font-extrabold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-md mt-1 inline-block">
                       {pendingEmail || "votre adresse email"}
                     </span>
                   </p>
                 </div>
 
-                <form onSubmit={handleVerifyOtp} className="space-y-4 max-w-sm mx-auto">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-                      Code d&apos;Authentification (6 chiffres ou lettres) *
-                    </label>
+                {/* Action principale : Lien de confirmation reçu par email */}
+                <div className="max-w-sm mx-auto p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-left space-y-3">
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    <strong>1.</strong> Ouvrez votre boîte mail (vérifiez aussi les <strong>Spams / Indésirables</strong>) et cliquez sur le lien de confirmation reçu.
+                    <br />
+                    <strong>2.</strong> Revenez ici pour configurer les informations et documents légaux de votre entreprise :
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleConfirmedByEmailLink}
+                    disabled={isLoading}
+                    className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Email confirmé ➔ Paramétrer mon Entreprise</span>
+                  </button>
+                </div>
+
+                {/* Option secondaire : Saisie d'un code à 6 chiffres (si SMTP personnalisé configuré) */}
+                <form onSubmit={handleVerifyOtp} className="space-y-3 max-w-sm mx-auto pt-2 border-t border-slate-100">
+                  <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Ou saisissez le code à 6 chiffres (si reçu par email)
+                  </label>
+                  <div className="flex items-center gap-2">
                     <input
                       type="text"
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value.toUpperCase())}
                       placeholder="123456"
                       maxLength={10}
-                      autoFocus
-                      className="w-full text-center py-3.5 px-4 bg-slate-50 border-2 border-blue-200 rounded-2xl text-2xl font-mono font-extrabold tracking-widest text-blue-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all shadow-inner"
+                      className="flex-1 text-center py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-mono font-extrabold tracking-widest text-slate-900 focus:outline-none focus:border-blue-600"
                       required
                     />
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      Valider
+                    </button>
                   </div>
-
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-xl shadow-lg shadow-blue-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <span>Valider le Code & Accéder à FacturX</span>
-                        <Check className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
                 </form>
 
-                {/* Bouton alternatif si l'utilisateur a reçu et cliqué sur un lien de confirmation Supabase */}
-                <div className="max-w-sm mx-auto pt-1">
-                  <button
-                    type="button"
-                    onClick={handleConfirmedByEmailLink}
-                    disabled={isLoading}
-                    className="w-full py-3 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>J&apos;ai cliqué sur le lien reçu par email ➔ Accéder</span>
-                  </button>
-                </div>
-
                 {/* Options de renvoi et retour */}
-                <div className="pt-2 flex flex-col items-center gap-2 text-xs">
+                <div className="pt-1 flex flex-col items-center gap-2 text-xs">
                   <button
                     type="button"
                     onClick={handleResendOtp}
@@ -972,8 +1001,8 @@ export default function LoginScreen({
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>
                       {resendCooldown > 0
-                        ? `Renvoyer un code dans ${resendCooldown}s`
-                        : "Renvoyer un nouveau code par email"}
+                        ? `Renvoyer l'email dans ${resendCooldown}s`
+                        : "Renvoyer l'email de confirmation"}
                     </span>
                   </button>
 
