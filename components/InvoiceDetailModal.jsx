@@ -30,6 +30,7 @@ export default function InvoiceDetailModal({
   onEditInvoice,
   companyInfo = defaultCompanyInfo,
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   if (!isOpen || !invoice) return null;
 
   const effectiveCompany = invoice.company || companyInfo || defaultCompanyInfo;
@@ -286,10 +287,10 @@ export default function InvoiceDetailModal({
                       {item.quantity}
                     </td>
                     <td className="py-3.5 px-4 text-right text-slate-600">
-                      {formatFCFA(item.unitPrice)}
+                      {formatFCFA(item.unitPrice, __cur)}
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-slate-900">
-                      {formatFCFA(item.quantity * item.unitPrice)}
+                      {formatFCFA(item.quantity * item.unitPrice, __cur)}
                     </td>
                   </tr>
                 ))}
@@ -339,21 +340,21 @@ export default function InvoiceDetailModal({
               <div className="flex justify-between text-xs text-slate-600">
                 <span>Sous-total HT :</span>
                 <span className="font-semibold text-slate-800">
-                  {formatFCFA(subtotal)}
+                  {formatFCFA(subtotal, __cur)}
                 </span>
               </div>
 
               <div className="flex justify-between text-xs text-slate-600">
                 <span>TVA (18%) :</span>
                 <span className="font-semibold text-slate-800">
-                  {formatFCFA(vatAmount)}
+                  {formatFCFA(vatAmount, __cur)}
                 </span>
               </div>
 
               <div className="pt-3 border-t border-blue-200/60 flex justify-between items-center text-sm font-extrabold text-slate-900">
                 <span className="text-slate-800">TOTAL TTC À PAYER :</span>
                 <span className="text-lg text-[#183BB0] font-black">
-                  {formatFCFA(total)}
+                  {formatFCFA(total, __cur)}
                 </span>
               </div>
             </div>

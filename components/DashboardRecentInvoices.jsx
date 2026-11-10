@@ -27,6 +27,7 @@ export default function DashboardRecentInvoices({
   companyInfo = null,
   onToast,
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const [activeMenuId, setActiveMenuId] = useState(null);
 
   // Fermer le menu lors de l'appui sur Escape
@@ -174,7 +175,7 @@ export default function DashboardRecentInvoices({
                     {inv.dueDate}
                   </td>
                   <td className="py-3.5 px-4 font-black text-slate-900">
-                    {formatFCFA(total)}
+                    {formatFCFA(total, __cur)}
                   </td>
                   <td className="py-3.5 px-4">
                     {getStatusBadge(inv.status)}

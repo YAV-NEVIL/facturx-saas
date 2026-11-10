@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { formatFCFA, calculateInvoiceTotals } from "@/lib/mock-data";
 
-export default function InvoiceMetricsBar({ invoices = [] }) {
+export default function InvoiceMetricsBar({ invoices = [], companyInfo = null }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   // Calculs statistiques opérationnels propres à la facturation
   let totalBilled = 0;
   let totalPaid = 0;
@@ -45,7 +46,7 @@ export default function InvoiceMetricsBar({ invoices = [] }) {
       id: "volume",
       label: "Total Pièces Émises",
       value: `${totalInvoices} Factures`,
-      subtitle: `Volume cumulé : ${formatFCFA(totalBilled)}`,
+      subtitle: `Volume cumulé : ${formatFCFA(totalBilled, __cur)}`,
       icon: Layers,
       iconBg: "bg-blue-50 text-blue-600 border border-blue-100",
       accent: "hover:border-blue-300",
@@ -54,7 +55,7 @@ export default function InvoiceMetricsBar({ invoices = [] }) {
       id: "paid",
       label: "Factures Soldées (Réglées)",
       value: `${countPaid} Payées`,
-      subtitle: `${paidRatio}% du portefeuille • ${formatFCFA(totalPaid)}`,
+      subtitle: `${paidRatio}% du portefeuille • ${formatFCFA(totalPaid, __cur)}`,
       icon: CheckCircle2,
       iconBg: "bg-emerald-50 text-emerald-600 border border-emerald-100",
       accent: "hover:border-emerald-300",
@@ -63,7 +64,7 @@ export default function InvoiceMetricsBar({ invoices = [] }) {
       id: "pending",
       label: "Factures Ouvertes (En cours)",
       value: `${countPending} En cours`,
-      subtitle: `Reste à percevoir : ${formatFCFA(totalPending)}`,
+      subtitle: `Reste à percevoir : ${formatFCFA(totalPending, __cur)}`,
       icon: Clock,
       iconBg: "bg-amber-50 text-amber-600 border border-amber-100",
       accent: "hover:border-amber-300",
@@ -71,8 +72,8 @@ export default function InvoiceMetricsBar({ invoices = [] }) {
     {
       id: "average",
       label: "Panier Moyen Facturé",
-      value: formatFCFA(averageInvoiceAmount),
-      subtitle: `TVA 18% légale appliquée (${countDraft} brouillon)`,
+      value: formatFCFA(averageInvoiceAmount, __cur),
+      subtitle: `TVA légale appliquée (${countDraft} brouillon)`,
       icon: Calculator,
       iconBg: "bg-purple-50 text-purple-600 border border-purple-100",
       accent: "hover:border-purple-300",

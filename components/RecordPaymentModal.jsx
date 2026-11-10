@@ -21,6 +21,7 @@ import {
   calculateInvoiceTotals,
   formatAmount,
   defaultCompanyInfo,
+  getCurrencySymbol,
 } from "@/lib/mock-data";
 
 export default function RecordPaymentModal({
@@ -34,6 +35,7 @@ export default function RecordPaymentModal({
   payments = [],
   userProfile = null,
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
@@ -176,7 +178,7 @@ export default function RecordPaymentModal({
       clientPhone: currentInvoice?.clientPhone || "",
       clientTaxId: currentInvoice?.taxId || "",
       amount: parsedAmount,
-      currency: "FC",
+      currency: getCurrencySymbol(__cur),
       paymentDate: paymentDate || "Aujourd'hui",
       paymentTime: paymentTime || "12:00",
       paymentMethod: paymentMethod,
@@ -250,7 +252,7 @@ export default function RecordPaymentModal({
                     const { total } = calculateInvoiceTotals(inv.items, inv.vatRate);
                     return (
                       <option key={inv.id} value={inv.id}>
-                        {inv.id} — {inv.clientName} ({formatAmount(total, "FC")}) • Échéance {inv.dueDate}
+                        {inv.id} — {inv.clientName} ({formatAmount(total, __cur)}) • Échéance {inv.dueDate}
                       </option>
                     );
                   })}
@@ -262,7 +264,7 @@ export default function RecordPaymentModal({
                     const { total } = calculateInvoiceTotals(inv.items, inv.vatRate);
                     return (
                       <option key={inv.id} value={inv.id}>
-                        [Déjà Payée] {inv.id} — {inv.clientName} ({formatAmount(total, "FC")})
+                        [Déjà Payée] {inv.id} — {inv.clientName} ({formatAmount(total, __cur)})
                       </option>
                     );
                   })}
@@ -301,19 +303,19 @@ export default function RecordPaymentModal({
                   <div className="p-2 bg-white/70 rounded-xl border border-blue-100/60">
                     <span className="text-[10px] text-slate-500 font-bold block uppercase">Total Facture</span>
                     <span className="font-extrabold text-slate-900 font-mono text-xs">
-                      {formatAmount(invoiceTotal, "FC")}
+                      {formatAmount(invoiceTotal, __cur)}
                     </span>
                   </div>
                   <div className="p-2 bg-white/70 rounded-xl border border-blue-100/60">
                     <span className="text-[10px] text-slate-500 font-bold block uppercase">Déjà Réglé</span>
                     <span className="font-extrabold text-emerald-700 font-mono text-xs">
-                      {formatAmount(alreadyPaid, "FC")}
+                      {formatAmount(alreadyPaid, __cur)}
                     </span>
                   </div>
                   <div className="p-2 bg-blue-100/60 rounded-xl border border-blue-200">
                     <span className="text-[10px] text-blue-800 font-bold block uppercase">Solde Restant Dû</span>
                     <span className="font-extrabold text-blue-950 font-mono text-xs">
-                      {formatAmount(remainingBalance, "FC")}
+                      {formatAmount(remainingBalance, __cur)}
                     </span>
                   </div>
                 </div>
@@ -336,7 +338,7 @@ export default function RecordPaymentModal({
                     }}
                     className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
                   >
-                    Solde dû ({formatAmount(remainingBalance > 0 ? remainingBalance : invoiceTotal, "FC")})
+                    Solde dû ({formatAmount(remainingBalance > 0 ? remainingBalance : invoiceTotal, __cur)})
                   </button>
                 )}
               </div>
@@ -351,7 +353,7 @@ export default function RecordPaymentModal({
                   required
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 font-extrabold text-xs text-slate-500 bg-slate-200/80 px-2 py-1 rounded-lg">
-                  FC
+                  {getCurrencySymbol(__cur)}
                 </span>
               </div>
 
@@ -366,7 +368,7 @@ export default function RecordPaymentModal({
                   ) : (
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
                       <Clock className="w-3.5 h-3.5 text-amber-600" />
-                      Règlement partiel (Reste dû : {formatAmount(Math.max(0, remainingBalance - parseFloat(amount)), "FC")})
+                      Règlement partiel (Reste dû : {formatAmount(Math.max(0, remainingBalance - parseFloat(amount)), __cur)})
                     </span>
                   )}
                 </div>

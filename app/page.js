@@ -1059,7 +1059,7 @@ export default function App() {
         await apiUpdateInvoiceStatus(newPayment.invoiceId, "payee");
       }
       showToast(
-        `Règlement ${newPayment.receiptNumber || newPayment.id} (${formatAmount(newPayment.amount, "FC")}) enregistré !${
+        `Règlement ${newPayment.receiptNumber || newPayment.id} (${formatAmount(newPayment.amount, newPayment.currency || companyInfo?.defaultCurrency)}) enregistré !${
           isFullySettled ? " 🎉 Facture 100% soldée." : ""
         }`,
         "success"
@@ -2027,7 +2027,7 @@ export default function App() {
                     Tableau de bord financier
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                    Synthèse globale, prévisions de trésorerie et pilotage du recouvrement en FCFA pour {companyInfo.name}
+                    Synthèse globale, prévisions de trésorerie et pilotage du recouvrement en {getCurrencySymbol(companyInfo?.defaultCurrency)} pour {companyInfo?.name || "votre entreprise"}
                   </p>
                 </div>
 
@@ -2081,12 +2081,13 @@ export default function App() {
               )}
 
               {/* 4 KPIs Globaux reliés aux données des factures */}
-              <StatsCards metrics={metrics} />
+              <StatsCards metrics={metrics} companyInfo={companyInfo} />
 
               {/* Prévisions de trésorerie (30j) & Alertes de recouvrement */}
               <DashboardForecast
                 invoices={invoices}
                 metrics={metrics}
+                companyInfo={companyInfo}
                 onNavigateToInvoices={() => setActiveTab("invoices")}
                 onOpenCreateInvoice={() => setIsCreateModalOpen(true)}
                 onOpenCreateClient={() => setIsCreateClientModalOpen(true)}
@@ -2099,6 +2100,7 @@ export default function App() {
                 onSelectInvoice={(inv) => setSelectedInvoice(inv)}
                 onNavigateToInvoices={() => setActiveTab("invoices")}
                 onOpenCreateInvoice={() => setIsCreateModalOpen(true)}
+                companyInfo={companyInfo}
               />
             </div>
           )}
@@ -2175,7 +2177,7 @@ export default function App() {
               )}
 
               {/* Barre de métriques opérationnelles dédiées à la facturation */}
-              <InvoiceMetricsBar invoices={displayedInvoices} />
+              <InvoiceMetricsBar invoices={displayedInvoices} companyInfo={companyInfo} />
 
               {/* Table intégrale et complète de toutes les factures avec filtres et pagination */}
               <InvoiceTable
@@ -3674,7 +3676,7 @@ export default function App() {
               onToast={showToast}
               onExportExcel={() => {
                 try {
-                  exportQuotesToXLSX(quotes);
+                  exportQuotesToXLSX(quotes, undefined, companyInfo?.defaultCurrency);
                   showToast("Pipeline commercial exporté avec succès en Excel !", "success");
                 } catch (e) {
                   showToast("Erreur lors de l'exportation du pipeline.", "error");
@@ -3783,6 +3785,7 @@ export default function App() {
         isOpen={!!reminderInvoice}
         onClose={() => setReminderInvoice(null)}
         onSaveReminder={handleSaveReminder}
+        companyInfo={companyInfo}
       />
 
       {/* Fiche Client 360° (Tiroir latéral immersif avec synthèse financière et historique) */}

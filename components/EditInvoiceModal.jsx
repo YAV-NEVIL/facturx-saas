@@ -16,7 +16,7 @@ import {
   MapPin,
   Save,
 } from "lucide-react";
-import { defaultClients, formatFCFA, calculateInvoiceTotals } from "@/lib/mock-data";
+import { defaultClients, formatFCFA, calculateInvoiceTotals, getCurrencySymbol } from "@/lib/mock-data";
 
 export default function EditInvoiceModal({
   isOpen,
@@ -26,6 +26,7 @@ export default function EditInvoiceModal({
   clients = [],
   companyInfo = null,
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const [clientId, setClientId] = useState(null);
   const [clientName, setClientName] = useState("");
   const [contactPerson, setContactPerson] = useState("");
@@ -72,7 +73,7 @@ export default function EditInvoiceModal({
 
   if (!isOpen || !invoice) return null;
 
-  // Calculs dynamiques en FCFA
+  // Calculs dynamiques dans la devise de l'entreprise
   const subtotal = items.reduce(
     (acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
     0
@@ -333,7 +334,7 @@ export default function EditInvoiceModal({
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-blue-600" />
-                <span>Prestations & Montants (FCFA)</span>
+                <span>Prestations & Montants ({getCurrencySymbol(__cur)})</span>
               </h3>
               <button
                 type="button"
@@ -383,7 +384,7 @@ export default function EditInvoiceModal({
                         min="0"
                         step="1000"
                         required
-                        placeholder="Prix Unit. (FCFA)"
+                        placeholder={`Prix Unit. (${getCurrencySymbol(__cur)})`}
                         value={item.unitPrice}
                         onChange={(e) => handleItemChange(idx, "unitPrice", e.target.value)}
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -391,7 +392,7 @@ export default function EditInvoiceModal({
                     </div>
 
                     <div className="w-32 text-right font-extrabold text-xs text-slate-900 shrink-0">
-                      {formatFCFA(lineTotal)}
+                      {formatFCFA(lineTotal, __cur)}
                     </div>
 
                     <button
@@ -439,16 +440,16 @@ export default function EditInvoiceModal({
 
             <div className="text-right space-y-1 w-full sm:w-auto">
               <div className="text-xs text-slate-500">
-                Total HT : <span className="font-semibold text-slate-700">{formatFCFA(subtotal)}</span>
+                Total HT : <span className="font-semibold text-slate-700">{formatFCFA(subtotal, __cur)}</span>
               </div>
               {applyVat && vatRate > 0 && (
                 <div className="text-xs text-slate-500">
                   TVA ({Math.round(vatRate * 100)}%) :{" "}
-                  <span className="font-semibold text-slate-700">{formatFCFA(vatAmount)}</span>
+                  <span className="font-semibold text-slate-700">{formatFCFA(vatAmount, __cur)}</span>
                 </div>
               )}
               <div className="text-sm font-black text-slate-900 border-t border-slate-200 pt-1">
-                Total TTC : <span className="text-[#183BB0]">{formatFCFA(total)}</span>
+                Total TTC : <span className="text-[#183BB0]">{formatFCFA(total, __cur)}</span>
               </div>
             </div>
           </div>

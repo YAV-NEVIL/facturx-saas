@@ -219,7 +219,7 @@ export default function AnalyticsView({
     const quoteConversionRate =
       totalQuotesVolume > 0
         ? Math.round((acceptedQuotesVolume / totalQuotesVolume) * 100)
-        : 68;
+        : 0;
 
     return {
       totalBilled,
@@ -321,7 +321,7 @@ export default function AnalyticsView({
 
     const maxVal = Math.max(
       ...timelineSeries.map((d) => Math.max(d.billed, d.paid)),
-      10000000
+      1
     ) * 1.15;
 
     // Amplitude de base de l'ondulation
@@ -1723,14 +1723,14 @@ export default function AnalyticsView({
                   Devis & Propositions Émises
                 </span>
                 <span className="font-black text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
-                  {formatAmount(analyticsData.totalQuotesVolume || 61538000, currencySymbol)}
+                  {formatAmount(analyticsData.totalQuotesVolume || 0, currencySymbol)}
                 </span>
               </div>
               <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
                 <div className="bg-blue-400 h-full rounded-full transition-all duration-500" style={{ width: "100%" }} />
               </div>
               <div className="flex justify-between text-[11px] text-slate-500">
-                <span>{quotes.length || 5} propositions commerciales actives</span>
+                <span>{quotes.length} proposition(s) commerciale(s) active(s)</span>
                 <span className="font-semibold text-slate-700">Base pipeline 100% →</span>
               </div>
             </div>

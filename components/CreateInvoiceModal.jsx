@@ -22,7 +22,7 @@ import {
   UserPlus,
   Edit3,
 } from "lucide-react";
-import { defaultClients, defaultCompanyInfo, formatFCFA } from "@/lib/mock-data";
+import { defaultClients, defaultCompanyInfo, formatFCFA, getCurrencySymbol } from "@/lib/mock-data";
 
 export default function CreateInvoiceModal({
   isOpen,
@@ -34,6 +34,7 @@ export default function CreateInvoiceModal({
   companyInfo = defaultCompanyInfo,
   existingInvoices = [],
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   // Coordonnées de l'Entreprise Émettrice (Votre Société)
   const activeCompany = companyInfo || defaultCompanyInfo;
   const [companyName, setCompanyName] = useState(activeCompany.name);
@@ -697,13 +698,13 @@ export default function CreateInvoiceModal({
                         onChange={(e) =>
                           handleItemChange(index, "unitPrice", e.target.value)
                         }
-                        placeholder="Prix U (FCFA)"
+                        placeholder={`Prix U (${getCurrencySymbol(__cur)})`}
                         className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-right focus:outline-none"
                       />
                     </div>
 
                     <div className="w-full sm:w-36 text-right font-bold text-xs text-slate-800 pr-2">
-                      {formatFCFA(lineTotal)}
+                      {formatFCFA(lineTotal, __cur)}
                     </div>
 
                     {items.length > 1 && (
@@ -755,17 +756,17 @@ export default function CreateInvoiceModal({
             <div className="w-full md:w-1/2 bg-white rounded-xl p-4 shadow-sm border border-slate-100 space-y-2">
               <div className="flex justify-between text-xs text-slate-600">
                 <span>Sous-total HT :</span>
-                <span className="font-semibold">{formatFCFA(subtotal)}</span>
+                <span className="font-semibold">{formatFCFA(subtotal, __cur)}</span>
               </div>
 
               <div className="flex justify-between text-xs text-slate-600">
                 <span>TVA (18%) :</span>
-                <span className="font-semibold">{formatFCFA(vatAmount)}</span>
+                <span className="font-semibold">{formatFCFA(vatAmount, __cur)}</span>
               </div>
 
               <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-sm font-extrabold text-slate-900">
                 <span>Total TTC :</span>
-                <span className="text-base text-blue-600">{formatFCFA(total)}</span>
+                <span className="text-base text-blue-600">{formatFCFA(total, __cur)}</span>
               </div>
             </div>
           </div>

@@ -19,7 +19,9 @@ export default function EditPaymentModal({
   payment,
   onUpdatePayment,
   onDeletePayment,
+  companyInfo = null,
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [paymentTime, setPaymentTime] = useState("");
@@ -106,7 +108,7 @@ export default function EditPaymentModal({
               </div>
               <div className="text-right">
                 <span className="font-black text-emerald-600 text-base">
-                  {formatAmount(payment.amount, payment.currency || "FC")}
+                  {formatAmount(payment.amount, payment.currency || __cur)}
                 </span>
               </div>
             </div>
@@ -221,7 +223,7 @@ export default function EditPaymentModal({
                 <p className="font-extrabold">Confirmer la suppression du règlement</p>
                 <p className="mt-1 text-rose-700">
                   Voulez-vous vraiment annuler l&apos;enregistrement de ce versement de{" "}
-                  <span className="font-bold">{formatAmount(payment.amount, payment.currency || "FC")}</span> pour {payment.clientName} ?
+                  <span className="font-bold">{formatAmount(payment.amount, payment.currency || __cur)}</span> pour {payment.clientName} ?
                 </p>
               </div>
             </div>

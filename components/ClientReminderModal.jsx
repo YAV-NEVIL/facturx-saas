@@ -27,7 +27,9 @@ export default function ClientReminderModal({
   isOpen,
   onClose,
   onSaveReminder,
+  companyInfo = null,
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const [activeChannel, setActiveChannel] = useState("whatsapp"); // 'whatsapp' | 'email' | 'phone'
   const [reminderLevel, setReminderLevel] = useState("niveau2"); // 'niveau1' | 'niveau2' | 'niveau3'
   const [copied, setCopied] = useState(false);
@@ -38,31 +40,36 @@ export default function ClientReminderModal({
 
   const { total } = calculateInvoiceTotals(invoice.items, invoice.vatRate);
   const cleanPhone = (invoice.clientPhone || "").replace(/[^0-9]/g, "");
+  const coName = companyInfo?.name || "Notre entreprise";
+  const coPhone = companyInfo?.phone || "";
+  const coEmail = companyInfo?.email || "";
+  const coBank = companyInfo?.bankName ? `${companyInfo.bankName}${companyInfo.iban ? ` (${companyInfo.iban})` : ""}` : "Coordonnées bancaires sur la facture";
+  const coMobile = companyInfo?.airtelMoneyNumber || companyInfo?.orangeMoneyNumber || companyInfo?.waveNumber || coPhone;
 
   // Messages types pré-formatés
   const getEmailContent = () => {
     switch (reminderLevel) {
       case "niveau1":
         return {
-          subject: `Rappel d'échéance : Facture ${invoice.id} - ${formatFCFA(total)}`,
-          body: `Bonjour ${invoice.contactPerson || invoice.clientName},\n\nSauf erreur ou omission de notre part, nous constatons que la facture ${invoice.id} d'un montant de ${formatFCFA(total)} arrive à échéance le ${invoice.dueDate}.\n\nVous trouverez en pièce jointe le duplicata de votre facture ainsi que notre RIB pour virement bancaire.\n\nNous restons à votre entière disposition pour tout renseignement complémentaire.\n\nBien cordialement,\nService Facturation & Comptabilité\nFacturX Technologies\n+221 33 820 40 50 | compta@facturx.africa`,
+          subject: `Rappel d'échéance : Facture ${invoice.id} - ${formatFCFA(total, __cur)}`,
+          body: `Bonjour ${invoice.contactPerson || invoice.clientName},\n\nSauf erreur ou omission de notre part, nous constatons que la facture ${invoice.id} d'un montant de ${formatFCFA(total, __cur)} arrive à échéance le ${invoice.dueDate}.\n\nVous trouverez en pièce jointe le duplicata de votre facture ainsi que notre RIB pour virement bancaire.\n\nNous restons à votre entière disposition pour tout renseignement complémentaire.\n\nBien cordialement,\nService Facturation & Comptabilité\n${coName}${coPhone || coEmail ? `\n${[coPhone, coEmail].filter(Boolean).join(" | ")}` : ""}`,
         };
       case "niveau3":
         return {
-          subject: `MISE EN DEMEURE : Facture impayée ${invoice.id} - ${formatFCFA(total)}`,
-          body: `À l'attention de la Direction Financière - ${invoice.clientName},\n\nMalgré nos précédentes relances, nous constatons que la facture ${invoice.id} émise le ${invoice.issueDate} d'un montant de ${formatFCFA(total)} demeure impayée à ce jour.\n\nNous vous prions de bien vouloir régulariser cette situation sous un délai de 48 heures ouvrées par virement bancaire ou paiement direct Wave/Orange Money (+221 77 492 10 20).\n\nÀ défaut de règlement, nous serons dans l'obligation de suspendre l'accès à vos prestations et d'engager les procédures de recouvrement contentieux.\n\nService Juridique & Recouvrement\nFacturX Technologies SARL`,
+          subject: `MISE EN DEMEURE : Facture impayée ${invoice.id} - ${formatFCFA(total, __cur)}`,
+          body: `À l'attention de la Direction Financière - ${invoice.clientName},\n\nMalgré nos précédentes relances, nous constatons que la facture ${invoice.id} émise le ${invoice.issueDate} d'un montant de ${formatFCFA(total, __cur)} demeure impayée à ce jour.\n\nNous vous prions de bien vouloir régulariser cette situation sous un délai de 48 heures ouvrées par virement bancaire ou Mobile Money${coMobile ? ` (${coMobile})` : ""}.\n\nÀ défaut de règlement, nous serons dans l'obligation de suspendre l'accès à vos prestations et d'engager les procédures de recouvrement contentieux.\n\nService Juridique & Recouvrement\n${coName}`,
         };
       case "niveau2":
       default:
         return {
-          subject: `Relance de paiement : Facture échue ${invoice.id} - ${formatFCFA(total)}`,
-          body: `Bonjour ${invoice.contactPerson || invoice.clientName},\n\nNous attirons votre attention sur le fait que la facture ${invoice.id} d'un montant de ${formatFCFA(total)}, échue le ${invoice.dueDate}, n'a pas encore fait l'objet d'un règlement.\n\nNous vous remercions de bien vouloir vérifier auprès de vos services comptables et de procéder au virement dans les meilleurs délais.\n\nCoordonnées de règlement :\n- Banque : UBA Sénégal (SN08 SN01 2013 0002 9847 2102 34)\n- Wave / Mobile Money : +221 77 492 10 20\n- Référence à indiquer : ${invoice.id}\n\nRestant à votre écoute,\nService Recouvrement - FacturX Technologies`,
+          subject: `Relance de paiement : Facture échue ${invoice.id} - ${formatFCFA(total, __cur)}`,
+          body: `Bonjour ${invoice.contactPerson || invoice.clientName},\n\nNous attirons votre attention sur le fait que la facture ${invoice.id} d'un montant de ${formatFCFA(total, __cur)}, échue le ${invoice.dueDate}, n'a pas encore fait l'objet d'un règlement.\n\nNous vous remercions de bien vouloir vérifier auprès de vos services comptables et de procéder au virement dans les meilleurs délais.\n\nCoordonnées de règlement :\n- Banque : ${coBank}${coMobile ? `\n- Mobile Money : ${coMobile}` : ""}\n- Référence à indiquer : ${invoice.id}\n\nRestant à votre écoute,\nService Recouvrement - ${coName}`,
         };
     }
   };
 
   const getWhatsAppMessage = () => {
-    return `Bonjour ${invoice.contactPerson || invoice.clientName},\n\nNous vous informons que la facture *${invoice.id}* d'un montant de *${formatFCFA(total)}* est échue depuis le ${invoice.dueDate}.\n\nMerci de procéder au règlement par virement ou par Wave/OM au *+221 77 492 10 20* (Réf: ${invoice.id}).\n\nN'hésitez pas si vous avez besoin du PDF de la facture.\n\nBien à vous,\n*FacturX Recouvrement*`;
+    return `Bonjour ${invoice.contactPerson || invoice.clientName},\n\nNous vous informons que la facture *${invoice.id}* d'un montant de *${formatFCFA(total, __cur)}* est échue depuis le ${invoice.dueDate}.\n\nMerci de procéder au règlement par virement${coMobile ? ` ou Mobile Money au *${coMobile}*` : ""} (Réf: ${invoice.id}).\n\nN'hésitez pas si vous avez besoin du PDF de la facture.\n\nBien à vous,\n*${coName}*`;
   };
 
   const emailData = getEmailContent();
@@ -168,7 +175,7 @@ export default function ClientReminderModal({
                   Montant en souffrance à recouvrer
                 </span>
                 <div className="text-xl sm:text-2xl font-black text-slate-900">
-                  {formatFCFA(total)}
+                  {formatFCFA(total, __cur)}
                 </div>
               </div>
             </div>
@@ -194,7 +201,7 @@ export default function ClientReminderModal({
                 Fiche Coordonnées du Client
               </span>
               <span className="text-[11px] text-slate-400 font-mono">
-                {invoice.taxId || "SN-NINEA-0089241"}
+                {invoice.taxId || "—"}
               </span>
             </div>
 

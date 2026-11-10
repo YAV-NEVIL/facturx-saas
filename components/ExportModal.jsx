@@ -20,7 +20,9 @@ export default function ExportModal({
   allInvoices = [],
   filteredInvoices = [],
   onToast,
+  companyInfo = null,
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const [scope, setScope] = useState("all"); // "all" ou "filtered"
   const [downloadingFormat, setDownloadingFormat] = useState(null);
 
@@ -35,13 +37,13 @@ export default function ExportModal({
 
       if (format === "xlsx") {
         const fileName = `Factures_FacturX_${today}.xlsx`;
-        exportToXLSX(targetInvoices, fileName);
+        exportToXLSX(targetInvoices, fileName, __cur);
         if (onToast) {
           onToast(`Téléchargement de "${fileName}" lancé avec succès !`, "success");
         }
       } else if (format === "csv") {
         const fileName = `Factures_FacturX_${today}.csv`;
-        exportToCSV(targetInvoices, fileName);
+        exportToCSV(targetInvoices, fileName, __cur);
         if (onToast) {
           onToast(`Téléchargement de "${fileName}" lancé avec succès !`, "success");
         }
@@ -165,7 +167,7 @@ export default function ExportModal({
                         </span>
                       </div>
                       <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        Classeur Microsoft Excel natif avec colonnes formatées, devises FCFA et détails complets des prestations.
+                        Classeur Microsoft Excel natif avec colonnes formatées, montants dans la devise de votre entreprise et détails complets des prestations.
                       </p>
                     </div>
                   </div>

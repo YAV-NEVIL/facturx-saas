@@ -10,15 +10,15 @@ import {
   ArrowDown,
   Sparkles,
 } from "lucide-react";
-import { formatFCFA } from "@/lib/mock-data";
+import { formatFCFA, formatAmount, getCurrencySymbol } from "@/lib/mock-data";
 
-// Composant de mini-diagramme interactif avec curseur dynamique et tooltip au survol
+// Composant de mini-diagramme interactif avec curseur dynamique et tooltip au survol / toucher mobile
 function InteractiveSparkline({
   points = [],
   color = "#2563EB",
   gradientId = "grad-blue",
   isPositive = true,
-  unit = "FCFA",
+  unit = "FC",
 }) {
   const [hoverIndex, setHoverIndex] = useState(null);
 
@@ -63,13 +63,23 @@ function InteractiveSparkline({
   const linePath = buildSmoothPath(coords);
   const areaPath = `${linePath} L ${coords[coords.length - 1].x},${height} L ${coords[0].x},${height} Z`;
 
-  // Gestion du survol avec la souris
-  const handleMouseMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
+  // Gestion du survol avec la souris ou du toucher sur mobile
+  const updateHoverFromClientX = (clientX, currentTarget) => {
+    const rect = currentTarget.getBoundingClientRect();
+    const mouseX = clientX - rect.left;
     const ratio = Math.max(0, Math.min(1, mouseX / rect.width));
     const closestIdx = Math.round(ratio * (points.length - 1));
     setHoverIndex(closestIdx);
+  };
+
+  const handleMouseMove = (e) => {
+    updateHoverFromClientX(e.clientX, e.currentTarget);
+  };
+
+  const handleTouchMove = (e) => {
+    if (e.touches && e.touches[0]) {
+      updateHoverFromClientX(e.touches[0].clientX, e.currentTarget);
+    }
   };
 
   const activeCoord = hoverIndex !== null ? coords[hoverIndex] : null;
@@ -79,6 +89,9 @@ function InteractiveSparkline({
       className="relative w-32 sm:w-36 h-12 cursor-crosshair select-none"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => setHoverIndex(null)}
+      onTouchStart={handleTouchMove}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={() => setTimeout(() => setHoverIndex(null), 1500)}
     >
       {/* Tooltip flottant au survol */}
       {activeCoord && (
@@ -183,79 +196,107 @@ function InteractiveSparkline({
   );
 }
 
-export default function StatsCards({ metrics }) {
+export default function StatsCards({ metrics, companyInfo = null }) {
+  const currency = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
+  const sym = getCurrencySymbol(currency);
+
+  const totalBilled = Number(metrics?.totalBilled) || 0;
+  const totalPaid = Number(metrics?.totalPaid) || 0;
+  const totalPending = Number(metrics?.totalPending) || 0;
+  const recoveryRate = Number(metrics?.recoveryRate) || 0;
+
+  const buildWeeklyAmountPoints = (finalVal) => {
+    if (!finalVal || finalVal <= 0) {
+      return [
+        { label: "Sem 1", val: 0, formatted: formatAmount(0, currency) },
+        { label: "Sem 2", val: 0, formatted: formatAmount(0, currency) },
+        { label: "Sem 3", val: 0, formatted: formatAmount(0, currency) },
+        { label: "Sem 4", val: 0, formatted: formatAmount(0, currency) },
+      ];
+    }
+    const w1 = Math.round(finalVal * 0.25);
+    const w2 = Math.round(finalVal * 0.52);
+    const w3 = Math.round(finalVal * 0.78);
+    return [
+      { label: "Sem 1", val: w1, formatted: formatAmount(w1, currency) },
+      { label: "Sem 2", val: w2, formatted: formatAmount(w2, currency) },
+      { label: "Sem 3", val: w3, formatted: formatAmount(w3, currency) },
+      { label: "Sem 4", val: finalVal, formatted: formatAmount(finalVal, currency) },
+    ];
+  };
+
+  const buildWeeklyRatePoints = (finalRate) => {
+    if (!finalRate || finalRate <= 0) {
+      return [
+        { label: "Sem 1", val: 0, formatted: "0%" },
+        { label: "Sem 2", val: 0, formatted: "0%" },
+        { label: "Sem 3", val: 0, formatted: "0%" },
+        { label: "Sem 4", val: 0, formatted: "0%" },
+      ];
+    }
+    const r1 = Math.round(finalRate * 0.65 * 10) / 10;
+    const r2 = Math.round(finalRate * 0.8 * 10) / 10;
+    const r3 = Math.round(finalRate * 0.92 * 10) / 10;
+    return [
+      { label: "Sem 1", val: r1, formatted: `${r1}%` },
+      { label: "Sem 2", val: r2, formatted: `${r2}%` },
+      { label: "Sem 3", val: r3, formatted: `${r3}%` },
+      { label: "Sem 4", val: finalRate, formatted: `${finalRate}%` },
+    ];
+  };
+
   const cards = [
     {
       id: "total",
       label: "Total Facturé",
-      value: formatFCFA(metrics.totalBilled),
-      change: "12% vs semaine passée",
+      value: formatFCFA(totalBilled, currency),
+      change: totalBilled > 0 ? "12% vs semaine passée" : "0% vs semaine passée",
       isPositive: true,
       icon: FileText,
       iconBg: "bg-blue-50 text-blue-600 border border-blue-100/60",
       color: "#2563EB",
       gradientId: "grad-blue-interactive",
       accentHover: "hover:border-blue-300 hover:shadow-blue-500/10",
-      points: [
-        { label: "Sem 1", val: 6400000, formatted: "6 400 000 FCFA" },
-        { label: "Sem 2", val: 14200000, formatted: "14 200 000 FCFA" },
-        { label: "Sem 3", val: 21800000, formatted: "21 800 000 FCFA" },
-        { label: "Sem 4", val: metrics.totalBilled || 32284800, formatted: formatFCFA(metrics.totalBilled) },
-      ],
+      points: buildWeeklyAmountPoints(totalBilled),
     },
     {
       id: "paid",
       label: "Montant Encaissé (Payé)",
-      value: formatFCFA(metrics.totalPaid),
-      change: "18% vs semaine passée",
+      value: formatFCFA(totalPaid, currency),
+      change: totalPaid > 0 ? "18% vs semaine passée" : "0% vs semaine passée",
       isPositive: true,
       icon: CheckCircle2,
       iconBg: "bg-emerald-50 text-emerald-600 border border-emerald-100/60",
       color: "#10B981",
       gradientId: "grad-emerald-interactive",
       accentHover: "hover:border-emerald-300 hover:shadow-emerald-500/10",
-      points: [
-        { label: "Sem 1", val: 2100000, formatted: "2 100 000 FCFA" },
-        { label: "Sem 2", val: 5600000, formatted: "5 600 000 FCFA" },
-        { label: "Sem 3", val: 9200000, formatted: "9 200 000 FCFA" },
-        { label: "Sem 4", val: metrics.totalPaid || 13806000, formatted: formatFCFA(metrics.totalPaid) },
-      ],
+      points: buildWeeklyAmountPoints(totalPaid),
     },
     {
       id: "pending",
       label: "En Attente & Retard",
-      value: formatFCFA(metrics.totalPending),
-      change: "5% vs semaine passée",
-      isPositive: false,
+      value: formatFCFA(totalPending, currency),
+      change: totalPending > 0 ? "5% vs semaine passée" : "0% vs semaine passée",
+      isPositive: totalPending === 0,
       icon: Clock,
       iconBg: "bg-amber-50 text-amber-600 border border-amber-100/60",
       color: "#F59E0B",
       gradientId: "grad-amber-interactive",
       accentHover: "hover:border-amber-300 hover:shadow-amber-500/10",
-      points: [
-        { label: "Sem 1", val: 4300000, formatted: "4 300 000 FCFA" },
-        { label: "Sem 2", val: 8600000, formatted: "8 600 000 FCFA" },
-        { label: "Sem 3", val: 12600000, formatted: "12 600 000 FCFA" },
-        { label: "Sem 4", val: metrics.totalPending || 15764800, formatted: formatFCFA(metrics.totalPending) },
-      ],
+      points: buildWeeklyAmountPoints(totalPending),
     },
     {
       id: "net",
       label: "Taux de Recouvrement",
-      value: `${metrics.recoveryRate}%`,
-      change: "7.4% vs moyenne",
+      value: `${recoveryRate}%`,
+      change: recoveryRate > 0 ? "7.4% vs moyenne" : "0% vs moyenne",
       isPositive: true,
       icon: Wallet,
       iconBg: "bg-purple-50 text-purple-600 border border-purple-100/60",
       color: "#8B5CF6",
       gradientId: "grad-purple-interactive",
       accentHover: "hover:border-purple-300 hover:shadow-purple-500/10",
-      points: [
-        { label: "Sem 1", val: 32.8, formatted: "32.8%" },
-        { label: "Sem 2", val: 36.5, formatted: "36.5%" },
-        { label: "Sem 3", val: 39.4, formatted: "39.4%" },
-        { label: "Sem 4", val: metrics.recoveryRate || 42.8, formatted: `${metrics.recoveryRate}%` },
-      ],
+      points: buildWeeklyRatePoints(recoveryRate),
     },
   ];
 
@@ -290,9 +331,8 @@ export default function StatsCards({ metrics }) {
             {/* Rangée inférieure : Indicateur de tendance à gauche + Mini-diagramme interactif animé au survol */}
             <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between gap-2">
               <div
-                className={`flex items-center gap-1 text-xs font-bold whitespace-nowrap ${
-                  card.isPositive ? "text-emerald-600" : "text-rose-600"
-                }`}
+                className={`flex items-center gap-1 text-xs font-bold whitespace-nowrap ${card.isPositive ? "text-emerald-600" : "text-rose-600"
+                  }`}
               >
                 {card.isPositive ? (
                   <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />

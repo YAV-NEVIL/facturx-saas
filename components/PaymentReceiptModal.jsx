@@ -18,7 +18,7 @@ import {
   MapPin,
   ExternalLink,
 } from "lucide-react";
-import { formatAmount, numberToFrenchWords, defaultCompanyInfo } from "@/lib/mock-data";
+import { formatAmount, numberToFrenchWords, defaultCompanyInfo, getCurrencySymbol } from "@/lib/mock-data";
 import { generateReceiptPdf } from "@/lib/pdf-generator";
 
 export default function PaymentReceiptModal({
@@ -34,7 +34,8 @@ export default function PaymentReceiptModal({
   if (!isOpen || !payment) return null;
 
   const effectiveCompany = companyInfo || defaultCompanyInfo;
-  const currencySymbol = payment.currency || "FC";
+  const currencySymbol = getCurrencySymbol(payment.currency || effectiveCompany.defaultCurrency || effectiveCompany.currencySymbol || "FC");
+  const currencyWords = { FC: "Francs Congolais", $: "Dollars Américains", "€": "Euros", "£": "Livres Sterling", FCFA: "Francs CFA" }[currencySymbol] || currencySymbol;
 
   // Impression native de la quittance
   const handlePrint = () => {
@@ -216,7 +217,7 @@ export default function PaymentReceiptModal({
             </div>
             {amountInWords && (
               <p className="text-xs font-semibold text-emerald-900 italic max-w-xl mx-auto capitalize">
-                « {amountInWords} Francs Congolais »
+                « {amountInWords} {currencyWords} »
               </p>
             )}
           </div>

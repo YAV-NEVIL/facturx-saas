@@ -19,16 +19,20 @@ import {
   Zap,
   Info,
 } from "lucide-react";
-import { formatFCFA, calculateInvoiceTotals } from "@/lib/mock-data";
+import { formatFCFA, calculateInvoiceTotals, getCurrencySymbol } from "@/lib/mock-data";
 
 export default function DashboardForecast({
   invoices = [],
   metrics,
+  companyInfo = null,
   onNavigateToInvoices,
   onOpenCreateInvoice,
   onOpenCreateClient,
   onOpenReminder,
 }) {
+  const currency = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
+  const sym = getCurrencySymbol(currency);
+  const hasInvoices = (metrics?.totalBilled || 0) > 0;
   // Horizon temporel sélectionné pour la simulation (7j, 15j, 30j, Trimestre)
   const [forecastHorizon, setForecastHorizon] = useState("30j");
   // Segment survolé (null | 'paid' | 'pending' | 'other')
@@ -55,30 +59,30 @@ export default function DashboardForecast({
     "7j": {
       label: "7 Jours",
       expectedInflow: Math.round(metrics.totalPending * 0.35),
-      confidence: "95% (Échéances fermes)",
-      dso: "14 jours",
-      statusText: "3 virements confirmés en fin de semaine",
+      confidence: hasInvoices ? "95% (Échéances fermes)" : "100% (Prêt)",
+      dso: hasInvoices ? "14 jours" : "0 jour",
+      statusText: hasInvoices ? "Échéances confirmées à 7 jours" : "Aucune échéance en attente",
     },
     "15j": {
       label: "15 Jours",
       expectedInflow: Math.round(metrics.totalPending * 0.65),
-      confidence: "88% (Accords clients)",
-      dso: "16 jours",
-      statusText: "Relances transmises avec RIB joint",
+      confidence: hasInvoices ? "88% (Accords clients)" : "100% (Prêt)",
+      dso: hasInvoices ? "16 jours" : "0 jour",
+      statusText: hasInvoices ? "Relances transmises avec coordonnées bancaires" : "Aucune échéance en attente",
     },
     "30j": {
       label: "30 Jours",
       expectedInflow: metrics.totalPending,
-      confidence: "82% (Flux régulier)",
-      dso: "18 jours",
-      statusText: "Cycle mensuel normal des règlements",
+      confidence: hasInvoices ? "82% (Flux régulier)" : "100% (Prêt)",
+      dso: hasInvoices ? "18 jours" : "0 jour",
+      statusText: hasInvoices ? "Cycle mensuel normal des règlements" : "Aucune échéance en attente",
     },
     "90j": {
       label: "Trimestre",
       expectedInflow: Math.round(metrics.totalBilled * 1.4),
       confidence: "Prévisionnelle",
-      dso: "21 jours",
-      statusText: "Croissance projetée du chiffre d'affaires",
+      dso: hasInvoices ? "21 jours" : "0 jour",
+      statusText: hasInvoices ? "Croissance projetée du chiffre d'affaires" : "Émettez vos factures pour projeter le trimestre",
     },
   };
 
@@ -127,7 +131,7 @@ export default function DashboardForecast({
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  Simulation des encaissements attendus en FCFA pour FacturX
+                  Simulation des encaissements attendus en {sym} pour {companyInfo?.name || "votre entreprise"}
                 </p>
               </div>
             </div>
@@ -160,7 +164,7 @@ export default function DashboardForecast({
                 <p className="font-bold">
                   Projection à {currentProjection.label} :{" "}
                   <span className="text-emerald-700 font-extrabold text-sm">
-                    +{formatFCFA(currentProjection.expectedInflow)}
+                    +{formatFCFA(currentProjection.expectedInflow, currency)}
                   </span>
                 </p>
                 <p className="text-[11px] text-blue-800/80 mt-0.5">
@@ -190,7 +194,7 @@ export default function DashboardForecast({
                 </span>
               </span>
               <span className="text-slate-900 font-black text-sm">
-                {formatFCFA(metrics.totalBilled)}
+                {formatFCFA(metrics.totalBilled, currency)}
               </span>
             </div>
 
@@ -256,7 +260,7 @@ export default function DashboardForecast({
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                     <span>Encaissé (Payé) :</span>
                     <span className="text-emerald-300 font-extrabold">
-                      {formatFCFA(metrics.totalPaid)} ({paidPercent}%)
+                      {formatFCFA(metrics.totalPaid, currency)} ({paidPercent}%)
                     </span>
                   </>
                 )}
@@ -265,7 +269,7 @@ export default function DashboardForecast({
                     <span className="w-2 h-2 rounded-full bg-blue-400"></span>
                     <span>À Échoir / En cours :</span>
                     <span className="text-blue-300 font-extrabold">
-                      {formatFCFA(metrics.totalPending)} ({pendingPercent}%)
+                      {formatFCFA(metrics.totalPending, currency)} ({pendingPercent}%)
                     </span>
                   </>
                 )}
@@ -302,7 +306,7 @@ export default function DashboardForecast({
                   </span>
                 </div>
                 <p className="font-black text-base text-slate-900 mt-1 truncate">
-                  {formatFCFA(metrics.totalPaid)}
+                  {formatFCFA(metrics.totalPaid, currency)}
                 </p>
                 <p className="text-[10px] text-emerald-700/80 mt-0.5">
                   Sécurisé sur les comptes bancaires
@@ -328,7 +332,7 @@ export default function DashboardForecast({
                   </span>
                 </div>
                 <p className="font-black text-base text-slate-900 mt-1 truncate">
-                  {formatFCFA(metrics.totalPending)}
+                  {formatFCFA(metrics.totalPending, currency)}
                 </p>
                 <p className="text-[10px] text-blue-700/80 mt-0.5">
                   Prochaines entrées de trésorerie
@@ -369,7 +373,7 @@ export default function DashboardForecast({
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span>
-              Calculs certifiés conformes avec <strong>TVA 18% UEMOA</strong>
+              Calculs certifiés conformes en <strong>{sym}</strong> (TVA DGI / OHADA)
             </span>
           </div>
 
@@ -437,7 +441,7 @@ export default function DashboardForecast({
                   </div>
 
                   <div className="text-right shrink-0">
-                    <p className="text-xs font-black text-slate-900">{formatFCFA(total)}</p>
+                    <p className="text-xs font-black text-slate-900">{formatFCFA(total, currency)}</p>
                     <button
                       onClick={() => onOpenReminder && onOpenReminder(inv)}
                       className="mt-1.5 px-3 py-1 text-[11px] font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition-all shadow-xs flex items-center gap-1.5 ml-auto active:scale-95 group-hover/item:shadow-rose-500/20"

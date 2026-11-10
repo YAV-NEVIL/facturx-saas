@@ -53,6 +53,7 @@ export default function PaymentsView({
   onOpenClientProfile,
   onNavigateToInvoices,
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   // Filtres locaux
   const [searchQuery, setSearchQuery] = useState("");
   const [channelFilter, setChannelFilter] = useState("all"); // 'all', 'virement', 'mobile', 'other'
@@ -305,7 +306,7 @@ export default function PaymentsView({
             </div>
           </div>
           <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-emerald-600 mt-2">
-            {formatAmount(metrics.totalPaid, "FC")}
+            {formatAmount(metrics.totalPaid, __cur)}
           </p>
           <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-slate-500">
             <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full text-[11px] inline-flex items-center gap-1">
@@ -327,7 +328,7 @@ export default function PaymentsView({
             </div>
           </div>
           <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-rose-600 mt-2">
-            {formatAmount(metrics.totalPending, "FC")}
+            {formatAmount(metrics.totalPending, __cur)}
           </p>
           <div className="flex items-center justify-between mt-2 text-xs">
             <span className="text-slate-500 font-medium">
@@ -404,7 +405,7 @@ export default function PaymentsView({
             </h3>
           </div>
           <span className="text-slate-500">
-            Total des liquidités lettrées : <strong className="text-slate-900 font-extrabold">{formatAmount(metrics.totalPaid, "FC")}</strong>
+            Total des liquidités lettrées : <strong className="text-slate-900 font-extrabold">{formatAmount(metrics.totalPaid, __cur)}</strong>
           </span>
         </div>
 
@@ -413,17 +414,17 @@ export default function PaymentsView({
           <div
             className="bg-blue-600 h-full transition-all duration-500"
             style={{ width: `${metrics.virementPercent}%` }}
-            title={`Virement Bancaire : ${formatAmount(metrics.virementAmount, "FC")} (${metrics.virementPercent}%)`}
+            title={`Virement Bancaire : ${formatAmount(metrics.virementAmount, __cur)} (${metrics.virementPercent}%)`}
           />
           <div
             className="bg-orange-500 h-full transition-all duration-500"
             style={{ width: `${metrics.mobilePercent}%` }}
-            title={`Mobile Money : ${formatAmount(metrics.mobileAmount, "FC")} (${metrics.mobilePercent}%)`}
+            title={`Mobile Money : ${formatAmount(metrics.mobileAmount, __cur)} (${metrics.mobilePercent}%)`}
           />
           <div
             className="bg-amber-500 h-full transition-all duration-500"
             style={{ width: `${metrics.otherPercent}%` }}
-            title={`Chèques / Espèces : ${formatAmount(metrics.otherAmount, "FC")} (${metrics.otherPercent}%)`}
+            title={`Chèques / Espèces : ${formatAmount(metrics.otherAmount, __cur)} (${metrics.otherPercent}%)`}
           />
         </div>
 
@@ -438,7 +439,7 @@ export default function PaymentsView({
             }`}
           >
             <span className="w-2.5 h-2.5 rounded-full bg-blue-600 border border-white" />
-            <span>Virement Bancaire : {metrics.virementPercent}% ({formatAmount(metrics.virementAmount, "FC")})</span>
+            <span>Virement Bancaire : {metrics.virementPercent}% ({formatAmount(metrics.virementAmount, __cur)})</span>
           </button>
 
           <button
@@ -450,7 +451,7 @@ export default function PaymentsView({
             }`}
           >
             <span className="w-2.5 h-2.5 rounded-full bg-orange-500 border border-white" />
-            <span>Mobile Money : {metrics.mobilePercent}% ({formatAmount(metrics.mobileAmount, "FC")})</span>
+            <span>Mobile Money : {metrics.mobilePercent}% ({formatAmount(metrics.mobileAmount, __cur)})</span>
           </button>
 
           <button
@@ -462,7 +463,7 @@ export default function PaymentsView({
             }`}
           >
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-white" />
-            <span>Chèques & Caisse : {metrics.otherPercent}% ({formatAmount(metrics.otherAmount, "FC")})</span>
+            <span>Chèques & Caisse : {metrics.otherPercent}% ({formatAmount(metrics.otherAmount, __cur)})</span>
           </button>
 
           {channelFilter !== "all" && (
@@ -693,7 +694,7 @@ export default function PaymentsView({
                       {/* 6. Montant Encaissé */}
                       <td className="py-4 px-4 text-right whitespace-nowrap">
                         <span className="font-black text-sm sm:text-base text-emerald-600">
-                          {formatAmount(p.amount, p.currency || "FC")}
+                          {formatAmount(p.amount, p.currency || __cur)}
                         </span>
                         <span className="block text-[10px] font-bold text-slate-400 uppercase">
                           TTC Lettré
@@ -797,6 +798,7 @@ export default function PaymentsView({
         payment={selectedPaymentForEdit}
         onUpdatePayment={onUpdatePayment}
         onDeletePayment={onDeletePayment}
+        companyInfo={companyInfo}
       />
 
     </div>

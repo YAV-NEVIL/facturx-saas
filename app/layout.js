@@ -11,7 +11,7 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata = {
   title: "FacturX — SaaS de Facturation & Recouvrement B2B (FCFA / RDC)",
-  description: "Solution moderne de facturation, devis et suivi des paiements en FCFA avec TVA 18% / 16% - Mode Hors-Ligne & PWA",
+  description: "Solution moderne de facturation, devis et suivi des paiements multi-devises (FC, $, €, FCFA) avec TVA 16% / 18% - Mode Hors-Ligne & PWA",
   manifest: "/manifest.json",
 };
 

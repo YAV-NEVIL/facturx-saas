@@ -42,6 +42,7 @@ export default function InvoiceTable({
   title = "Registre Complet des Factures",
   subtitle = "Historique intégral et gestion de toutes les pièces comptables émises",
 }) {
+  const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date_desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -418,9 +419,9 @@ export default function InvoiceTable({
                       {inv.dueDate}
                     </td>
 
-                    {/* Total Amount in FCFA */}
+                    {/* Montant total dans la devise de l'entreprise */}
                     <td className="py-3 sm:py-4 px-3.5 sm:px-6 whitespace-nowrap font-extrabold text-slate-900">
-                      {formatFCFA(total)}
+                      {formatFCFA(total, __cur)}
                     </td>
 
                     {/* Status Badge */}
@@ -626,6 +627,7 @@ export default function InvoiceTable({
         allInvoices={invoices}
         filteredInvoices={sortedInvoices}
         onToast={onToast}
+        companyInfo={companyInfo}
       />
 
       {/* Pop-up de confirmation de Modification (Oui / Non) */}
