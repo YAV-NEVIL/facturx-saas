@@ -17,9 +17,16 @@ import {
   Send,
   MessageCircle,
   FileEdit,
+  QrCode,
+  Copy,
+  Check,
 } from "lucide-react";
 import { calculateInvoiceTotals, defaultCompanyInfo, formatFCFA } from "@/lib/mock-data";
 import { generateInvoicePdf } from "@/lib/pdf-generator";
+import {
+  ensureInvoiceDgiCertification,
+  generateDgiQrMatrix,
+} from "@/lib/dgi-service";
 
 export default function InvoiceDetailModal({
   invoice,
@@ -30,6 +37,7 @@ export default function InvoiceDetailModal({
   onEditInvoice,
   companyInfo = defaultCompanyInfo,
 }) {
+  const [copiedCodeDef, setCopiedCodeDef] = React.useState(false);
   const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   if (!isOpen || !invoice) return null;
 
@@ -39,6 +47,23 @@ export default function InvoiceDetailModal({
     invoice.items,
     invoice.vatRate
   );
+
+  const dgiCert = ensureInvoiceDgiCertification(
+    { ...invoice, subtotal, vatAmount, total },
+    effectiveCompany
+  );
+  const qrMatrix = generateDgiQrMatrix(dgiCert.dgiQrPayload);
+  const effectiveVatPct = Math.round(
+    (invoice.vatRate !== undefined ? Number(invoice.vatRate) : 0.16) * 100
+  );
+
+  const handleCopyCodeDef = () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(dgiCert.dgiCodeDef);
+      setCopiedCodeDef(true);
+      setTimeout(() => setCopiedCodeDef(false), 2000);
+    }
+  };
 
   const getStatusDisplay = (status) => {
     switch (status) {
@@ -77,7 +102,7 @@ export default function InvoiceDetailModal({
       <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-100 my-8 overflow-hidden">
         {/* Top Action Bar */}
         <div className="px-6 py-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="font-extrabold text-base tracking-wide text-white">
               Facture {invoice.id}
             </span>
@@ -85,6 +110,10 @@ export default function InvoiceDetailModal({
               className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusInfo.classes}`}
             >
               {statusInfo.label}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+              <ShieldCheck className="w-3 h-3" />
+              NORMALISÉE DGI • {dgiCert.dgiInvoiceType} • GR. {dgiCert.dgiTaxGroup}
             </span>
           </div>
 
@@ -345,7 +374,9 @@ export default function InvoiceDetailModal({
               </div>
 
               <div className="flex justify-between text-xs text-slate-600">
-                <span>TVA (18%) :</span>
+                <span>
+                  TVA ({effectiveVatPct}% • Gr. {dgiCert.dgiTaxGroup}) :
+                </span>
                 <span className="font-semibold text-slate-800">
                   {formatFCFA(vatAmount, __cur)}
                 </span>
@@ -360,13 +391,130 @@ export default function InvoiceDetailModal({
             </div>
           </div>
 
+          {/* Cartouche Officiel de Sécurité DGI RDC (SFE / DEF / e-MCF) */}
+          <div className="mt-8 rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-blue-50/40 p-4 sm:p-5 shadow-2xs">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+              {/* QR Code Officiel 21x21 Vectoriel */}
+              <div className="shrink-0 flex flex-col items-center bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                <svg
+                  viewBox="0 0 21 21"
+                  className="w-24 h-24 text-slate-900"
+                  shapeRendering="crispEdges"
+                  aria-label="QR Code de vérification DGI SFE"
+                >
+                  <rect width="21" height="21" fill="#FFFFFF" />
+                  {qrMatrix.map((row, rIdx) =>
+                    row.map((cell, cIdx) =>
+                      cell ? (
+                        <rect
+                          key={`${rIdx}-${cIdx}`}
+                          x={cIdx}
+                          y={rIdx}
+                          width="1"
+                          height="1"
+                          fill="#0F172A"
+                        />
+                      ) : null
+                    )
+                  )}
+                </svg>
+                <span className="mt-1.5 text-[9px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <QrCode className="w-2.5 h-2.5 text-blue-600" />
+                  Vérification SFE
+                </span>
+              </div>
+
+              {/* Métadonnées de Certification DGI */}
+              <div className="flex-1 w-full space-y-2.5 text-center sm:text-left">
+                <div className="flex flex-wrap items-center justify-center sm:justify-between gap-2 pb-2 border-b border-slate-200/80">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
+                      Facture Normalisée DGI RDC — SFE / e-MCF
+                    </span>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                    {dgiCert.dgiMode === "production"
+                      ? "Certifié e-MCF Production"
+                      : "Certifié SFE Homologation"}
+                  </span>
+                </div>
+
+                {/* Code DEF / DGI */}
+                <div className="bg-slate-900 text-white rounded-xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 block">
+                      CODE DEF / DGI (Signature Électronique)
+                    </span>
+                    <span className="font-mono text-xs sm:text-sm font-extrabold tracking-wider text-emerald-400">
+                      {dgiCert.dgiCodeDef}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyCodeDef}
+                    className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] font-bold text-white flex items-center gap-1 transition-colors"
+                  >
+                    {copiedCodeDef ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span>Copié</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 text-slate-300" />
+                        <span>Copier</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Grille NIM / ISF / Compteurs / Groupe Fiscal */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5 text-left">
+                  <div className="bg-white rounded-lg p-2 border border-slate-200/70">
+                    <span className="text-[9px] font-bold uppercase text-slate-400 block">
+                      NIM (Machine SFE)
+                    </span>
+                    <span className="font-mono text-[11px] font-extrabold text-slate-800">
+                      {dgiCert.dgiNim}
+                    </span>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-slate-200/70">
+                    <span className="text-[9px] font-bold uppercase text-slate-400 block">
+                      ISF (Système)
+                    </span>
+                    <span className="font-mono text-[11px] font-extrabold text-slate-800">
+                      {dgiCert.dgiIsf}
+                    </span>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-slate-200/70">
+                    <span className="text-[9px] font-bold uppercase text-slate-400 block">
+                      Compteurs DGI
+                    </span>
+                    <span className="font-mono text-[11px] font-extrabold text-slate-800">
+                      {dgiCert.dgiCounters}
+                    </span>
+                  </div>
+                  <div className="bg-white rounded-lg p-2 border border-slate-200/70">
+                    <span className="text-[9px] font-bold uppercase text-slate-400 block">
+                      Régime Fiscal
+                    </span>
+                    <span className="text-[11px] font-extrabold text-blue-700">
+                      {dgiCert.dgiTaxGroupLabel}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Legal Stamp Footer */}
-          <div className="mt-12 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
+          <div className="mt-8 pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              Document généré électroniquement conforme aux dispositions fiscales régionales
+              Facture normalisée conforme au Système de Facturation Électronique (SFE - DGI RDC & OHADA)
             </span>
-            <span>FacturX v1.0 • Page 1/1</span>
+            <span>FacturX SFE v2.0 • Page 1/1</span>
           </div>
         </div>
       </div>

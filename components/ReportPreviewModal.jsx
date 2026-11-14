@@ -121,7 +121,7 @@ export default function ReportPreviewModal({
 *Statut :* Document conforme et validé par l'Administration FacturX.
 Le rapport PDF officiel haute fidélité a été généré et peut être transmis en pièce jointe.
 
-_Généré via FacturX SaaS — Système de Gestion & Facturation OHADA_`;
+_Généré via FacturX SaaS — Système de Gestion et Facturation OHADA_`;
   };
 
   const handleOpenWhatsApp = () => {
@@ -172,8 +172,8 @@ Tél : ${compPhone} • Email : ${compEmail}`;
     const recipient = emailRecipient.trim();
     const mailto = recipient
       ? `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(
-          subject
-        )}&body=${encodeURIComponent(body)}`
+        subject
+      )}&body=${encodeURIComponent(body)}`
       : `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
   };
@@ -419,15 +419,14 @@ Tél : ${compPhone} • Email : ${compEmail}`;
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              item.status === "payee"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : item.status === "en_attente"
+                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${item.status === "payee"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : item.status === "en_attente"
                                 ? "bg-rose-100 text-rose-800"
                                 : item.status === "envoyee"
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-slate-100 text-slate-800"
-                            }`}
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-slate-100 text-slate-800"
+                              }`}
                           >
                             {item.statusLabel || item.status || "En cours"}
                           </span>

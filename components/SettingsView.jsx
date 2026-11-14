@@ -59,6 +59,7 @@ import {
   fetchAllKybDossiersForSuperAdmin,
   reviewCompanyKybDossier,
   getKybDocumentSignedUrl,
+  upsertCompanyProfile,
 } from "@/lib/supabaseService";
 
 export default function SettingsView({
@@ -398,23 +399,28 @@ export default function SettingsView({
   };
 
   // Sauvegarder l'intégralité des paramètres
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      try {
-        localStorage.setItem("facturx_settings_v3", JSON.stringify(settings));
-        if (setUserProfile) {
-          const newProfile = { ...userProfile, ...profileForm };
-          setUserProfile(newProfile);
-          localStorage.setItem("facturx_user_profile_v3", JSON.stringify(newProfile));
-        }
-        setIsSaving(false);
-        if (onToast) onToast("Tous les paramètres ont été enregistrés avec succès !", "success");
-      } catch (e) {
-        setIsSaving(false);
-        if (onToast) onToast("Erreur lors de la sauvegarde locale.", "error");
+    try {
+      localStorage.setItem("facturx_settings_v3", JSON.stringify(settings));
+      if (setUserProfile) {
+        const newProfile = { ...userProfile, ...profileForm };
+        setUserProfile(newProfile);
+        localStorage.setItem("facturx_user_profile_v3", JSON.stringify(newProfile));
       }
-    }, 400);
+      if (companyInfo?.id) {
+        try {
+          await upsertCompanyProfile(companyInfo);
+        } catch (dbErr) {
+          console.warn("Synchronisation Supabase companyInfo:", dbErr);
+        }
+      }
+      setIsSaving(false);
+      if (onToast) onToast("Tous les paramètres ont été enregistrés avec succès !", "success");
+    } catch (e) {
+      setIsSaving(false);
+      if (onToast) onToast("Erreur lors de la sauvegarde locale.", "error");
+    }
   };
 
   // Export complet de sauvegarde JSON
@@ -1113,6 +1119,129 @@ export default function SettingsView({
                 className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-800 leading-relaxed outline-none"
               />
             </div>
+          </div>
+
+          {/* Carte dédiée : Conformité Fiscale DGI RDC — Facture Normalisée (SFE / DEF / e-MCF) */}
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-xs space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                  Conformité Fiscale DGI RDC — Facture Normalisée (SFE / e-MCF)
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                  Configurez votre Dispositif Électronique Fiscal (DEF / e-MCF) pour apposer automatiquement le Code DEF, le NIM, l&apos;ISF et le QR Code officiel sur chaque facture.
+                </p>
+              </div>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-extrabold border ${
+                  companyInfo?.dgiMode === "production"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
+              >
+                {companyInfo?.dgiMode === "production"
+                  ? "Mode Production e-MCF Actif"
+                  : "Mode Homologation SFE (Sandbox)"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                  Environnement de Certification DGI
+                </label>
+                <select
+                  value={companyInfo?.dgiMode || "sandbox"}
+                  onChange={(e) =>
+                    setCompanyInfo &&
+                    setCompanyInfo({ ...companyInfo, dgiMode: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900"
+                >
+                  <option value="sandbox">
+                    Homologation SFE / Simulation Locale (Sans jeton DGI requis)
+                  </option>
+                  <option value="production">
+                    Production Live e-MCF (Connecté au serveur DGI RDC)
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                  Groupe de Taxation DGI par défaut
+                </label>
+                <select
+                  value={companyInfo?.dgiDefaultTaxGroup || "B"}
+                  onChange={(e) =>
+                    setCompanyInfo &&
+                    setCompanyInfo({
+                      ...companyInfo,
+                      dgiDefaultTaxGroup: e.target.value,
+                    })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900"
+                >
+                  <option value="B">Groupe B — TVA Régime Général RDC (16%)</option>
+                  <option value="A">Groupe A — Exonéré de TVA (0%)</option>
+                  <option value="C">Groupe C — Exportation & Assimilés (0%)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                  NIM — Numéro d&apos;Identification Machine (DEF / SFE)
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo?.dgiNim || "CD01-SFE-001420"}
+                  onChange={(e) =>
+                    setCompanyInfo &&
+                    setCompanyInfo({ ...companyInfo, dgiNim: e.target.value })
+                  }
+                  placeholder="Ex: CD01-SFE-001420"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                  ISF — Identifiant Système Facturier
+                </label>
+                <input
+                  type="text"
+                  value={companyInfo?.dgiIsf || "ISF-FACTURX-RDC-01"}
+                  onChange={(e) =>
+                    setCompanyInfo &&
+                    setCompanyInfo({ ...companyInfo, dgiIsf: e.target.value })
+                  }
+                  placeholder="Ex: ISF-FACTURX-RDC-01"
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-900"
+                />
+              </div>
+            </div>
+
+            {companyInfo?.dgiMode === "production" && (
+              <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-2">
+                <label className="text-xs font-bold text-emerald-900 block">
+                  Jeton API e-MCF (Délivré par la DGI après homologation de l&apos;entreprise)
+                </label>
+                <input
+                  type="password"
+                  value={companyInfo?.dgiApiToken || ""}
+                  onChange={(e) =>
+                    setCompanyInfo &&
+                    setCompanyInfo({ ...companyInfo, dgiApiToken: e.target.value })
+                  }
+                  placeholder="Collez votre jeton Bearer e-MCF officiel DGI..."
+                  className="w-full px-3.5 py-2 bg-white border border-emerald-300 rounded-xl text-xs font-mono text-slate-900"
+                />
+                <p className="text-[11px] text-emerald-700">
+                  En cas d&apos;indisponibilité temporaire du réseau DGI, FacturX bascule automatiquement sur la signature SFE hors-ligne sécurisée.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

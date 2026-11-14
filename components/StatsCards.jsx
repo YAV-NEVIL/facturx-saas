@@ -196,17 +196,81 @@ function InteractiveSparkline({
   );
 }
 
-export default function StatsCards({ metrics, companyInfo = null }) {
+// Analyse une date au format JJ/MM/AAAA ou AAAA-MM-JJ et renvoie le jour du mois (1..31) et le timestamp
+function parseInvoiceDateInfo(dateStr) {
+  if (!dateStr) return { dayOfMonth: 22, ms: 0 };
+  const s = String(dateStr).trim();
+  const slashParts = s.split("/");
+  if (slashParts.length === 3) {
+    const d = parseInt(slashParts[0], 10) || 1;
+    const m = (parseInt(slashParts[1], 10) || 1) - 1;
+    const y = parseInt(slashParts[2], 10) || 2026;
+    const dt = new Date(y, m, d);
+    return { dayOfMonth: Math.min(31, Math.max(1, d)), ms: dt.getTime() };
+  }
+  const dt = new Date(s);
+  if (!Number.isNaN(dt.getTime())) {
+    return { dayOfMonth: dt.getDate(), ms: dt.getTime() };
+  }
+  return { dayOfMonth: 22, ms: 0 };
+}
+
+function getWeekBucketIndex(dateStr) {
+  const { dayOfMonth } = parseInvoiceDateInfo(dateStr);
+  if (dayOfMonth <= 7) return 0; // Sem 1
+  if (dayOfMonth <= 14) return 1; // Sem 2
+  if (dayOfMonth <= 21) return 2; // Sem 3
+  return 3; // Sem 4
+}
+
+export default function StatsCards({
+  metrics,
+  companyInfo = null,
+  invoices = [],
+  payments = [],
+}) {
   const currency = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
-  const sym = getCurrencySymbol(currency);
 
   const totalBilled = Number(metrics?.totalBilled) || 0;
   const totalPaid = Number(metrics?.totalPaid) || 0;
   const totalPending = Number(metrics?.totalPending) || 0;
   const recoveryRate = Number(metrics?.recoveryRate) || 0;
 
-  const buildWeeklyAmountPoints = (finalVal) => {
-    if (!finalVal || finalVal <= 0) {
+  // Agrégation hebdomadaire réelle (Sem 1 à Sem 4) basée sur les dates d'émission et d'encaissement
+  const validInvoices = (invoices || []).filter((inv) => inv.status !== "brouillon");
+
+  const weeklyBilledBuckets = [0, 0, 0, 0];
+  const weeklyPaidBuckets = [0, 0, 0, 0];
+  const weeklyPendingBuckets = [0, 0, 0, 0];
+
+  validInvoices.forEach((inv) => {
+    const wIdx = getWeekBucketIndex(inv.issueDate || inv.issue_date);
+    const invTotal =
+      Number(inv.total) ||
+      (inv.items || []).reduce(
+        (acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
+        0
+      ) *
+        (1 + (inv.vatRate !== undefined ? Number(inv.vatRate) : 0.16));
+
+    weeklyBilledBuckets[wIdx] += Math.round(invTotal);
+    if (inv.status === "payee") {
+      weeklyPaidBuckets[wIdx] += Math.round(invTotal);
+    } else if (inv.status === "envoyee" || inv.status === "en_attente") {
+      weeklyPendingBuckets[wIdx] += Math.round(invTotal);
+    }
+  });
+
+  // Prise en compte des règlements enregistrés dans la table payments s'ils sont fournis
+  if (Array.isArray(payments) && payments.length > 0 && weeklyPaidBuckets.every((v) => v === 0) && totalPaid > 0) {
+    payments.forEach((p) => {
+      const wIdx = getWeekBucketIndex(p.paymentDate || p.date || p.createdAt);
+      weeklyPaidBuckets[wIdx] += Math.round(Number(p.amount) || 0);
+    });
+  }
+
+  const buildCumulativeWeeklyAmountPoints = (buckets, finalTotal) => {
+    if (!finalTotal || finalTotal <= 0) {
       return [
         { label: "Sem 1", val: 0, formatted: formatAmount(0, currency) },
         { label: "Sem 2", val: 0, formatted: formatAmount(0, currency) },
@@ -214,19 +278,33 @@ export default function StatsCards({ metrics, companyInfo = null }) {
         { label: "Sem 4", val: 0, formatted: formatAmount(0, currency) },
       ];
     }
-    const w1 = Math.round(finalVal * 0.25);
-    const w2 = Math.round(finalVal * 0.52);
-    const w3 = Math.round(finalVal * 0.78);
+    const sumBuckets = buckets.reduce((a, b) => a + b, 0);
+    if (sumBuckets <= 0) {
+      return [
+        { label: "Sem 1", val: 0, formatted: formatAmount(0, currency) },
+        { label: "Sem 2", val: 0, formatted: formatAmount(0, currency) },
+        { label: "Sem 3", val: 0, formatted: formatAmount(0, currency) },
+        { label: "Sem 4", val: finalTotal, formatted: formatAmount(finalTotal, currency) },
+      ];
+    }
+    const scale = finalTotal / sumBuckets;
+    const c1 = Math.round(buckets[0] * scale);
+    const c2 = Math.round((buckets[0] + buckets[1]) * scale);
+    const c3 = Math.round((buckets[0] + buckets[1] + buckets[2]) * scale);
     return [
-      { label: "Sem 1", val: w1, formatted: formatAmount(w1, currency) },
-      { label: "Sem 2", val: w2, formatted: formatAmount(w2, currency) },
-      { label: "Sem 3", val: w3, formatted: formatAmount(w3, currency) },
-      { label: "Sem 4", val: finalVal, formatted: formatAmount(finalVal, currency) },
+      { label: "Sem 1", val: c1, formatted: formatAmount(c1, currency) },
+      { label: "Sem 2", val: c2, formatted: formatAmount(c2, currency) },
+      { label: "Sem 3", val: c3, formatted: formatAmount(c3, currency) },
+      { label: "Sem 4", val: finalTotal, formatted: formatAmount(finalTotal, currency) },
     ];
   };
 
-  const buildWeeklyRatePoints = (finalRate) => {
-    if (!finalRate || finalRate <= 0) {
+  const billedPoints = buildCumulativeWeeklyAmountPoints(weeklyBilledBuckets, totalBilled);
+  const paidPoints = buildCumulativeWeeklyAmountPoints(weeklyPaidBuckets, totalPaid);
+  const pendingPoints = buildCumulativeWeeklyAmountPoints(weeklyPendingBuckets, totalPending);
+
+  const buildRealWeeklyRatePoints = () => {
+    if (!recoveryRate || recoveryRate <= 0) {
       return [
         { label: "Sem 1", val: 0, formatted: "0%" },
         { label: "Sem 2", val: 0, formatted: "0%" },
@@ -234,15 +312,31 @@ export default function StatsCards({ metrics, companyInfo = null }) {
         { label: "Sem 4", val: 0, formatted: "0%" },
       ];
     }
-    const r1 = Math.round(finalRate * 0.65 * 10) / 10;
-    const r2 = Math.round(finalRate * 0.8 * 10) / 10;
-    const r3 = Math.round(finalRate * 0.92 * 10) / 10;
-    return [
-      { label: "Sem 1", val: r1, formatted: `${r1}%` },
-      { label: "Sem 2", val: r2, formatted: `${r2}%` },
-      { label: "Sem 3", val: r3, formatted: `${r3}%` },
-      { label: "Sem 4", val: finalRate, formatted: `${finalRate}%` },
-    ];
+    return [0, 1, 2, 3].map((idx) => {
+      if (idx === 3) {
+        return { label: "Sem 4", val: recoveryRate, formatted: `${recoveryRate}%` };
+      }
+      const bVal = billedPoints[idx].val;
+      const pVal = paidPoints[idx].val;
+      const rVal = bVal > 0 ? Math.min(100, Math.round((pVal / bVal) * 1000) / 10) : 0;
+      return {
+        label: `Sem ${idx + 1}`,
+        val: rVal,
+        formatted: `${rVal}%`,
+      };
+    });
+  };
+
+  const ratePoints = buildRealWeeklyRatePoints();
+
+  const computeWeekOverWeekChange = (pts, suffix = "vs semaine passée") => {
+    const w3 = pts[2]?.val || 0;
+    const w4 = pts[3]?.val || 0;
+    if (w4 === 0 && w3 === 0) return `0% ${suffix}`;
+    if (w3 === 0 && w4 > 0) return `+100% ${suffix}`;
+    const pct = Math.round(((w4 - w3) / w3) * 1000) / 10;
+    const sign = pct > 0 ? "+" : "";
+    return `${sign}${pct}% ${suffix}`;
   };
 
   const cards = [
@@ -250,53 +344,53 @@ export default function StatsCards({ metrics, companyInfo = null }) {
       id: "total",
       label: "Total Facturé",
       value: formatFCFA(totalBilled, currency),
-      change: totalBilled > 0 ? "12% vs semaine passée" : "0% vs semaine passée",
-      isPositive: true,
+      change: computeWeekOverWeekChange(billedPoints),
+      isPositive: (billedPoints[3]?.val || 0) >= (billedPoints[2]?.val || 0),
       icon: FileText,
       iconBg: "bg-blue-50 text-blue-600 border border-blue-100/60",
       color: "#2563EB",
       gradientId: "grad-blue-interactive",
       accentHover: "hover:border-blue-300 hover:shadow-blue-500/10",
-      points: buildWeeklyAmountPoints(totalBilled),
+      points: billedPoints,
     },
     {
       id: "paid",
       label: "Montant Encaissé (Payé)",
       value: formatFCFA(totalPaid, currency),
-      change: totalPaid > 0 ? "18% vs semaine passée" : "0% vs semaine passée",
-      isPositive: true,
+      change: computeWeekOverWeekChange(paidPoints),
+      isPositive: (paidPoints[3]?.val || 0) >= (paidPoints[2]?.val || 0),
       icon: CheckCircle2,
       iconBg: "bg-emerald-50 text-emerald-600 border border-emerald-100/60",
       color: "#10B981",
       gradientId: "grad-emerald-interactive",
       accentHover: "hover:border-emerald-300 hover:shadow-emerald-500/10",
-      points: buildWeeklyAmountPoints(totalPaid),
+      points: paidPoints,
     },
     {
       id: "pending",
       label: "En Attente & Retard",
       value: formatFCFA(totalPending, currency),
-      change: totalPending > 0 ? "5% vs semaine passée" : "0% vs semaine passée",
+      change: computeWeekOverWeekChange(pendingPoints),
       isPositive: totalPending === 0,
       icon: Clock,
       iconBg: "bg-amber-50 text-amber-600 border border-amber-100/60",
       color: "#F59E0B",
       gradientId: "grad-amber-interactive",
       accentHover: "hover:border-amber-300 hover:shadow-amber-500/10",
-      points: buildWeeklyAmountPoints(totalPending),
+      points: pendingPoints,
     },
     {
       id: "net",
       label: "Taux de Recouvrement",
       value: `${recoveryRate}%`,
-      change: recoveryRate > 0 ? "7.4% vs moyenne" : "0% vs moyenne",
-      isPositive: true,
+      change: computeWeekOverWeekChange(ratePoints, "vs sem. 3"),
+      isPositive: (ratePoints[3]?.val || 0) >= (ratePoints[2]?.val || 0),
       icon: Wallet,
       iconBg: "bg-purple-50 text-purple-600 border border-purple-100/60",
       color: "#8B5CF6",
       gradientId: "grad-purple-interactive",
       accentHover: "hover:border-purple-300 hover:shadow-purple-500/10",
-      points: buildWeeklyRatePoints(recoveryRate),
+      points: ratePoints,
     },
   ];
 

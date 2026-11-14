@@ -179,17 +179,17 @@ graph TD
 
 ---
 
-## 🟡 ÉTAPE 6 : Facture Normalisée DGI RDC (SFE / e-MCF), Analytique Temps Réel & Domaine Pro
-> **Statut actuel :** `[ ] PROCHAINE ÉTAPE / ÉVOLUTION MÉTIER & INFRASTRUCTURE`  
+## 🟢 ÉTAPE 6 : Facture Normalisée DGI RDC (SFE / e-MCF), Analytique Temps Réel & Domaine Pro
+> **Statut actuel :** `[x] 6.1 & 6.2 COMPLÈTES — [ ] 6.3 EN ATTENTE DE DOMAINE / SMTP`  
 > **Livrables :** Conformité fiscale électronique DGI RDC (QR Code DEF/e-MCF), agrégation hebdomadaire réelle des courbes, domaine personnalisé et SMTP dédié.
 
 ### Ce que comprend cette étape :
-- [ ] **6.1 Intégration de la Facture Normalisée DGI RDC (`SFE` / `e-MCF` / `DEF`)** :
-  - Ajout des champs réglementaires DGI dans la table `companies` et les paramètres : **NIM** (Numéro d'Identification de la Machine fiscale), **ISF** (Identifiant du Système de Facturation) et token API `e-MCF` (modes *Sandbox Test* et *Production*).
-  - Support des groupes de taxation officiels DGI RDC (**Groupe A** : Exonéré 0%, **Groupe B** : Taxable TVA 16%, **Groupe C** : Exportation 0%) et des types de factures (**FV** Facture de Vente, **FA** Facture d'Avoir, **FP** Proforma).
-  - Route serveur sécurisée (`app/api/dgi-sign/route.js`) générant ou récupérant la signature électronique DGI (**Code DEF/DGI**, compteurs de sécurité, horodatage officiel).
-  - Apposition automatique du **QR Code officiel DGI RDC** et du cartouche de sécurité `CODE DEF / DGI` sur les factures PDF ([lib/pdf-generator.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/pdf-generator.js)) et l'aperçu ([components/InvoiceDetailModal.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/InvoiceDetailModal.jsx)).
-- [ ] **6.2 Courbes Hebdomadaires & Tendances Calculées sur les Dates Réelles** :
+- [x] **6.1 Intégration de la Facture Normalisée DGI RDC (`SFE` / `e-MCF` / `DEF`)** :
+  - Ajout des champs réglementaires DGI dans la table `companies` et les paramètres ([components/SettingsView.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/SettingsView.jsx)) : **NIM** (Numéro d'Identification de la Machine fiscale), **ISF** (Identifiant du Système de Facturation) et token API `e-MCF` (modes *Homologation SFE Sandbox* et *Production*).
+  - Support des groupes de taxation officiels DGI RDC (**Groupe A** : Exonéré 0%, **Groupe B** : Taxable TVA 16%, **Groupe C** : Exportation 0%) et des types de factures (**FV** Facture de Vente, **FA** Facture d'Avoir, **FP** Proforma) dans [lib/dgi-service.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/dgi-service.js) et [components/CreateInvoiceModal.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/CreateInvoiceModal.jsx).
+  - Route serveur sécurisée ([app/api/dgi-sign/route.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/app/api/dgi-sign/route.js)) générant ou récupérant la signature électronique DGI (**Code DEF/DGI**, compteurs de sécurité, horodatage officiel).
+  - Apposition automatique du **QR Code officiel DGI RDC (21×21 vectoriel)** et du cartouche de sécurité `CODE DEF / DGI` sur les factures PDF ([lib/pdf-generator.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/pdf-generator.js)) et l'aperçu ([components/InvoiceDetailModal.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/InvoiceDetailModal.jsx)).
+- [x] **6.2 Courbes Hebdomadaires & Tendances Calculées sur les Dates Réelles** :
   - Calcul dynamique des points `Sem 1` à `Sem 4` et des pourcentages d'évolution hebdomadaire dans [components/StatsCards.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/StatsCards.jsx) à partir des dates d'émission et de règlement réelles des factures.
 - [ ] **6.3 Nom de Domaine Personnalisé & Serveur SMTP Dédié** :
   - Connexion d'un domaine personnalisé (ex. `app.facturx.cd`) sur Vercel avec certificat SSL automatique.
@@ -206,7 +206,7 @@ graph TD
 | **3** | **Analytique & Rapports Fiscaux en Direct** | <span style="color:green;font-weight:bold;">✅ Complète</span> | DSO, trésorerie, journal TVA 16%/18%, exports |
 | **4** | **Authentification & Rôles Multi-Tenant** | <span style="color:green;font-weight:bold;">✅ Complète</span> | Login Supabase Auth, rôles équipe, isolation RLS |
 | **5** | **Tests E2E, Mode Hors-Ligne, KYB 48h, Multi-Devises & Prod** | <span style="color:green;font-weight:bold;">✅ Complète</span> | PWA hors-ligne, Onboarding KYB, devise unique, déploiement Vercel |
-| **6** | **Facture Normalisée DGI RDC (e-MCF), Domaine & SMTP Pro** | <span style="color:#2563EB;font-weight:bold;">🎯 Prochaine étape</span> | QR Code DGI / Code DEF, courbes réelles, domaine & SMTP |
+| **6** | **Facture Normalisée DGI RDC (e-MCF), Domaine & SMTP Pro** | <span style="color:green;font-weight:bold;">✅ 6.1 & 6.2 Complètes</span> | QR Code DGI / Code DEF, courbes réelles (6.3 Domaine/SMTP optionnel) |
 
 ---
 

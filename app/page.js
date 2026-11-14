@@ -2081,7 +2081,12 @@ export default function App() {
               )}
 
               {/* 4 KPIs Globaux reliés aux données des factures */}
-              <StatsCards metrics={metrics} companyInfo={companyInfo} />
+              <StatsCards
+                metrics={metrics}
+                companyInfo={companyInfo}
+                invoices={displayedInvoices}
+                payments={payments}
+              />
 
               {/* Prévisions de trésorerie (30j) & Alertes de recouvrement */}
               <DashboardForecast

@@ -21,8 +21,15 @@ import {
   ChevronUp,
   UserPlus,
   Edit3,
+  ShieldCheck,
+  QrCode,
 } from "lucide-react";
 import { defaultClients, defaultCompanyInfo, formatFCFA, getCurrencySymbol } from "@/lib/mock-data";
+import {
+  DGI_TAX_GROUPS,
+  DGI_INVOICE_TYPES,
+  ensureInvoiceDgiCertification,
+} from "@/lib/dgi-service";
 
 export default function CreateInvoiceModal({
   isOpen,
@@ -97,7 +104,31 @@ export default function CreateInvoiceModal({
   const [dueDate, setDueDate] = useState("05/11/2026");
   const [status, setStatus] = useState("envoyee");
   const [applyVat, setApplyVat] = useState(true);
-  const [vatRate, setVatRate] = useState(activeCompany.defaultVatRate || 0.16); // 16% TVA RDC par défaut
+  const [vatRate, setVatRate] = useState(
+    activeCompany.defaultVatRate !== undefined ? Number(activeCompany.defaultVatRate) : 0.16
+  ); // 16% TVA RDC par défaut
+  const [dgiInvoiceType, setDgiInvoiceType] = useState("FV");
+  const [dgiTaxGroupId, setDgiTaxGroupId] = useState(
+    activeCompany.dgiDefaultTaxGroup === "A"
+      ? "A_0"
+      : activeCompany.dgiDefaultTaxGroup === "C"
+      ? "C_0"
+      : Number(activeCompany.defaultVatRate) === 0.18
+      ? "B_18"
+      : "B_16"
+  );
+
+  const selectedTaxGroupMeta =
+    DGI_TAX_GROUPS.find((g) => g.id === dgiTaxGroupId) || DGI_TAX_GROUPS[0];
+
+  const handleTaxGroupChange = (groupId) => {
+    setDgiTaxGroupId(groupId);
+    const found = DGI_TAX_GROUPS.find((g) => g.id === groupId);
+    if (found) {
+      setVatRate(found.rate);
+      setApplyVat(found.rate > 0);
+    }
+  };
 
   const [items, setItems] = useState([
     { description: "Prestation de développement & intégration", quantity: 1, unitPrice: 1200000 },
@@ -195,12 +226,16 @@ export default function CreateInvoiceModal({
     const maxNum = invoiceNumbers.length > 0 ? Math.max(...invoiceNumbers) : 89;
     const nextInvoiceId = `FAC-2026-${String(maxNum + 1).padStart(4, "0")}`;
 
-    const newInvoice = {
+    const effectiveVatRate = applyVat ? vatRate : 0;
+    const effectiveTaxGroup = applyVat ? selectedTaxGroupMeta.code : "A";
+
+    const baseInvoice = {
       id: nextInvoiceId,
       clientId: finalClientId,
       company: {
         name: companyName.trim() || activeCompany.name,
         ninea: companyNinea.trim() || activeCompany.ninea,
+        nif: activeCompany.nif || companyNinea.trim() || "A-0998231-X",
         rccm: companyRccm.trim() || activeCompany.rccm,
         address: companyAddress.trim() || activeCompany.address,
         city: companyCity.trim() || activeCompany.city,
@@ -208,6 +243,9 @@ export default function CreateInvoiceModal({
         email: companyEmail.trim() || activeCompany.email,
         phone: companyPhone.trim() || activeCompany.phone,
         logoUrl: activeCompany.logoUrl || null,
+        dgiMode: activeCompany.dgiMode || "sandbox",
+        dgiNim: activeCompany.dgiNim || "CD01-SFE-001420",
+        dgiIsf: activeCompany.dgiIsf || "ISF-FACTURX-RDC-01",
       },
       clientName: clientName.trim(),
       contactPerson: contactPerson.trim(),
@@ -220,9 +258,25 @@ export default function CreateInvoiceModal({
       dueDate,
       status,
       items,
-      vatRate: applyVat ? vatRate : 0,
+      subtotal,
+      vatAmount,
+      total,
+      vatRate: effectiveVatRate,
+      dgiInvoiceType,
+      dgiTaxGroup: effectiveTaxGroup,
       notes,
       reminders: [],
+    };
+
+    const dgiCert = ensureInvoiceDgiCertification(
+      baseInvoice,
+      baseInvoice.company,
+      (existingInvoices?.length || 0) + 1
+    );
+
+    const newInvoice = {
+      ...baseInvoice,
+      ...dgiCert,
     };
 
     onCreateInvoice(newInvoice);
@@ -722,21 +776,73 @@ export default function CreateInvoiceModal({
             </div>
           </div>
 
-          {/* Section 4: TVA & Récapitulatif Totaux */}
-          <div className="bg-[#EEF4FD] rounded-2xl p-5 border border-blue-100 flex flex-col md:flex-row items-center justify-between gap-6">
-            {/* TVA Toggle and Notes */}
-            <div className="space-y-3 w-full md:w-1/2">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="applyVat"
-                  checked={applyVat}
-                  onChange={(e) => setApplyVat(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                />
-                <label htmlFor="applyVat" className="text-xs font-bold text-slate-800">
-                  Appliquer la TVA légale (18%)
-                </label>
+          {/* Section 4: TVA, Fiscalité Normalisée DGI (SFE / e-MCF) & Récapitulatif Totaux */}
+          <div className="bg-[#EEF4FD] rounded-2xl p-5 border border-blue-100 flex flex-col md:flex-row items-start justify-between gap-6">
+            {/* Fiscalité DGI & Notes */}
+            <div className="space-y-3.5 w-full md:w-7/12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Type de pièce DGI (SFE)
+                  </label>
+                  <select
+                    value={dgiInvoiceType}
+                    onChange={(e) => setDgiInvoiceType(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    {DGI_INVOICE_TYPES.map((t) => (
+                      <option key={t.code} value={t.code}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Groupe de taxation DGI
+                  </label>
+                  <select
+                    value={dgiTaxGroupId}
+                    onChange={(e) => handleTaxGroupChange(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    {DGI_TAX_GROUPS.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 bg-white/80 px-3 py-2 rounded-xl border border-blue-100">
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    id="applyVat"
+                    checked={applyVat}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setApplyVat(checked);
+                      if (!checked) {
+                        setDgiTaxGroupId("A_0");
+                      } else if (vatRate === 0) {
+                        setVatRate(0.16);
+                        setDgiTaxGroupId("B_16");
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                  />
+                  <label htmlFor="applyVat" className="text-xs font-bold text-slate-800">
+                    Appliquer la TVA ({Math.round((applyVat ? vatRate : 0) * 100)}% •{" "}
+                    {applyVat ? selectedTaxGroupMeta.shortLabel : "Groupe A Exonéré"})
+                  </label>
+                </div>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold">
+                  <ShieldCheck className="w-3 h-3" />
+                  SFE / DEF Actif
+                </span>
               </div>
 
               <div>
@@ -753,20 +859,33 @@ export default function CreateInvoiceModal({
             </div>
 
             {/* Total figures */}
-            <div className="w-full md:w-1/2 bg-white rounded-xl p-4 shadow-sm border border-slate-100 space-y-2">
+            <div className="w-full md:w-5/12 bg-white rounded-xl p-4 shadow-sm border border-slate-100 space-y-2.5">
               <div className="flex justify-between text-xs text-slate-600">
                 <span>Sous-total HT :</span>
                 <span className="font-semibold">{formatFCFA(subtotal, __cur)}</span>
               </div>
 
               <div className="flex justify-between text-xs text-slate-600">
-                <span>TVA (18%) :</span>
+                <span>
+                  TVA ({Math.round((applyVat ? vatRate : 0) * 100)}% • Gr.{" "}
+                  {applyVat ? selectedTaxGroupMeta.code : "A"}) :
+                </span>
                 <span className="font-semibold">{formatFCFA(vatAmount, __cur)}</span>
               </div>
 
               <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-sm font-extrabold text-slate-900">
                 <span>Total TTC :</span>
                 <span className="text-base text-blue-600">{formatFCFA(total, __cur)}</span>
+              </div>
+
+              <div className="pt-2 border-t border-dashed border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
+                <span className="inline-flex items-center gap-1 font-semibold text-slate-600">
+                  <QrCode className="w-3.5 h-3.5 text-blue-600" />
+                  NIM : {activeCompany.dgiNim || "CD01-SFE-001420"}
+                </span>
+                <span className="font-mono font-bold text-blue-700">
+                  {dgiInvoiceType} • CODE DEF
+                </span>
               </div>
             </div>
           </div>

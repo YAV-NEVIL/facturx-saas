@@ -87,7 +87,7 @@ export default function RecordPaymentModal({
       const mm = String(today.getMonth() + 1).padStart(2, "0");
       const yyyy = today.getFullYear();
       setPaymentDate(`${dd}/${mm}/${yyyy}`);
-      
+
       const hh = String(today.getHours()).padStart(2, "0");
       const min = String(today.getMinutes()).padStart(2, "0");
       setPaymentTime(`${hh}:${min}`);
@@ -201,7 +201,7 @@ export default function RecordPaymentModal({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-200">
-        
+
         {/* Entête de la Modale */}
         <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white">
           <div className="flex items-center gap-3">
@@ -287,13 +287,12 @@ export default function RecordPaymentModal({
                     <span className="text-[10px] font-bold text-blue-600 uppercase block">
                       Statut actuel
                     </span>
-                    <span className={`font-extrabold uppercase px-2 py-0.5 rounded-full text-[10px] ${
-                      currentInvoice.status === "payee"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : currentInvoice.status === "en_attente"
+                    <span className={`font-extrabold uppercase px-2 py-0.5 rounded-full text-[10px] ${currentInvoice.status === "payee"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : currentInvoice.status === "en_attente"
                         ? "bg-rose-100 text-rose-800"
                         : "bg-orange-100 text-orange-800"
-                    }`}>
+                      }`}>
                       {currentInvoice.status === "payee" ? "Soldée" : currentInvoice.status === "en_attente" ? "En retard" : "Envoyée"}
                     </span>
                   </div>
@@ -413,13 +412,12 @@ export default function RecordPaymentModal({
                     key={index}
                     type="button"
                     onClick={() => handleSelectPaymentPreset(preset)}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all text-left ${
-                      isSelected
-                        ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25 scale-[1.02]"
-                        : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
-                    }`}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-[10px] border text-xs font-medium transition-colors text-left ${isSelected
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                      }`}
                   >
-                    <span className="text-sm">{preset.icon}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? "bg-white" : "bg-slate-400"}`} />
                     <span className="truncate">{preset.label}</span>
                   </button>
                 );
