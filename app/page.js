@@ -1059,8 +1059,8 @@ export default function App() {
         await apiUpdateInvoiceStatus(newPayment.invoiceId, "payee");
       }
       showToast(
-        `Règlement ${newPayment.receiptNumber || newPayment.id} (${formatAmount(newPayment.amount, newPayment.currency || companyInfo?.defaultCurrency)}) enregistré !${
-          isFullySettled ? " 🎉 Facture 100% soldée." : ""
+        `Règlement ${newPayment.receiptNumber || newPayment.id} (${formatAmount(newPayment.amount, newPayment.currency || companyInfo?.defaultCurrency)}) enregistré${
+          isFullySettled ? " — Facture soldée" : ""
         }`,
         "success"
       );
@@ -1070,7 +1070,7 @@ export default function App() {
       if (newPayment.invoiceId && isFullySettled) {
         enqueueOfflineAction("UPDATE_INVOICE_STATUS", { id: newPayment.invoiceId, status: "payee" }, userProfile?.companyId);
       }
-      showToast(`Règlement enregistré en file d'attente hors-ligne !`, "info");
+      showToast(`Règlement enregistré en file d'attente hors-ligne`, "info");
     }
   };
 
@@ -1364,14 +1364,14 @@ export default function App() {
     setSelectedQuote(null);
     setSelectedInvoice(newInvoice);
 
-    showToast(`✨ Conversion du devis en facture...`, "info");
+    showToast(`Conversion du devis en facture`, "info");
     try {
       await apiCreateInvoice(newInvoice, userProfile?.companyId);
       await apiUpdateQuoteStatus(quote.id, "accepte", nextInvoiceId);
-      showToast(`✨ Devis ${quote.id} converti en Facture ${nextInvoiceId} !`, "success");
+      showToast(`Devis ${quote.id} converti en facture ${nextInvoiceId}`, "success");
     } catch (err) {
       console.error("Erreur conversion devis Supabase:", err);
-      showToast(`✨ Devis ${quote.id} converti en Facture officielle ${nextInvoiceId} !`, "success");
+      showToast(`Devis ${quote.id} converti en facture officielle ${nextInvoiceId}`, "success");
     }
   };
 
@@ -1787,7 +1787,7 @@ export default function App() {
       />
 
       {/* 2. Main Content Area */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
+      <div className="flex-1 lg:pl-[260px] flex flex-col min-w-0">
         {/* Top Header with interactive Calendar & Profile navigation */}
         <Header
           searchQuery={searchQuery}
@@ -1877,43 +1877,42 @@ export default function App() {
           {/* TAB: DASHBOARD (SYNTHÈSE FINANCIÈRE & PRÉVISIONS) */}
           {activeTab === "dashboard" && (
             <div className="space-y-5 sm:space-y-6 lg:space-y-8 animate-in fade-in duration-200">
-              {/* BANNIÈRE DE BIENVENUE PERSONNALISÉE SELON LE PROFIL CONNECTÉ */}
-              <div className="bg-gradient-to-r from-[#1A44B8] via-[#163DA9] to-[#2D60FF] rounded-2xl p-4 sm:p-6 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 min-w-0">
-                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-base sm:text-lg font-extrabold shadow-inner shrink-0">
+              {/* BARRE DE CONTEXTE DE L'ENTREPRISE (UNSLOP PASS 2 & PASS 4 : SANS BANNIÈRE CRIARDE NI EMOJI DE SALUTATION) */}
+              <div className="bg-white rounded-[14px] p-4 sm:p-5 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                  <div className="w-10 h-10 rounded-[10px] bg-slate-100 border border-slate-200 text-slate-800 flex items-center justify-center text-sm font-medium shrink-0">
                     {userProfile?.initials || "FX"}
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-lg sm:text-2xl font-extrabold tracking-tight">
-                        Bonjour, {userProfile?.fullName || "Collaborateur"} 👋
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h2 className="text-base sm:text-lg font-medium text-slate-900">
+                        {companyInfo?.name || userProfile?.companyName || "Mon Entreprise"}
                       </h2>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        En ligne
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                        {selectedDate || selectedPeriod || "Octobre 2026"}
                       </span>
                       {!isPlatformSuperAdmin && effectiveKybStatus === "pending_review" && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-amber-400/25 text-amber-100 border border-amber-300/40">
-                          <Clock className="w-3 h-3 animate-pulse shrink-0" />
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[6px] text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                          <Clock className="w-3 h-3 stroke-[1.5] shrink-0" />
                           Vérification en cours (48h)
                         </span>
                       )}
                       {!isPlatformSuperAdmin && effectiveKybStatus === "rejected" && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-rose-500/30 text-rose-100 border border-rose-300/40">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[6px] text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">
+                          <AlertCircle className="w-3 h-3 stroke-[1.5] shrink-0" />
                           Documents à revoir
                         </span>
                       )}
                       {!isPlatformSuperAdmin && effectiveKybStatus === "approved" && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-400/25 text-emerald-100 border border-emerald-300/40">
-                          <ShieldCheck className="w-3 h-3 shrink-0" />
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[6px] text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <ShieldCheck className="w-3 h-3 stroke-[1.5] shrink-0" />
                           Entreprise vérifiée
                         </span>
                       )}
                     </div>
-                    <p className="text-xs sm:text-sm text-blue-100/90 mt-1 break-words">
-                      Espace <strong>{userProfile?.badge || userProfile?.role}</strong> chez{" "}
-                      <span className="underline decoration-blue-300 font-bold">{companyInfo?.name || userProfile?.companyName || "Mon Entreprise"}</span>
+                    <p className="text-xs text-slate-500 mt-0.5 break-words">
+                      {userProfile?.fullName || "Collaborateur"} • Espace {userProfile?.badge || userProfile?.role}
                     </p>
                   </div>
                 </div>
@@ -1922,10 +1921,10 @@ export default function App() {
                   <div className="flex items-center gap-2 self-start md:self-auto">
                     <button
                       onClick={() => setActiveTab("company")}
-                      className="px-3.5 py-2 bg-white/15 hover:bg-white/25 active:scale-95 text-white border border-white/20 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                      className="h-9 px-3.5 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] text-slate-700 border border-slate-200 text-xs font-medium rounded-[8px] transition-colors duration-150 cursor-pointer flex items-center gap-1.5"
                     >
-                      <Building2 className="w-3.5 h-3.5 text-blue-200" />
-                      Mon Entreprise
+                      <Building2 className="w-3.5 h-3.5 stroke-[1.5] text-slate-500" />
+                      Mon entreprise
                     </button>
                   </div>
                 )}

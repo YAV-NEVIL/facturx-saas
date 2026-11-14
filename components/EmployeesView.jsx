@@ -156,13 +156,13 @@ export default function EmployeesView({
   const roleLabel = (role) => {
     switch (role) {
       case "admin":
-        return "👑 Administrateur Général";
+        return "Administrateur général";
       case "comptable":
-        return "📊 Responsable Comptable";
+        return "Responsable comptable";
       case "commercial":
-        return "🤝 Chargé Commercial";
+        return "Chargé commercial";
       case "gestionnaire_stock":
-        return "📦 Gestionnaire de Stock";
+        return "Gestionnaire de stock";
       default:
         return "Membre de l'équipe";
     }
@@ -290,8 +290,8 @@ export default function EmployeesView({
             className="py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600/30 cursor-pointer"
           >
             <option value="all">Tous les statuts</option>
-            <option value="online">🟢 En ligne</option>
-            <option value="offline">⚪ Hors ligne</option>
+            <option value="online">En ligne</option>
+            <option value="offline">Hors ligne</option>
           </select>
 
           {/* Filtre Rôle */}
@@ -538,23 +538,23 @@ export default function EmployeesView({
                   {[
                     {
                       id: "admin",
-                      title: "👑 Administrateur",
+                      title: "Administrateur",
                       desc: "Accès total sans restriction",
                     },
                     {
                       id: "comptable",
-                      title: "📊 Responsable Comptable",
-                      desc: "Factures, Devis, Paiements & TVA",
+                      title: "Responsable comptable",
+                      desc: "Factures, devis, paiements et TVA",
                     },
                     {
                       id: "commercial",
-                      title: "🤝 Chargé Commercial",
-                      desc: "Devis, CRM Clients",
+                      title: "Chargé commercial",
+                      desc: "Devis, CRM clients",
                     },
                     {
                       id: "gestionnaire_stock",
-                      title: "📦 Gestionnaire Stock",
-                      desc: "Articles, Devis, Facturation",
+                      title: "Gestionnaire stock",
+                      desc: "Articles, devis, facturation",
                     },
                   ].map((r) => (
                     <div

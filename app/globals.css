@@ -2,16 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   UNSLOP DESIGN SYSTEM — TOKENS (by Damir Sokolovsky @heydamir, CC BY 4.0)
+   Direction: Exact, calme, institutionnel (Grand Livre & Trésorerie OHADA/RDC)
+   Neutral Ramp: Graphite / Ink
+   ========================================================================== */
+
 :root {
-  --background: #f6f8fc;
-  --foreground: #0f172a;
-  --accent-primary: #2563eb;
-  --accent-primary-hover: #1d4ed8;
+  --bg-deep: #0f0f10;
+  --background: #fafafa;
+  --surface-card: #ffffff;
+  --surface-raised: #f4f4f5;
+  --hairline: rgba(23, 23, 23, 0.08);
+  --foreground: #171717;
+  --text-secondary: #525252;
+  --text-muted: #737373;
+  --accent-primary: #183bb0;
+  --accent-primary-hover: #143196;
+  --semantic-positive: #16a34a;
+  --semantic-negative: #dc2626;
+  --ease-unslop: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html.dark {
-  --background: #0b132b;
-  --foreground: #f8fafc;
+  --bg-deep: #0f0f10;
+  --background: #141415;
+  --surface-card: #19191b;
+  --surface-raised: #232325;
+  --hairline: rgba(237, 237, 237, 0.08);
+  --foreground: #ededed;
+  --text-secondary: #a1a1a6;
+  --text-muted: #85858b;
+  --accent-primary: #3b82f6;
+  --accent-primary-hover: #2563eb;
+  --semantic-positive: #4cc38a;
+  --semantic-negative: #e5484d;
   color-scheme: dark;
 }
 
@@ -29,7 +54,44 @@ body {
   font-family: var(--font-jakarta), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  transition: background-color 160ms var(--ease-unslop), color 160ms var(--ease-unslop);
+}
+
+/* Pass 5 (Type): Chiffres tabulaires alignés partout et hiérarchie par la taille (poids 400–600) */
+table,
+td,
+th,
+.tabular-nums,
+.font-mono,
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+.font-black,
+.font-extrabold {
+  font-weight: 600 !important;
+}
+
+.font-bold {
+  font-weight: 500 !important;
+}
+
+/* Pass 5 (Type): Pas d'espacement négatif sur le petit texte (< 16px) */
+.text-xs,
+.text-\[10px\],
+.text-\[11px\],
+.text-\[12px\],
+.text-\[13px\],
+.text-sm {
+  letter-spacing: 0 !important;
+}
+
+/* Pass 9 (Motion): Courbe d'accélération unique et sobre */
+*,
+*::before,
+*::after {
+  transition-timing-function: var(--ease-unslop);
 }
 
 /* Défilement fluide tactile sur mobile pour les tableaux larges */
@@ -38,51 +100,51 @@ body {
 }
 
 /* ==========================================================================
-   COULEURS D'ACCENTUATION DYNAMIQUES (CLAIR & SOMBRE HAUT CONTRASTE WCAG AA)
+   COULEURS D'ACCENTUATION DYNAMIQUES (CLAIR & SOMBRE CONTRASTE >= 4.5:1)
    ========================================================================== */
 html[data-accent="emerald"] .bg-blue-600,
 html[data-accent="emerald"] .bg-\[\#2D60FF\],
 html[data-accent="emerald"] .bg-\[\#183BB0\] {
-  background-color: #047857 !important;
+  background-color: #15803d !important;
   color: #ffffff !important;
 }
 html[data-accent="emerald"] .hover\:bg-blue-700:hover,
 html[data-accent="emerald"] .hover\:bg-\[\#122F8C\]:hover {
-  background-color: #065f46 !important;
+  background-color: #166534 !important;
 }
 html[data-accent="emerald"] .border-blue-600,
 html[data-accent="emerald"] .border-blue-500 {
-  border-color: #10b981 !important;
+  border-color: #16a34a !important;
 }
 
 html[data-accent="violet"] .bg-blue-600,
 html[data-accent="violet"] .bg-\[\#2D60FF\],
 html[data-accent="violet"] .bg-\[\#183BB0\] {
-  background-color: #7c3aed !important;
+  background-color: #6d28d9 !important;
   color: #ffffff !important;
 }
 html[data-accent="violet"] .hover\:bg-blue-700:hover,
 html[data-accent="violet"] .hover\:bg-\[\#122F8C\]:hover {
-  background-color: #6d28d9 !important;
+  background-color: #5b21b6 !important;
 }
 html[data-accent="violet"] .border-blue-600,
 html[data-accent="violet"] .border-blue-500 {
-  border-color: #8b5cf6 !important;
+  border-color: #7c3aed !important;
 }
 
 html[data-accent="indigo"] .bg-blue-600,
 html[data-accent="indigo"] .bg-\[\#2D60FF\],
 html[data-accent="indigo"] .bg-\[\#183BB0\] {
-  background-color: #4f46e5 !important;
+  background-color: #4338ca !important;
   color: #ffffff !important;
 }
 html[data-accent="indigo"] .hover\:bg-blue-700:hover,
 html[data-accent="indigo"] .hover\:bg-\[\#122F8C\]:hover {
-  background-color: #4338ca !important;
+  background-color: #3730a3 !important;
 }
 html[data-accent="indigo"] .border-blue-600,
 html[data-accent="indigo"] .border-blue-500 {
-  border-color: #6366f1 !important;
+  border-color: #4f46e5 !important;
 }
 
 html[data-accent="amber"] .bg-blue-600,
@@ -97,29 +159,60 @@ html[data-accent="amber"] .hover\:bg-\[\#122F8C\]:hover {
 }
 html[data-accent="amber"] .border-blue-600,
 html[data-accent="amber"] .border-blue-500 {
-  border-color: #f59e0b !important;
+  border-color: #d97706 !important;
 }
 
 html[data-accent="slate"] .bg-blue-600,
 html[data-accent="slate"] .bg-\[\#2D60FF\],
 html[data-accent="slate"] .bg-\[\#183BB0\] {
-  background-color: #334155 !important;
+  background-color: #171717 !important;
   color: #ffffff !important;
 }
 html.dark[data-accent="slate"] .bg-blue-600,
 html.dark[data-accent="slate"] .bg-\[\#2D60FF\],
 html.dark[data-accent="slate"] .bg-\[\#183BB0\] {
-  background-color: #3b82f6 !important;
-  color: #ffffff !important;
+  background-color: #ededed !important;
+  color: #0f0f10 !important;
 }
 
 /* ==========================================================================
-   SYSTÈME MODE SOMBRE HAUTE LISIBILITÉ (WCAG AA / AAA SUR TOUTES LES COULEURS)
+   PASS 2 & PASS 7 : RAMPE NEUTRE GRAPHITE EN MODE CLAIR & SOMBRE
    ========================================================================== */
 
-/* 1. Surfaces principales & cartes (opacités >= 50% uniquement pour préserver le glassmorphism /5../25 des bannières) */
+/* Fond de page principal en mode clair (#fafafa) */
+.bg-\[\#F6F8FC\] {
+  background-color: var(--background) !important;
+}
+
+/* Bordures hairlines subtiles en mode clair (8% d'opacité) */
+.border-slate-100,
+.border-slate-200,
+.border-slate-200\/80,
+.border-slate-200\/90 {
+  border-color: var(--hairline) !important;
+}
+
+/* Ombres neutres très douces en mode clair, aucune ombre portée en mode sombre */
+.shadow-sm,
+.shadow-md,
+.shadow-lg,
+.shadow-\[0_2px_10px_rgba\(0\,0\,0\,0\.03\)\],
+.shadow-\[0_2px_12px_rgba\(0\,0\,0\,0\.03\)\] {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.dark .shadow-sm,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl,
+html.dark .shadow-\[0_2px_10px_rgba\(0\,0\,0\,0\.03\)\],
+html.dark .shadow-\[0_2px_12px_rgba\(0\,0\,0\,0\.03\)\] {
+  box-shadow: none !important;
+}
+
+/* 1. Surfaces principales & cartes en Mode Sombre (Rampe Graphite #141415 / #19191b / #232325) */
 html.dark .bg-\[\#F6F8FC\] {
-  background-color: #0b132b !important;
+  background-color: #141415 !important;
 }
 
 html.dark .bg-white,
@@ -129,15 +222,15 @@ html.dark .bg-white\/70,
 html.dark .bg-white\/80,
 html.dark .bg-white\/90,
 html.dark .bg-white\/95 {
-  background-color: #111c44 !important;
-  color: #f8fafc;
+  background-color: #19191b !important;
+  color: #ededed;
 }
 
-/* Conserver le bouton CTA blanc de la sidebar et le carré logo d'aperçu nets */
-html.dark aside .bg-white,
-html.dark [class*="from-blue-900"] .bg-white {
-  background-color: #ffffff !important;
-  color: #183bb0 !important;
+/* Conserver le bouton primaire clair dans la sidebar sombre */
+html.dark aside .bg-\[\#ededed\],
+html.dark aside .bg-white {
+  background-color: #ededed !important;
+  color: #0f0f10 !important;
 }
 
 html.dark .bg-\[\#EEF4FD\],
@@ -145,19 +238,19 @@ html.dark [class*="bg-[#EEF4FD]"],
 html.dark .bg-slate-50,
 html.dark [class*="bg-slate-50/"],
 html.dark .bg-gray-50 {
-  background-color: #182454 !important;
-  color: #e2e8f0;
+  background-color: #232325 !important;
+  color: #ededed;
 }
 
 html.dark .bg-slate-100,
 html.dark [class*="bg-slate-100/"],
 html.dark .bg-slate-200,
 html.dark [class*="bg-slate-200/"] {
-  background-color: #1f2d66 !important;
-  color: #f1f5f9;
+  background-color: #27272a !important;
+  color: #ededed;
 }
 
-/* 2. Neutralisation des dégradés clairs (from-white exact, from-*-50) sans toucher aux from-white/15 de la sidebar */
+/* 2. Suppression des dégradés de surface en Mode Sombre -> surface plane #19191b */
 html.dark .from-white,
 html.dark [class*="from-slate-50"],
 html.dark [class*="from-slate-100"],
@@ -167,16 +260,16 @@ html.dark [class*="from-emerald-50"],
 html.dark [class*="from-amber-50"],
 html.dark [class*="from-rose-50"],
 html.dark [class*="from-purple-50"] {
-  --tw-gradient-from: #162352 var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: rgba(22, 35, 82, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-from: #232325 var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: #232325 var(--tw-gradient-to-position) !important;
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
 }
 
 html.dark .via-white,
 html.dark [class*="via-slate-50"],
-html.dark [class*="via-blue-50"] {
-  --tw-gradient-via: #14204b var(--tw-gradient-via-position) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+html.dark [class*="via-blue-50"],
+html.dark [class*="via-indigo-50"] {
+  --tw-gradient-via: #232325 var(--tw-gradient-via-position) !important;
 }
 
 html.dark .to-white,
@@ -188,32 +281,32 @@ html.dark [class*="to-emerald-50"],
 html.dark [class*="to-amber-50"],
 html.dark [class*="to-rose-50"],
 html.dark [class*="to-purple-50"] {
-  --tw-gradient-to: #111c44 var(--tw-gradient-to-position) !important;
+  --tw-gradient-to: #232325 var(--tw-gradient-to-position) !important;
 }
 
-/* Pastilles de statut en hexadécimal (Payée, Envoyée, En retard, Brouillon) en Mode Sombre */
+/* Pastilles de statut sémantiques en Mode Sombre */
 html.dark .bg-\[\#DCFCE7\] {
-  background-color: rgba(16, 185, 129, 0.22) !important;
-  color: #4ade80 !important;
-  border-color: rgba(52, 211, 153, 0.4) !important;
+  background-color: rgba(76, 195, 138, 0.14) !important;
+  color: #4cc38a !important;
+  border-color: rgba(76, 195, 138, 0.28) !important;
 }
 html.dark .bg-\[\#FFEDD5\] {
-  background-color: rgba(249, 115, 22, 0.22) !important;
-  color: #fdba74 !important;
-  border-color: rgba(251, 146, 60, 0.4) !important;
+  background-color: rgba(245, 158, 11, 0.14) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.28) !important;
 }
 html.dark .bg-\[\#FFE4E6\] {
-  background-color: rgba(244, 63, 94, 0.24) !important;
-  color: #fda4af !important;
-  border-color: rgba(251, 113, 133, 0.4) !important;
+  background-color: rgba(229, 72, 77, 0.14) !important;
+  color: #e5484d !important;
+  border-color: rgba(229, 72, 77, 0.28) !important;
 }
 html.dark .bg-\[\#F1F5F9\] {
-  background-color: rgba(148, 163, 184, 0.22) !important;
-  color: #e2e8f0 !important;
-  border-color: rgba(148, 163, 184, 0.35) !important;
+  background-color: #232325 !important;
+  color: #a1a1a6 !important;
+  border-color: rgba(237, 237, 237, 0.08) !important;
 }
 
-/* 3. Surfaces colorées pastel (-50 / -100 / -200 et leurs variantes /20../90) converties en verre sombre profond */
+/* 3. Surfaces teintées subtiles en Mode Sombre */
 html.dark .bg-blue-50,
 html.dark [class*="bg-blue-50/"],
 html.dark .bg-blue-100,
@@ -222,17 +315,15 @@ html.dark .bg-blue-200,
 html.dark [class*="bg-blue-200/"],
 html.dark .bg-cyan-50,
 html.dark [class*="bg-cyan-50/"],
-html.dark .bg-sky-50 {
-  background-color: rgba(37, 99, 235, 0.22) !important;
-}
-
+html.dark .bg-sky-50,
 html.dark .bg-indigo-50,
 html.dark [class*="bg-indigo-50/"],
 html.dark .bg-indigo-100,
-html.dark [class*="bg-indigo-100/"],
-html.dark .bg-indigo-200,
-html.dark [class*="bg-indigo-200/"] {
-  background-color: rgba(79, 70, 229, 0.22) !important;
+html.dark .bg-purple-50,
+html.dark [class*="bg-purple-50/"],
+html.dark .bg-purple-100,
+html.dark .bg-violet-50 {
+  background-color: #232325 !important;
 }
 
 html.dark .bg-emerald-50,
@@ -244,7 +335,7 @@ html.dark [class*="bg-emerald-200/"],
 html.dark .bg-green-50,
 html.dark .bg-green-100,
 html.dark .bg-teal-50 {
-  background-color: rgba(16, 185, 129, 0.2) !important;
+  background-color: rgba(76, 195, 138, 0.12) !important;
 }
 
 html.dark .bg-amber-50,
@@ -257,7 +348,7 @@ html.dark .bg-yellow-50,
 html.dark .bg-orange-50,
 html.dark [class*="bg-orange-50/"],
 html.dark .bg-orange-100 {
-  background-color: rgba(245, 158, 11, 0.2) !important;
+  background-color: rgba(245, 158, 11, 0.12) !important;
 }
 
 html.dark .bg-rose-50,
@@ -268,98 +359,69 @@ html.dark .bg-rose-200,
 html.dark [class*="bg-rose-200/"],
 html.dark .bg-red-50,
 html.dark .bg-red-100 {
-  background-color: rgba(244, 63, 94, 0.22) !important;
+  background-color: rgba(229, 72, 77, 0.12) !important;
 }
 
-html.dark .bg-purple-50,
-html.dark [class*="bg-purple-50/"],
-html.dark .bg-purple-100,
-html.dark [class*="bg-purple-100/"],
-html.dark .bg-purple-200,
-html.dark [class*="bg-purple-200/"],
-html.dark .bg-violet-50,
-html.dark .bg-violet-100 {
-  background-color: rgba(168, 85, 247, 0.22) !important;
-}
-
-/* 4. Bordures subtiles et colorées en Mode Sombre */
+/* 4. Bordures Hairline (8% d'opacité du texte primaire) en Mode Sombre */
 html.dark .border-slate-100,
 html.dark .border-slate-200,
 html.dark [class*="border-slate-200/"],
 html.dark .border-slate-300,
+html.dark .border-blue-100,
+html.dark .border-blue-200,
+html.dark [class*="border-blue-200/"],
+html.dark .border-indigo-100,
+html.dark .border-indigo-200,
+html.dark .border-purple-100,
+html.dark .border-purple-200,
 html.dark .divide-slate-50 > * + *,
 html.dark .divide-slate-100 > * + *,
 html.dark .divide-slate-200 > * + * {
-  border-color: #2b3a78 !important;
-}
-
-html.dark .border-blue-100,
-html.dark .border-blue-200,
-html.dark [class*="border-blue-200/"] {
-  border-color: rgba(96, 165, 250, 0.35) !important;
-}
-
-html.dark .border-indigo-100,
-html.dark .border-indigo-200 {
-  border-color: rgba(129, 140, 248, 0.35) !important;
+  border-color: rgba(237, 237, 237, 0.08) !important;
 }
 
 html.dark .border-emerald-100,
 html.dark .border-emerald-200,
 html.dark .border-emerald-300 {
-  border-color: rgba(52, 211, 153, 0.35) !important;
+  border-color: rgba(76, 195, 138, 0.24) !important;
 }
 
 html.dark .border-amber-100,
 html.dark .border-amber-200,
 html.dark .border-amber-300 {
-  border-color: rgba(251, 191, 36, 0.35) !important;
+  border-color: rgba(245, 158, 11, 0.24) !important;
 }
 
 html.dark .border-rose-100,
 html.dark .border-rose-200,
 html.dark .border-rose-300 {
-  border-color: rgba(251, 113, 133, 0.35) !important;
+  border-color: rgba(229, 72, 77, 0.24) !important;
 }
 
-html.dark .border-purple-100,
-html.dark .border-purple-200 {
-  border-color: rgba(192, 132, 252, 0.35) !important;
-}
-
-/* 5. Typographie neutre haute lisibilité en Mode Sombre (ratio >= 5.2:1 partout) */
+/* 5. Trois rôles de texte stricts en Mode Sombre : Primary (#ededed), Secondary (#a1a1a6), Muted (#85858b) */
 html.dark .text-slate-950,
 html.dark .text-slate-900,
-html.dark .text-gray-900 {
-  color: #ffffff !important;
-}
-
 html.dark .text-slate-800,
+html.dark .text-gray-900,
 html.dark .text-gray-800 {
-  color: #f8fafc !important;
+  color: #ededed !important;
 }
 
 html.dark .text-slate-700,
-html.dark .text-gray-700 {
-  color: #e2e8f0 !important;
-}
-
 html.dark .text-slate-600,
+html.dark .text-gray-700,
 html.dark .text-gray-600 {
-  color: #cbd5e1 !important;
+  color: #a1a1a6 !important;
 }
 
 html.dark .text-slate-500,
-html.dark .text-gray-500 {
-  color: #b4c2e4 !important;
-}
-
 html.dark .text-slate-400,
+html.dark .text-gray-500,
 html.dark .text-gray-400 {
-  color: #9db0d8 !important;
+  color: #85858b !important;
 }
 
-/* 6. Textes colorés lumineux en Mode Sombre (fini les bleus/verts/rouges/violets foncés illisibles sur fond sombre) */
+/* 6. Un seul accent et couleurs sémantiques adoucies en Mode Sombre */
 html.dark .text-blue-600,
 html.dark .text-blue-700,
 html.dark .text-blue-800,
@@ -368,25 +430,16 @@ html.dark .text-blue-950,
 html.dark [class*="text-blue-700/"],
 html.dark [class*="text-blue-800/"],
 html.dark .text-\[\#183BB0\],
-html.dark .text-\[\#1A44B8\] {
-  color: #7dd3fc !important;
-}
-
-/* Garder le bouton blanc de la sidebar et le carré logo d'aperçu lisibles sur fond #ffffff */
-html.dark aside .bg-white,
-html.dark aside .bg-white.text-\[\#183DA9\],
-html.dark [class*="from-blue-900"] .bg-white.text-\[\#183BB0\] {
-  background-color: #ffffff !important;
-  color: #183bb0 !important;
-}
-
+html.dark .text-\[\#1A44B8\],
 html.dark .text-indigo-600,
 html.dark .text-indigo-700,
 html.dark .text-indigo-800,
-html.dark .text-indigo-900,
-html.dark .text-indigo-950,
-html.dark [class*="text-indigo-700/"] {
-  color: #a5b4fc !important;
+html.dark .text-purple-600,
+html.dark .text-purple-700,
+html.dark .text-purple-800,
+html.dark .text-violet-600,
+html.dark .text-violet-700 {
+  color: #60a5fa !important;
 }
 
 html.dark .text-emerald-600,
@@ -399,9 +452,8 @@ html.dark [class*="text-emerald-700/"],
 html.dark [class*="text-emerald-800/"],
 html.dark .text-green-600,
 html.dark .text-green-700,
-html.dark .text-green-800,
-html.dark .text-green-950 {
-  color: #4ade80 !important;
+html.dark .text-green-800 {
+  color: #4cc38a !important;
 }
 
 html.dark .text-amber-600,
@@ -409,15 +461,10 @@ html.dark .text-amber-700,
 html.dark .text-amber-800,
 html.dark .text-amber-900,
 html.dark .text-amber-950,
-html.dark [class*="text-amber-600/"],
-html.dark [class*="text-amber-700/"],
-html.dark [class*="text-amber-800/"],
 html.dark .text-orange-600,
 html.dark .text-orange-700,
-html.dark .text-orange-800,
-html.dark .text-orange-900,
-html.dark .text-orange-950 {
-  color: #fbbf24 !important;
+html.dark .text-orange-800 {
+  color: #f59e0b !important;
 }
 
 html.dark .text-rose-600,
@@ -425,32 +472,14 @@ html.dark .text-rose-700,
 html.dark .text-rose-800,
 html.dark .text-rose-900,
 html.dark .text-rose-950,
-html.dark [class*="text-rose-600/"],
-html.dark [class*="text-rose-700/"],
 html.dark .text-red-600,
 html.dark .text-red-700,
-html.dark .text-red-800,
-html.dark .text-red-950 {
-  color: #fda4af !important;
+html.dark .text-red-800 {
+  color: #e5484d !important;
 }
 
-html.dark .text-purple-600,
-html.dark .text-purple-700,
-html.dark .text-purple-800,
-html.dark .text-purple-900,
-html.dark .text-purple-950,
-html.dark [class*="text-purple-600/"],
-html.dark [class*="text-purple-700/"],
-html.dark .text-violet-600,
-html.dark .text-violet-700,
-html.dark .text-violet-800,
-html.dark .text-violet-950 {
-  color: #d8b4fe !important;
-}
-
-/* Garantir un contraste >= 4.5:1 pour les pastilles pleines avec texte blanc */
 html.dark .bg-emerald-600.text-white {
-  background-color: #047857 !important;
+  background-color: #15803d !important;
   color: #ffffff !important;
 }
 html.dark .bg-amber-600.text-white {
@@ -458,29 +487,25 @@ html.dark .bg-amber-600.text-white {
   color: #ffffff !important;
 }
 html.dark .text-white {
-  color: #ffffff !important;
+  color: #ededed !important;
 }
 
 /* 7. États de survol & Champs de formulaire en Mode Sombre */
 html.dark .hover\:bg-slate-50:hover,
-html.dark .hover\:bg-slate-50\/80:hover {
-  background-color: #1f2e69 !important;
-}
-
+html.dark .hover\:bg-slate-50\/80:hover,
 html.dark .hover\:bg-slate-100:hover,
 html.dark .hover\:bg-slate-200:hover {
-  background-color: #26387d !important;
+  background-color: #27272a !important;
 }
 
 html.dark input:not([type="checkbox"]):not([type="radio"]),
 html.dark select,
 html.dark textarea {
-  background-color: #182454 !important;
-  border-color: #2f4082 !important;
-  color: #ffffff !important;
+  background-color: #232325 !important;
+  border-color: rgba(237, 237, 237, 0.1) !important;
+  color: #ededed !important;
 }
 
-/* Ne pas surcharger le fond transparent de la barre de recherche intégrée */
 html.dark header input[type="text"] {
   background-color: transparent !important;
   border-color: transparent !important;
@@ -488,10 +513,10 @@ html.dark header input[type="text"] {
 
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #8fa3cc !important;
+  color: #85858b !important;
 }
 
-/* Custom scrollbar for sleek dashboard feel */
+/* Scrollbar discrète */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -502,23 +527,23 @@ html.dark textarea::placeholder {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 9999px;
+  background: #d4d4d8;
+  border-radius: 6px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a1a1aa;
 }
 
 html.dark ::-webkit-scrollbar-thumb {
-  background: #2b3a78;
+  background: #27272a;
 }
 
 html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #3f53a3;
+  background: #3f3f46;
 }
 
-/* Optimisation pour impression professionnelle de documents PDF / Factures */
+/* Impression professionnelle PDF / Factures */
 @media print {
   aside,
   header,

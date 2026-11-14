@@ -67,15 +67,15 @@ export default function RecordPaymentModal({
 
   // Méthodes de paiement prédéfinies adaptées RDC et Afrique
   const paymentMethodsList = [
-    { label: "Virement Rawbank", method: "Virement Bancaire", bank: "Rawbank", channel: "virement", icon: "🏛️" },
-    { label: "Virement Equity BCDC", method: "Virement Bancaire", bank: "Equity BCDC", channel: "virement", icon: "🏦" },
-    { label: "Virement TMB (Trust Merchant Bank)", method: "Virement Bancaire", bank: "TMB (Trust Merchant Bank)", channel: "virement", icon: "🏛️" },
-    { label: "Mobile Money - Airtel Money Pro", method: "Mobile Money - Airtel Money", bank: "Airtel Money Pro", channel: "mobile_airtel", icon: "🔴" },
-    { label: "Mobile Money - Orange Money RDC", method: "Mobile Money - Orange Money", bank: "Orange Money RDC", channel: "mobile_orange", icon: "📱" },
-    { label: "Mobile Money - Vodacom M-Pesa", method: "Mobile Money - M-Pesa", bank: "Vodacom M-Pesa", channel: "mobile_mpesa", icon: "🟢" },
-    { label: "Mobile Money - Wave Digital", method: "Mobile Money - Wave", bank: "Wave Digital", channel: "mobile_wave", icon: "🌊" },
-    { label: "Chèque Bancaire Certifié", method: "Chèque Bancaire", bank: "Rawbank", channel: "cheque", icon: "📜" },
-    { label: "Règlement en Espèces / Caisse", method: "Espèces / Caisse", bank: "Caisse Centrale", channel: "especes", icon: "💵" },
+    { label: "Virement Rawbank", method: "Virement Bancaire", bank: "Rawbank", channel: "virement" },
+    { label: "Virement Equity BCDC", method: "Virement Bancaire", bank: "Equity BCDC", channel: "virement" },
+    { label: "Virement TMB (Trust Merchant Bank)", method: "Virement Bancaire", bank: "TMB (Trust Merchant Bank)", channel: "virement" },
+    { label: "Mobile Money - Airtel Money Pro", method: "Mobile Money - Airtel Money", bank: "Airtel Money Pro", channel: "mobile_airtel" },
+    { label: "Mobile Money - Orange Money RDC", method: "Mobile Money - Orange Money", bank: "Orange Money RDC", channel: "mobile_orange" },
+    { label: "Mobile Money - Vodacom M-Pesa", method: "Mobile Money - M-Pesa", bank: "Vodacom M-Pesa", channel: "mobile_mpesa" },
+    { label: "Mobile Money - Wave Digital", method: "Mobile Money - Wave", bank: "Wave Digital", channel: "mobile_wave" },
+    { label: "Chèque Bancaire Certifié", method: "Chèque Bancaire", bank: "Rawbank", channel: "cheque" },
+    { label: "Règlement en Espèces / Caisse", method: "Espèces / Caisse", bank: "Caisse Centrale", channel: "especes" },
   ];
 
   // Initialisation à l'ouverture de la modale
@@ -412,13 +412,13 @@ export default function RecordPaymentModal({
                     key={index}
                     type="button"
                     onClick={() => handleSelectPaymentPreset(preset)}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all text-left ${
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-[10px] border text-xs font-medium transition-colors text-left ${
                       isSelected
-                        ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25 scale-[1.02]"
+                        ? "bg-blue-600 text-white border-blue-600"
                         : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
                     }`}
                   >
-                    <span className="text-sm">{preset.icon}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? "bg-white" : "bg-slate-400"}`} />
                     <span className="truncate">{preset.label}</span>
                   </button>
                 );
