@@ -51,7 +51,7 @@ export async function POST(request) {
         </div>`
       : `<div style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 28px; border: 1px solid #fecdd3; border-radius: 16px; color: #0f172a;">
           <div style="display: inline-block; padding: 6px 12px; border-radius: 999px; background: #fff1f2; color: #be123c; font-size: 12px; font-weight: 700; margin-bottom: 16px;">
-            ⚠️ Documents non conformes — Révision demandée
+            Documents non conformes — Révision demandée
           </div>
           <h2 style="margin: 0 0 12px; font-size: 20px; color: #0f172a;">Veuillez revoir les documents de ${companyName}</h2>
           <p style="font-size: 14px; line-height: 1.6; color: #334155;">

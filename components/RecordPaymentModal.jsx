@@ -16,6 +16,7 @@ import {
   Smartphone,
   Banknote,
   Clock,
+  Landmark,
 } from "lucide-react";
 import {
   calculateInvoiceTotals,
@@ -67,15 +68,15 @@ export default function RecordPaymentModal({
 
   // Méthodes de paiement prédéfinies adaptées RDC et Afrique
   const paymentMethodsList = [
-    { label: "Virement Rawbank", method: "Virement Bancaire", bank: "Rawbank", channel: "virement", icon: "🏛️" },
-    { label: "Virement Equity BCDC", method: "Virement Bancaire", bank: "Equity BCDC", channel: "virement", icon: "🏦" },
-    { label: "Virement TMB (Trust Merchant Bank)", method: "Virement Bancaire", bank: "TMB (Trust Merchant Bank)", channel: "virement", icon: "🏛️" },
-    { label: "Mobile Money - Airtel Money Pro", method: "Mobile Money - Airtel Money", bank: "Airtel Money Pro", channel: "mobile_airtel", icon: "🔴" },
-    { label: "Mobile Money - Orange Money RDC", method: "Mobile Money - Orange Money", bank: "Orange Money RDC", channel: "mobile_orange", icon: "📱" },
-    { label: "Mobile Money - Vodacom M-Pesa", method: "Mobile Money - M-Pesa", bank: "Vodacom M-Pesa", channel: "mobile_mpesa", icon: "🟢" },
-    { label: "Mobile Money - Wave Digital", method: "Mobile Money - Wave", bank: "Wave Digital", channel: "mobile_wave", icon: "🌊" },
-    { label: "Chèque Bancaire Certifié", method: "Chèque Bancaire", bank: "Rawbank", channel: "cheque", icon: "📜" },
-    { label: "Règlement en Espèces / Caisse", method: "Espèces / Caisse", bank: "Caisse Centrale", channel: "especes", icon: "💵" },
+    { label: "Virement Rawbank", method: "Virement Bancaire", bank: "Rawbank", channel: "virement", icon: <Landmark className="w-4 h-4 shrink-0" /> },
+    { label: "Virement Equity BCDC", method: "Virement Bancaire", bank: "Equity BCDC", channel: "virement", icon: <Building2 className="w-4 h-4 shrink-0" /> },
+    { label: "Virement TMB (Trust Merchant Bank)", method: "Virement Bancaire", bank: "TMB (Trust Merchant Bank)", channel: "virement", icon: <Landmark className="w-4 h-4 shrink-0" /> },
+    { label: "Mobile Money - Airtel Money Pro", method: "Mobile Money - Airtel Money", bank: "Airtel Money Pro", channel: "mobile_airtel", icon: <Smartphone className="w-4 h-4 shrink-0" /> },
+    { label: "Mobile Money - Orange Money RDC", method: "Mobile Money - Orange Money", bank: "Orange Money RDC", channel: "mobile_orange", icon: <Smartphone className="w-4 h-4 shrink-0" /> },
+    { label: "Mobile Money - Vodacom M-Pesa", method: "Mobile Money - M-Pesa", bank: "Vodacom M-Pesa", channel: "mobile_mpesa", icon: <Smartphone className="w-4 h-4 shrink-0" /> },
+    { label: "Mobile Money - Wave Digital", method: "Mobile Money - Wave", bank: "Wave Digital", channel: "mobile_wave", icon: <Smartphone className="w-4 h-4 shrink-0" /> },
+    { label: "Chèque Bancaire Certifié", method: "Chèque Bancaire", bank: "Rawbank", channel: "cheque", icon: <FileText className="w-4 h-4 shrink-0" /> },
+    { label: "Règlement en Espèces / Caisse", method: "Espèces / Caisse", bank: "Caisse Centrale", channel: "especes", icon: <Banknote className="w-4 h-4 shrink-0" /> },
   ];
 
   // Initialisation à l'ouverture de la modale

@@ -29,6 +29,7 @@ import {
   Check,
   ShieldCheck,
   XCircle,
+  User,
 } from "lucide-react";
 import { calculateInvoiceTotals, formatAmount } from "@/lib/mock-data";
 
@@ -169,7 +170,7 @@ export default function QuotesPipelineView({
     if (onUpdateStatus) {
       onUpdateStatus(quote.id, "accepte");
       if (onToast) {
-        onToast(`🎉 Accord commercial validé pour le devis ${quote.id} ! Prêt à facturer.`, "success");
+        onToast(`Accord commercial validé pour le devis ${quote.id} ! Prêt à facturer.`, "success");
       }
     }
   };
@@ -856,8 +857,9 @@ export default function QuotesPipelineView({
 
                       {/* Contact & Localisation */}
                       {q.contactPerson && (
-                        <p className="text-[11px] text-slate-500 font-medium truncate">
-                          👤 {q.contactPerson}
+                        <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1">
+                          <User className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{q.contactPerson}</span>
                         </p>
                       )}
 

@@ -1060,7 +1060,7 @@ export default function App() {
       }
       showToast(
         `Règlement ${newPayment.receiptNumber || newPayment.id} (${formatAmount(newPayment.amount, newPayment.currency || companyInfo?.defaultCurrency)}) enregistré !${
-          isFullySettled ? " 🎉 Facture 100% soldée." : ""
+          isFullySettled ? " Facture 100% soldée." : ""
         }`,
         "success"
       );
@@ -1364,14 +1364,14 @@ export default function App() {
     setSelectedQuote(null);
     setSelectedInvoice(newInvoice);
 
-    showToast(`✨ Conversion du devis en facture...`, "info");
+    showToast(`Conversion du devis en facture...`, "info");
     try {
       await apiCreateInvoice(newInvoice, userProfile?.companyId);
       await apiUpdateQuoteStatus(quote.id, "accepte", nextInvoiceId);
-      showToast(`✨ Devis ${quote.id} converti en Facture ${nextInvoiceId} !`, "success");
+      showToast(`Devis ${quote.id} converti en Facture ${nextInvoiceId} !`, "success");
     } catch (err) {
       console.error("Erreur conversion devis Supabase:", err);
-      showToast(`✨ Devis ${quote.id} converti en Facture officielle ${nextInvoiceId} !`, "success");
+      showToast(`Devis ${quote.id} converti en Facture officielle ${nextInvoiceId} !`, "success");
     }
   };
 
@@ -1886,7 +1886,7 @@ export default function App() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h2 className="text-lg sm:text-2xl font-extrabold tracking-tight">
-                        Bonjour, {userProfile?.fullName || "Collaborateur"} 👋
+                        Bonjour, {userProfile?.fullName || "Collaborateur"}
                       </h2>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>

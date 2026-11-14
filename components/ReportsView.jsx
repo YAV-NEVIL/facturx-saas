@@ -859,7 +859,7 @@ export default function ReportsView({
               }`}
             >
               <AlertTriangle className="w-4 h-4 text-rose-600" />
-              <span>🚨 Créances Échues & Relances</span>
+              <span>Créances Échues & Relances</span>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold">
                 {overdueInvoices.length}
               </span>
@@ -874,7 +874,7 @@ export default function ReportsView({
               }`}
             >
               <Clock className="w-4 h-4 text-amber-500" />
-              <span>⏳ Paiements en Attente</span>
+              <span>Paiements en Attente</span>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
                 {pendingInvoices.length}
               </span>
@@ -889,7 +889,7 @@ export default function ReportsView({
               }`}
             >
               <Briefcase className="w-4 h-4 text-blue-600" />
-              <span>🎯 Prospects & Devis</span>
+              <span>Prospects & Devis</span>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
                 {quotes.length}
               </span>
@@ -904,7 +904,7 @@ export default function ReportsView({
               }`}
             >
               <ShieldCheck className="w-4 h-4 text-indigo-600" />
-              <span>⚖️ Déclaration Fiscale OHADA / DGI</span>
+              <span>Déclaration Fiscale OHADA / DGI</span>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
                 TVA {Math.round((companyInfo.defaultVatRate ?? 0.16) * 100)}%
               </span>

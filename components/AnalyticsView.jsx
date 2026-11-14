@@ -1648,7 +1648,7 @@ export default function AnalyticsView({
                           className="flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer group-hover:scale-105"
                         >
                           <Send className="w-3 h-3 text-white" />
-                          Relance Express ⚡
+                          <span>Relance Express</span>
                         </button>
 
                         {/* Bouton Voir Facture */}
@@ -1911,33 +1911,36 @@ export default function AnalyticsView({
               </button>
               <button
                 onClick={() => setTableFilter("overdue")}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
+                className={`px-2.5 py-1 rounded-lg transition-all inline-flex items-center gap-1.5 ${
                   tableFilter === "overdue"
                     ? "bg-rose-600 text-white shadow-2xs"
                     : "text-rose-700 hover:text-rose-900"
                 }`}
               >
-                🔴 Retard ({analyticsData.countOverdue})
+                <span className={`w-2 h-2 rounded-full ${tableFilter === "overdue" ? "bg-white" : "bg-rose-500"}`} />
+                <span>Retard ({analyticsData.countOverdue})</span>
               </button>
               <button
                 onClick={() => setTableFilter("pending")}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
+                className={`px-2.5 py-1 rounded-lg transition-all inline-flex items-center gap-1.5 ${
                   tableFilter === "pending"
                     ? "bg-amber-500 text-white shadow-2xs"
                     : "text-amber-700 hover:text-amber-900"
                 }`}
               >
-                🟠 En attente ({analyticsData.countPending})
+                <span className={`w-2 h-2 rounded-full ${tableFilter === "pending" ? "bg-white" : "bg-amber-500"}`} />
+                <span>En attente ({analyticsData.countPending})</span>
               </button>
               <button
                 onClick={() => setTableFilter("payee")}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
+                className={`px-2.5 py-1 rounded-lg transition-all inline-flex items-center gap-1.5 ${
                   tableFilter === "payee"
                     ? "bg-emerald-600 text-white shadow-2xs"
                     : "text-emerald-700 hover:text-emerald-900"
                 }`}
               >
-                🟢 Payées ({analyticsData.countPaid})
+                <span className={`w-2 h-2 rounded-full ${tableFilter === "payee" ? "bg-white" : "bg-emerald-500"}`} />
+                <span>Payées ({analyticsData.countPaid})</span>
               </button>
             </div>
           </div>
@@ -2064,8 +2067,9 @@ export default function AnalyticsView({
                         </span>
                       )}
                       {isOverdue && (
-                        <span className="text-[11px] text-rose-700 font-extrabold bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                          ⚠️ Relance requise
+                        <span className="inline-flex items-center gap-1 text-[11px] text-rose-700 font-extrabold bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
+                          <span>Relance requise</span>
                         </span>
                       )}
                       {inv.status === "brouillon" && (

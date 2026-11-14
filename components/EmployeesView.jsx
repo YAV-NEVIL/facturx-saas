@@ -21,6 +21,8 @@ import {
   X,
   Building2,
   UserCheck,
+  BarChart3,
+  Package,
 } from "lucide-react";
 
 export default function EmployeesView({
@@ -156,13 +158,33 @@ export default function EmployeesView({
   const roleLabel = (role) => {
     switch (role) {
       case "admin":
-        return "👑 Administrateur Général";
+        return (
+          <>
+            <Shield className="w-3.5 h-3.5 shrink-0" />
+            <span>Administrateur Général</span>
+          </>
+        );
       case "comptable":
-        return "📊 Responsable Comptable";
+        return (
+          <>
+            <BarChart3 className="w-3.5 h-3.5 shrink-0" />
+            <span>Responsable Comptable</span>
+          </>
+        );
       case "commercial":
-        return "🤝 Chargé Commercial";
+        return (
+          <>
+            <Briefcase className="w-3.5 h-3.5 shrink-0" />
+            <span>Chargé Commercial</span>
+          </>
+        );
       case "gestionnaire_stock":
-        return "📦 Gestionnaire de Stock";
+        return (
+          <>
+            <Package className="w-3.5 h-3.5 shrink-0" />
+            <span>Gestionnaire de Stock</span>
+          </>
+        );
       default:
         return "Membre de l'équipe";
     }
@@ -290,8 +312,8 @@ export default function EmployeesView({
             className="py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600/30 cursor-pointer"
           >
             <option value="all">Tous les statuts</option>
-            <option value="online">🟢 En ligne</option>
-            <option value="offline">⚪ Hors ligne</option>
+            <option value="online">En ligne</option>
+            <option value="offline">Hors ligne</option>
           </select>
 
           {/* Filtre Rôle */}
@@ -538,22 +560,26 @@ export default function EmployeesView({
                   {[
                     {
                       id: "admin",
-                      title: "👑 Administrateur",
+                      title: "Administrateur",
+                      icon: <Shield className="w-3.5 h-3.5 text-purple-600 shrink-0" />,
                       desc: "Accès total sans restriction",
                     },
                     {
                       id: "comptable",
-                      title: "📊 Responsable Comptable",
+                      title: "Responsable Comptable",
+                      icon: <BarChart3 className="w-3.5 h-3.5 text-blue-600 shrink-0" />,
                       desc: "Factures, Devis, Paiements & TVA",
                     },
                     {
                       id: "commercial",
-                      title: "🤝 Chargé Commercial",
+                      title: "Chargé Commercial",
+                      icon: <Briefcase className="w-3.5 h-3.5 text-emerald-600 shrink-0" />,
                       desc: "Devis, CRM Clients",
                     },
                     {
                       id: "gestionnaire_stock",
-                      title: "📦 Gestionnaire Stock",
+                      title: "Gestionnaire Stock",
+                      icon: <Package className="w-3.5 h-3.5 text-amber-600 shrink-0" />,
                       desc: "Articles, Devis, Facturation",
                     },
                   ].map((r) => (
@@ -566,7 +592,10 @@ export default function EmployeesView({
                           : "bg-slate-50 border-slate-200 hover:border-slate-300"
                       }`}
                     >
-                      <p className="text-xs font-bold text-slate-900">{r.title}</p>
+                      <p className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        {r.icon}
+                        <span>{r.title}</span>
+                      </p>
                       <p className="text-[10px] text-slate-500 mt-0.5">{r.desc}</p>
                     </div>
                   ))}
