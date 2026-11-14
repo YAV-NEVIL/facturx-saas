@@ -32,7 +32,8 @@ export default function Sidebar({
   userProfile = null,
   subscriptionPlan = "free",
 }) {
-  const planBadge = String(subscriptionPlan || "free").toUpperCase();
+  const rawPlan = String(subscriptionPlan || "free").toLowerCase().trim();
+  const planBadge = (rawPlan === "stargate" ? "starter" : rawPlan).toUpperCase();
   const isRestrictedForRole = (itemId) => {
     if (itemId === "employees" && subscriptionPlan === "free") return true;
     if (userRole === "admin") return false;

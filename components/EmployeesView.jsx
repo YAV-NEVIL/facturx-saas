@@ -89,7 +89,7 @@ export default function EmployeesView({
           <p className="text-xs sm:text-sm text-slate-500 mt-2 leading-relaxed">
             L&apos;offre gratuite est limitée à <strong>1 seul accès (Propriétaire)</strong> et{" "}
             <strong>3 factures</strong>. Passez à l&apos;offre{" "}
-            <strong className="text-slate-900">Stargate (14 $/mois)</strong> pour inclure jusqu&apos;à
+            <strong className="text-slate-900">Starter (14 $/mois)</strong> pour inclure jusqu&apos;à
             3 employés, ou à l&apos;offre{" "}
             <strong className="text-[#183BB0]">Business (34 $/mois)</strong> pour un nombre illimité
             de collaborateurs.
@@ -102,7 +102,7 @@ export default function EmployeesView({
             className="w-full sm:w-auto px-6 py-3 bg-[#183BB0] hover:bg-[#122F8C] text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>Voir les abonnements Stargate (14 $) & Business (34 $)</span>
+            <span>Voir les abonnements Starter (14 $) & Business (34 $)</span>
           </button>
         </div>
       </div>
@@ -253,10 +253,10 @@ export default function EmployeesView({
 
         <button
           onClick={() => {
-            if (subscriptionPlan === "stargate" && totalEmployees >= 3) {
+            if ((subscriptionPlan === "starter" || subscriptionPlan === "stargate") && totalEmployees >= 3) {
               if (onToast) {
                 onToast(
-                  "Limite Stargate atteinte (3/3 employés). Passez à l'offre Business (34 $) pour des employés illimités.",
+                  "Limite Starter atteinte (3/3 employés). Passez à l'offre Business (34 $) pour des employés illimités.",
                   "info"
                 );
               }

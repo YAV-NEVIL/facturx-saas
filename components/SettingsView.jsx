@@ -773,7 +773,7 @@ export default function SettingsView({
               sans employés), la configuration avancée des{" "}
               <strong>relances automatiques, modèles WhatsApp/Email, passerelles et équipes</strong>{" "}
               est verrouillée. Passez à l&apos;offre{" "}
-              <strong className="text-slate-900">Stargate (14 $/mois)</strong> ou débloquez
+              <strong className="text-slate-900">Starter (14 $/mois)</strong> ou débloquez
               l&apos;accès intégral avec{" "}
               <strong className="text-[#183BB0]">Business (34 $/mois)</strong>.
             </p>
@@ -785,7 +785,7 @@ export default function SettingsView({
               className="w-full sm:w-auto px-6 py-3 bg-[#183BB0] hover:bg-[#122F8C] text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>Passer à Stargate (14 $) ou Business (34 $)</span>
+              <span>Passer à Starter (14 $) ou Business (34 $)</span>
             </button>
           </div>
         </div>

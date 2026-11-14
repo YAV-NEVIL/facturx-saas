@@ -57,6 +57,7 @@ export default function PricingView({
   });
 
   const activePlan = getPlanConfig(currentPlanId);
+  const normalizedCurrentPlanId = activePlan.id;
   const maxInvoices = activePlan.limits.maxInvoices;
   const invoiceUsagePercent =
     maxInvoices === Infinity
@@ -64,7 +65,7 @@ export default function PricingView({
       : Math.min(100, Math.round((invoiceCount / maxInvoices) * 100));
 
   const handlePlanButtonClick = (plan) => {
-    if (plan.id === currentPlanId) {
+    if (plan.id === normalizedCurrentPlanId) {
       if (onToast) {
         onToast(`Vous utilisez déjà l'offre ${plan.name}.`, "info");
       }
@@ -114,56 +115,56 @@ export default function PricingView({
     {
       feature: "Génération de factures normalisées DGI",
       free: "3 factures max",
-      stargate: "100 factures / mois",
+      starter: "100 factures / mois",
       business: "Illimitées",
       gold: "Illimitées + Multi-filiales",
     },
     {
       feature: "Devis & Estimations commerciales",
       free: "3 devis max",
-      stargate: "100 devis / mois",
+      starter: "100 devis / mois",
       business: "Illimités",
       gold: "Illimités",
     },
     {
       feature: "Relances clients (WhatsApp, Email, SMS)",
       free: false,
-      stargate: "WhatsApp & Email",
+      starter: "WhatsApp & Email",
       business: "Illimitées (Tous canaux)",
       gold: "Illimitées + API dédiée",
     },
     {
       feature: "Employés & Collaborateurs (Accès RBAC)",
       free: false,
-      stargate: "Jusqu'à 3 employés",
+      starter: "Jusqu'à 3 employés",
       business: "Employés illimités",
       gold: "Illimités + SSO Entreprise",
     },
     {
       feature: "Paramètres avancés & Personnalisation",
       free: "Restreints",
-      stargate: "Débloqués",
+      starter: "Débloqués",
       business: "Accès intégral (100 %)",
       gold: "Sur mesure + Marque blanche",
     },
     {
       feature: "Passerelle DGI RDC e-MCF (SFE + QR Code)",
       free: "Simulation SFE",
-      stargate: "SFE + PDF Certifié",
+      starter: "SFE + PDF Certifié",
       business: "Sandbox + Production Live",
       gold: "Serveur e-MCF dédié sur site",
     },
     {
       feature: "Exports Comptables OHADA (Excel / CSV / PDF)",
       free: "PDF standard",
-      stargate: "PDF + Excel",
+      starter: "PDF + Excel",
       business: "Complet (OHADA + FEC + JSON)",
       gold: "Connecteur ERP (SAP / Odoo / Sage)",
     },
     {
       feature: "Support & Accompagnement",
       free: "Documentation",
-      stargate: "Support Email & Chat",
+      starter: "Support Email & Chat",
       business: "Support Prioritaire 7j/7",
       gold: "Account Manager dédié 24/7 + SLA 99,9%",
     },
@@ -189,7 +190,7 @@ export default function PricingView({
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 max-w-2xl">
             Choisissez l&apos;offre adaptée à la taille de votre activité. Commencez gratuitement avec{" "}
-            <strong>3 factures</strong>, évoluez vers <strong>Stargate (14 $)</strong> ou débloquez l&apos;accès total avec{" "}
+            <strong>3 factures</strong>, évoluez vers <strong>Starter (14 $)</strong> ou débloquez l&apos;accès total avec{" "}
             <strong>Business (34 $)</strong>.
           </p>
         </div>
@@ -324,7 +325,7 @@ export default function PricingView({
             <p className="text-[11px] text-slate-500 mt-2">
               {activePlan.limits.allowReminders
                 ? "Relances WhatsApp, Email & SMS disponibles en 1 clic."
-                : "Aucune relance autorisée dans l'offre Free. Passez à Stargate (14 $) ou Business (34 $)."}
+                : "Aucune relance autorisée dans l'offre Free. Passez à Starter (14 $) ou Business (34 $)."}
             </p>
           </div>
 
@@ -388,10 +389,10 @@ export default function PricingView({
         </div>
       </div>
 
-      {/* 3. Grille des 4 Offres : Free ($0), Stargate ($14), Business ($34), Gold (Contactez-nous) */}
+      {/* 3. Grille des 4 Offres : Free ($0), Starter ($14), Business ($34), Gold (Contactez-nous) */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 items-stretch">
         {SUBSCRIPTION_PLANS.map((plan) => {
-          const isCurrent = plan.id === currentPlanId;
+          const isCurrent = plan.id === normalizedCurrentPlanId;
           const isBusiness = plan.id === "business";
           const isGold = plan.id === "gold";
           const displayPrice =
@@ -421,7 +422,7 @@ export default function PricingView({
                         ? "bg-amber-400 text-slate-950 border-amber-300"
                         : isGold
                         ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
-                        : plan.id === "stargate"
+                        : plan.id === "starter"
                         ? "bg-blue-50 text-[#183BB0] border-blue-200"
                         : "bg-slate-100 text-slate-700 border-slate-200"
                     }`}
@@ -593,7 +594,7 @@ export default function PricingView({
                       ? "bg-white hover:bg-blue-50 text-[#183BB0] shadow-lg"
                       : isGold
                       ? "bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 shadow-lg"
-                      : plan.id === "stargate"
+                      : plan.id === "starter"
                       ? "bg-[#183BB0] hover:bg-[#122F8C] text-white shadow-md shadow-blue-900/15"
                       : "bg-slate-900 hover:bg-slate-800 text-white"
                   }`}
@@ -640,7 +641,7 @@ export default function PricingView({
               <tr className="bg-slate-50 border-b border-slate-100 text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">
                 <th className="py-3.5 px-5 min-w-[220px]">Fonctionnalité / Paramètre</th>
                 <th className="py-3.5 px-4 text-center">Free (0 $)</th>
-                <th className="py-3.5 px-4 text-center text-[#183BB0]">Stargate (14 $)</th>
+                <th className="py-3.5 px-4 text-center text-[#183BB0]">Starter (14 $)</th>
                 <th className="py-3.5 px-4 text-center bg-blue-50/70 text-[#183BB0]">
                   Business (34 $)
                 </th>
@@ -665,7 +666,7 @@ export default function PricingView({
                     )}
                   </td>
                   <td className="py-3.5 px-4 text-center font-bold text-slate-800">
-                    {row.stargate}
+                    {row.starter}
                   </td>
                   <td className="py-3.5 px-4 text-center font-extrabold text-[#183BB0] bg-blue-50/30">
                     {row.business}
@@ -680,7 +681,7 @@ export default function PricingView({
         </div>
       </div>
 
-      {/* 5. Modal de Paiement / Activation pour Stargate (14$) ou Business (34$) */}
+      {/* 5. Modal de Paiement / Activation pour Starter (14$) ou Business (34$) */}
       {checkoutPlan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-5">
@@ -764,7 +765,7 @@ export default function PricingView({
                   Déblocage instantané après validation :
                 </p>
                 <p className="text-emerald-800">
-                  {checkoutPlan.id === "stargate"
+                  {checkoutPlan.id === "starter"
                     ? "100 factures/mois, relances WhatsApp & Email, et jusqu'à 3 employés."
                     : "Factures illimitées, relances illimitées, employés illimités et accès total à tous les paramètres."}
                 </p>
@@ -941,3 +942,4 @@ export default function PricingView({
     </div>
   );
 }
+

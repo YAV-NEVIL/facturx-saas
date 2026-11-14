@@ -844,15 +844,16 @@ export default function App() {
     setTimeout(() => setFeedbackToast(null), 3500);
   };
 
-  // Gestion des offres d'abonnement (Free: 3 factures/pas de relance/pas d'employés, Stargate: 14$/100 factures, Business: 34$/illimité, Gold: sur mesure)
-  const activeSubscriptionPlan = companyInfo?.subscriptionPlan || "free";
+  // Gestion des offres d'abonnement (Free: 3 factures/pas de relance/pas d'employés, Starter: 14$/100 factures, Business: 34$/illimité, Gold: sur mesure)
+  const rawSubscriptionPlan = companyInfo?.subscriptionPlan || "free";
+  const activeSubscriptionPlan = rawSubscriptionPlan === "stargate" ? "starter" : rawSubscriptionPlan;
   const activeBillingCycle = companyInfo?.subscriptionBillingCycle || "monthly";
 
   const handleOpenCreateInvoiceWithLimit = (preselectedClient = null) => {
     const quota = canCreateInvoice(activeSubscriptionPlan, invoices.length);
     if (!quota.allowed) {
       showToast(
-        `Limite de l'offre ${quota.plan.name} atteinte (${quota.max} factures max). Passez à Stargate (14 $) ou Business (34 $) pour générer plus de factures.`,
+        `Limite de l'offre ${quota.plan.name} atteinte (${quota.max} factures max). Passez à Starter (14 $) ou Business (34 $) pour générer plus de factures.`,
         "info"
       );
       setActiveTab("pricing");
@@ -868,7 +869,7 @@ export default function App() {
     const check = canSendReminder(activeSubscriptionPlan);
     if (!check.allowed) {
       showToast(
-        "Les relances clients ne sont pas incluses dans l'offre Free (0 $). Passez à Stargate (14 $) ou Business (34 $) pour débloquer les relances.",
+        "Les relances clients ne sont pas incluses dans l'offre Free (0 $). Passez à Starter (14 $) ou Business (34 $) pour débloquer les relances.",
         "info"
       );
       setActiveTab("pricing");
@@ -1045,7 +1046,7 @@ export default function App() {
     const quota = canCreateInvoice(activeSubscriptionPlan, invoices.length);
     if (!quota.allowed) {
       showToast(
-        `Limite de l'offre ${quota.plan.name} atteinte (${quota.max} factures maximum). Passez à l'offre Stargate (14 $) ou Business (34 $).`,
+        `Limite de l'offre ${quota.plan.name} atteinte (${quota.max} factures maximum). Passez à l'offre Starter (14 $) ou Business (34 $).`,
         "info"
       );
       setIsCreateModalOpen(false);
@@ -1549,7 +1550,7 @@ export default function App() {
     const quota = canCreateInvoice(activeSubscriptionPlan, invoices.length);
     if (!quota.allowed) {
       showToast(
-        `Limite de l'offre ${quota.plan.name} atteinte (${quota.max} factures max). Passez à Stargate (14 $) ou Business (34 $) pour convertir ce devis en facture.`,
+        `Limite de l'offre ${quota.plan.name} atteinte (${quota.max} factures max). Passez à Starter (14 $) ou Business (34 $) pour convertir ce devis en facture.`,
         "info"
       );
       setActiveTab("pricing");
@@ -3921,7 +3922,7 @@ export default function App() {
             />
           )}
 
-          {/* TAB: ABONNEMENT & TARIFS (PRICING: FREE 0$, STARGATE 14$, BUSINESS 34$, GOLD SUR MESURE) */}
+          {/* TAB: ABONNEMENT & TARIFS (PRICING: FREE 0$, STARTER 14$, BUSINESS 34$, GOLD SUR MESURE) */}
           {activeTab === "pricing" && (
             <PricingView
               currentPlanId={activeSubscriptionPlan}
