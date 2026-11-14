@@ -219,20 +219,29 @@ export default function CreateInvoiceModal({
 
     const invoiceNumbers = (existingInvoices || [])
       .map((inv) => {
-        const match = inv.id && inv.id.match(/FAC-2026-(\d+)/);
+        const match = inv.id && String(inv.id).match(/(\d+)\s*$/);
         return match ? parseInt(match[1], 10) : 0;
       })
       .filter(Boolean);
-    const maxNum = invoiceNumbers.length > 0 ? Math.max(...invoiceNumbers) : 89;
-    const nextInvoiceId = `FAC-2026-${String(maxNum + 1).padStart(4, "0")}`;
+    const nextSeq = invoiceNumbers.length > 0 ? Math.max(...invoiceNumbers) + 1 : (existingInvoices?.length || 0) + 1;
+    const compInitials = (activeCompany.initials || activeCompany.name || "FX")
+      .replace(/[^A-Za-z0-9]/g, "")
+      .toUpperCase()
+      .slice(0, 2) || "FX";
+    const compSuffix = activeCompany.id
+      ? String(activeCompany.id).replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase()
+      : "";
+    const nextInvoiceId = `FAC-2026-${compInitials}${compSuffix}-${String(nextSeq).padStart(4, "0")}`;
 
     const effectiveVatRate = applyVat ? vatRate : 0;
     const effectiveTaxGroup = applyVat ? selectedTaxGroupMeta.code : "A";
 
     const baseInvoice = {
       id: nextInvoiceId,
+      companyId: activeCompany.id || null,
       clientId: finalClientId,
       company: {
+        id: activeCompany.id || null,
         name: companyName.trim() || activeCompany.name,
         ninea: companyNinea.trim() || activeCompany.ninea,
         nif: activeCompany.nif || companyNinea.trim() || "A-0998231-X",

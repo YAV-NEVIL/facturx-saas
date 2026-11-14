@@ -12,7 +12,12 @@ import {
 } from "lucide-react";
 import { formatFCFA, calculateInvoiceTotals } from "@/lib/mock-data";
 
-export default function InvoiceMetricsBar({ invoices = [], companyInfo = null }) {
+export default function InvoiceMetricsBar({
+  invoices = [],
+  companyInfo = null,
+  activeFilter = "all",
+  onSelectFilter = null,
+}) {
   const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   // Calculs statistiques opérationnels propres à la facturation
   let totalBilled = 0;
@@ -44,39 +49,47 @@ export default function InvoiceMetricsBar({ invoices = [], companyInfo = null })
   const cards = [
     {
       id: "volume",
+      filterKey: "all",
       label: "Total Pièces Émises",
-      value: `${totalInvoices} Factures`,
+      value: `${totalInvoices} Facture${totalInvoices > 1 ? "s" : ""}`,
       subtitle: `Volume cumulé : ${formatFCFA(totalBilled, __cur)}`,
       icon: Layers,
       iconBg: "bg-blue-50 text-blue-600 border border-blue-100",
       accent: "hover:border-blue-300",
+      activeClass: "border-blue-400 ring-2 ring-blue-500/15",
     },
     {
       id: "paid",
+      filterKey: "payee",
       label: "Factures Soldées (Réglées)",
-      value: `${countPaid} Payées`,
+      value: `${countPaid} Payée${countPaid > 1 ? "s" : ""}`,
       subtitle: `${paidRatio}% du portefeuille • ${formatFCFA(totalPaid, __cur)}`,
       icon: CheckCircle2,
       iconBg: "bg-emerald-50 text-emerald-600 border border-emerald-100",
       accent: "hover:border-emerald-300",
+      activeClass: "border-emerald-400 ring-2 ring-emerald-500/15",
     },
     {
       id: "pending",
+      filterKey: "envoyee",
       label: "Factures Ouvertes (En cours)",
       value: `${countPending} En cours`,
       subtitle: `Reste à percevoir : ${formatFCFA(totalPending, __cur)}`,
       icon: Clock,
       iconBg: "bg-amber-50 text-amber-600 border border-amber-100",
       accent: "hover:border-amber-300",
+      activeClass: "border-amber-400 ring-2 ring-amber-500/15",
     },
     {
       id: "average",
+      filterKey: "all",
       label: "Panier Moyen Facturé",
       value: formatFCFA(averageInvoiceAmount, __cur),
       subtitle: `TVA légale appliquée (${countDraft} brouillon)`,
       icon: Calculator,
       iconBg: "bg-purple-50 text-purple-600 border border-purple-100",
       accent: "hover:border-purple-300",
+      activeClass: "border-purple-400 ring-2 ring-purple-500/15",
     },
   ];
 
@@ -84,10 +97,14 @@ export default function InvoiceMetricsBar({ invoices = [], companyInfo = null })
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((c) => {
         const Icon = c.icon;
+        const isSelected = activeFilter === c.filterKey && c.id !== "average";
         return (
           <div
             key={c.id}
-            className={`bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-md transition-all duration-200 flex items-center gap-3.5 group ${c.accent}`}
+            onClick={() => onSelectFilter && onSelectFilter(c.filterKey)}
+            className={`bg-white rounded-2xl p-5 border shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-md transition-all duration-200 flex items-center gap-3.5 group cursor-pointer active:scale-[0.99] ${
+              isSelected ? c.activeClass : `border-slate-100 ${c.accent}`
+            }`}
           >
             <div
               className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${c.iconBg} shadow-xs transition-transform group-hover:scale-105`}

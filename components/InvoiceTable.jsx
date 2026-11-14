@@ -39,17 +39,27 @@ export default function InvoiceTable({
   searchQuery = "",
   onToast,
   companyInfo = null,
+  externalStatusFilter = null,
+  onStatusFilterChange = null,
   title = "Registre Complet des Factures",
   subtitle = "Historique intégral et gestion de toutes les pièces comptables émises",
 }) {
   const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(externalStatusFilter || "all");
   const [sortBy, setSortBy] = useState("date_desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [activeMenuId, setActiveMenuId] = useState(null);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  // Synchroniser le filtre de statut lorsqu'une carte du Tableau de Bord ou de la barre de métriques est cliquée
+  useEffect(() => {
+    if (externalStatusFilter) {
+      setStatusFilter(externalStatusFilter);
+      setCurrentPage(1);
+    }
+  }, [externalStatusFilter]);
 
   // Fermer le menu lors de l'appui sur Escape
   useEffect(() => {
@@ -239,6 +249,7 @@ export default function InvoiceTable({
                 onClick={() => {
                   setStatusFilter(tab.id);
                   setCurrentPage(1);
+                  if (onStatusFilterChange) onStatusFilterChange(tab.id);
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                   statusFilter === tab.id

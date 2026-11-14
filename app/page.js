@@ -63,6 +63,7 @@ import {
   initOfflineSync,
   processSyncQueue,
   getPendingCount,
+  getPendingQueue,
 } from "@/lib/offlineSyncService";
 import {
   initialInvoices,
@@ -162,10 +163,26 @@ export default function App() {
   const [clientToDelete, setClientToDelete] = useState(null);
   const [quoteToDelete, setQuoteToDelete] = useState(null);
   const [selectedClientForProfile, setSelectedClientForProfile] = useState(null);
-  const [selectedPeriod, setSelectedPeriod] = useState("Ce mois-ci");
+  const [selectedPeriod, setSelectedPeriod] = useState("Toutes les dates");
   const [selectedDate, setSelectedDate] = useState(null);
+  const [invoiceFilterOverride, setInvoiceFilterOverride] = useState("all");
   const [feedbackToast, setFeedbackToast] = useState(null);
   const [currentTheme, setCurrentTheme] = useState("light");
+
+  // Navigation intelligente depuis les cartes du Tableau de Bord vers les Factures filtrées ou Paiements
+  const handleNavigateFromDashboardCard = (targetFilter = "all", targetTab = "invoices") => {
+    setSelectedDate(null);
+    setSelectedPeriod("Toutes les dates");
+    if (targetTab === "payments") {
+      setActiveTab("payments");
+    } else {
+      setInvoiceFilterOverride(targetFilter || "all");
+      setActiveTab("invoices");
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   const applyTheme = (theme) => {
     setCurrentTheme(theme);
@@ -288,6 +305,31 @@ export default function App() {
       const activeCompId = overrideCompId || parsedUser?.companyId || null;
 
       try {
+        // Rejouer en priorité toute action en file d'attente (ex: facture créée précédemment)
+        if (typeof navigator !== "undefined" && navigator.onLine && getPendingCount() > 0) {
+          try {
+            await processSyncQueue({
+              apiCreateClient,
+              apiUpdateClient,
+              apiDeleteClient,
+              apiCreateInvoice,
+              apiUpdateInvoice,
+              apiUpdateInvoiceStatus,
+              apiAddInvoiceReminder,
+              apiDeleteInvoice,
+              apiCreateQuote,
+              apiUpdateQuoteStatus,
+              apiDeleteQuote,
+              apiCreatePayment,
+              apiUpdatePayment,
+              apiDeletePayment,
+              upsertCompanyProfile,
+            });
+          } catch (replayErr) {
+            console.warn("Rejeu file d'attente avant sync:", replayErr);
+          }
+        }
+
         const [comp, clis, invs, qts, pays, tms] = await Promise.all([
           fetchCompanyProfile(activeCompId).catch((e) => {
             console.warn("Supabase fetchCompanyProfile:", e);
@@ -346,7 +388,62 @@ export default function App() {
           setClients(clis);
         }
         if (Array.isArray(invs)) {
-          setInvoices(invs);
+          // Fusionner avec les factures créées localement ou en file d'attente qui ne seraient pas encore dans Supabase
+          let mergedInvs = [...invs];
+          if (typeof window !== "undefined") {
+            try {
+              const seenIds = new Set(invs.map((i) => i.id));
+              const candidates = [];
+
+              // 1. Factures présentes dans la file d'attente hors-ligne
+              const queuedActions = getPendingQueue();
+              queuedActions.forEach((act) => {
+                if (act?.type === "CREATE_INVOICE" && act.payload?.id) {
+                  candidates.push(act.payload);
+                }
+              });
+
+              // 2. Factures présentes dans le cache local
+              const rawLocalInvs = localStorage.getItem(STORAGE_KEY_INVOICES);
+              if (rawLocalInvs) {
+                const localInvs = JSON.parse(rawLocalInvs);
+                if (Array.isArray(localInvs)) {
+                  candidates.push(...localInvs);
+                }
+              }
+
+              const unsyncedLocal = [];
+              candidates.forEach((loc) => {
+                if (
+                  loc &&
+                  loc.id &&
+                  !seenIds.has(loc.id) &&
+                  (!loc.companyId || !activeCompId || loc.companyId === activeCompId)
+                ) {
+                  seenIds.add(loc.id);
+                  unsyncedLocal.push(loc);
+                }
+              });
+
+              if (unsyncedLocal.length > 0) {
+                mergedInvs = [...unsyncedLocal, ...invs];
+                // Synchroniser automatiquement ces factures locales vers Supabase en arrière-plan
+                unsyncedLocal.forEach((uInv) => {
+                  apiCreateInvoice(uInv, activeCompId).catch((e) =>
+                    console.warn("Auto-sync facture locale vers Supabase:", e)
+                  );
+                });
+              }
+            } catch (e) {
+              console.warn("Fusion localStorage invoices:", e);
+            }
+          }
+          setInvoices(mergedInvs);
+          if (typeof window !== "undefined" && mergedInvs.length > 0) {
+            try {
+              localStorage.setItem(STORAGE_KEY_INVOICES, JSON.stringify(mergedInvs));
+            } catch (e) {}
+          }
         }
         if (Array.isArray(qts)) {
           setQuotes(qts);
@@ -382,15 +479,22 @@ export default function App() {
     };
 
     let parsedUser = null;
+    let parsedComp = null;
     const rawSaved = localStorage.getItem(STORAGE_KEY_USER_PROFILE);
     if (rawSaved) {
       try {
         parsedUser = JSON.parse(rawSaved);
       } catch (e) {}
     }
+    const rawComp = localStorage.getItem(STORAGE_KEY_COMPANY);
+    if (rawComp) {
+      try {
+        parsedComp = JSON.parse(rawComp);
+      } catch (e) {}
+    }
 
-    if (parsedUser?.companyId) {
-      syncFromSupabase(parsedUser.companyId);
+    if (parsedUser?.companyId || parsedComp?.id || parsedUser?.email) {
+      syncFromSupabase(parsedUser?.companyId || parsedComp?.id || null);
     }
 
     return () => {
@@ -685,26 +789,42 @@ export default function App() {
   // Filtrage par date/période historique
   const displayedInvoices = invoices.filter((inv) => {
     if (!selectedDate && (selectedPeriod === "Toutes les dates" || !selectedPeriod)) return true;
+    const invDate = String(inv.issueDate || "");
     if (selectedDate && selectedDate.includes("/")) {
-      return inv.issueDate === selectedDate;
+      return invDate === selectedDate;
     }
+    const now = new Date();
+    const ddNow = String(now.getDate()).padStart(2, "0");
+    const mmNow = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyyNow = String(now.getFullYear());
+    const todayStr = `${ddNow}/${mmNow}/${yyyyNow}`;
+
     if (selectedPeriod === "Aujourd'hui") {
-      return inv.issueDate === "21/10/2026";
+      return invDate === todayStr || invDate === "21/10/2026";
     }
     if (selectedPeriod === "Hier") {
-      return inv.issueDate === "20/10/2026";
+      const yest = new Date(now.getTime() - 86400000);
+      const yestStr = `${String(yest.getDate()).padStart(2, "0")}/${String(yest.getMonth() + 1).padStart(2, "0")}/${yest.getFullYear()}`;
+      return invDate === yestStr || invDate === "20/10/2026";
     }
     if (selectedPeriod === "Avant-hier") {
-      return inv.issueDate === "19/10/2026";
+      const bef = new Date(now.getTime() - 2 * 86400000);
+      const befStr = `${String(bef.getDate()).padStart(2, "0")}/${String(bef.getMonth() + 1).padStart(2, "0")}/${bef.getFullYear()}`;
+      return invDate === befStr || invDate === "19/10/2026";
     }
     if (selectedPeriod === "Cette semaine") {
-      return ["19/10/2026", "20/10/2026", "21/10/2026", "22/10/2026", "23/10/2026", "24/10/2026", "25/10/2026"].includes(inv.issueDate);
+      return (
+        invDate === todayStr ||
+        invDate.includes(`/${mmNow}/`) ||
+        ["19/10/2026", "20/10/2026", "21/10/2026", "22/10/2026", "23/10/2026", "24/10/2026", "25/10/2026"].includes(invDate)
+      );
     }
     if (selectedPeriod === "Ce mois-ci") {
-      return inv.issueDate.includes("/10/");
+      return invDate.includes(`/${mmNow}/`) || invDate.includes("/10/");
     }
     if (selectedPeriod === "Mois précédent") {
-      return inv.issueDate.includes("/09/");
+      const prevMonth = String(now.getMonth() === 0 ? 12 : now.getMonth()).padStart(2, "0");
+      return invDate.includes(`/${prevMonth}/`) || invDate.includes("/09/");
     }
     return true;
   });
@@ -851,22 +971,53 @@ export default function App() {
 
   // Add new invoice
   const handleCreateInvoice = async (newInvoice) => {
-    setInvoices((prev) => [newInvoice, ...prev]);
+    const activeCompId = userProfile?.companyId || companyInfo?.id || newInvoice.companyId || null;
+    const invoiceToSave = {
+      ...newInvoice,
+      companyId: activeCompId,
+    };
+
+    // Réinitialiser les filtres de date pour que la nouvelle facture soit immédiatement visible sur le Tableau de Bord
+    setSelectedDate(null);
+    setSelectedPeriod("Toutes les dates");
+
+    setInvoices((prev) => {
+      const updated = [invoiceToSave, ...prev];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(STORAGE_KEY_INVOICES, JSON.stringify(updated));
+        } catch (e) {}
+      }
+      return updated;
+    });
 
     if (typeof navigator !== "undefined" && !navigator.onLine) {
-      enqueueOfflineAction("CREATE_INVOICE", newInvoice, userProfile?.companyId);
-      showToast(`Facture ${newInvoice.id} créée en mode hors-ligne (en attente de sync).`, "info");
+      enqueueOfflineAction("CREATE_INVOICE", invoiceToSave, activeCompId);
+      showToast(`Facture ${invoiceToSave.id} créée en mode hors-ligne (en attente de sync).`, "info");
       return;
     }
 
-    showToast(`Enregistrement de la facture ${newInvoice.id}...`, "info");
+    showToast(`Enregistrement de la facture ${invoiceToSave.id}...`, "info");
     try {
-      await apiCreateInvoice(newInvoice, userProfile?.companyId);
-      showToast(`La facture ${newInvoice.id} a été enregistrée !`, "success");
+      const savedInv = await apiCreateInvoice(invoiceToSave, activeCompId);
+      if (savedInv && savedInv.id) {
+        setInvoices((prev) => {
+          const updated = prev.map((inv) =>
+            inv.id === invoiceToSave.id ? { ...invoiceToSave, ...savedInv } : inv
+          );
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem(STORAGE_KEY_INVOICES, JSON.stringify(updated));
+            } catch (e) {}
+          }
+          return updated;
+        });
+      }
+      showToast(`La facture ${savedInv?.id || invoiceToSave.id} a été enregistrée !`, "success");
     } catch (err) {
       console.warn("Erreur sauvegarde facture Supabase, mise en file d'attente hors-ligne:", err);
-      enqueueOfflineAction("CREATE_INVOICE", newInvoice, userProfile?.companyId);
-      showToast(`Facture ${newInvoice.id} créée (sauvegardée en file d'attente hors-ligne).`, "info");
+      enqueueOfflineAction("CREATE_INVOICE", invoiceToSave, activeCompId);
+      showToast(`Facture ${invoiceToSave.id} créée (sauvegardée en file d'attente hors-ligne).`, "info");
     }
   };
 
@@ -2086,6 +2237,7 @@ export default function App() {
                 companyInfo={companyInfo}
                 invoices={displayedInvoices}
                 payments={payments}
+                onNavigateCard={handleNavigateFromDashboardCard}
               />
 
               {/* Prévisions de trésorerie (30j) & Alertes de recouvrement */}
@@ -2093,7 +2245,8 @@ export default function App() {
                 invoices={invoices}
                 metrics={metrics}
                 companyInfo={companyInfo}
-                onNavigateToInvoices={() => setActiveTab("invoices")}
+                onNavigateToInvoices={() => handleNavigateFromDashboardCard("all", "invoices")}
+                onNavigateCard={handleNavigateFromDashboardCard}
                 onOpenCreateInvoice={() => setIsCreateModalOpen(true)}
                 onOpenCreateClient={() => setIsCreateClientModalOpen(true)}
                 onOpenReminder={(inv) => setReminderInvoice(inv)}
@@ -2103,9 +2256,12 @@ export default function App() {
               <DashboardRecentInvoices
                 invoices={displayedInvoices}
                 onSelectInvoice={(inv) => setSelectedInvoice(inv)}
-                onNavigateToInvoices={() => setActiveTab("invoices")}
+                onNavigateToInvoices={() => handleNavigateFromDashboardCard("all", "invoices")}
                 onOpenCreateInvoice={() => setIsCreateModalOpen(true)}
+                onMarkAsPaid={handleMarkAsPaid}
+                onOpenReminder={(inv) => setReminderInvoice(inv)}
                 companyInfo={companyInfo}
+                onToast={showToast}
               />
             </div>
           )}
@@ -2121,7 +2277,7 @@ export default function App() {
                       Registre Comptable
                     </span>
                     <span className="text-[10px] font-semibold text-slate-500">
-                      Conformité UEMOA / OHADA • TVA 18%
+                      Conformité DGI RDC (SFE / e-MCF) & OHADA
                     </span>
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1.5">
@@ -2182,7 +2338,12 @@ export default function App() {
               )}
 
               {/* Barre de métriques opérationnelles dédiées à la facturation */}
-              <InvoiceMetricsBar invoices={displayedInvoices} companyInfo={companyInfo} />
+              <InvoiceMetricsBar
+                invoices={displayedInvoices}
+                companyInfo={companyInfo}
+                activeFilter={invoiceFilterOverride}
+                onSelectFilter={(flt) => setInvoiceFilterOverride(flt)}
+              />
 
               {/* Table intégrale et complète de toutes les factures avec filtres et pagination */}
               <InvoiceTable
@@ -2197,6 +2358,8 @@ export default function App() {
                 searchQuery={searchQuery}
                 onToast={showToast}
                 companyInfo={companyInfo}
+                externalStatusFilter={invoiceFilterOverride}
+                onStatusFilterChange={(flt) => setInvoiceFilterOverride(flt)}
                 title="Registre Général des Factures"
                 subtitle="Visualisation, filtrage avancé et gestion opérationnelle de toutes les pièces comptables"
               />

@@ -26,6 +26,7 @@ export default function DashboardForecast({
   metrics,
   companyInfo = null,
   onNavigateToInvoices,
+  onNavigateCard = null,
   onOpenCreateInvoice,
   onOpenCreateClient,
   onOpenReminder,
@@ -33,6 +34,10 @@ export default function DashboardForecast({
   const currency = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const sym = getCurrencySymbol(currency);
   const hasInvoices = (metrics?.totalBilled || 0) > 0;
+  const countPaid = invoices.filter((inv) => inv.status === "payee").length;
+  const countPending = invoices.filter(
+    (inv) => inv.status === "envoyee" || inv.status === "en_attente"
+  ).length;
   // Horizon temporel sélectionné pour la simulation (7j, 15j, 30j, Trimestre)
   const [forecastHorizon, setForecastHorizon] = useState("30j");
   // Segment survolé (null | 'paid' | 'pending' | 'other')
@@ -186,11 +191,18 @@ export default function DashboardForecast({
 
           {/* Section Barre de Répartition avec interaction dynamique au survol */}
           <div className="mt-5 space-y-2 relative">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-600">
+            <div
+              onClick={() =>
+                onNavigateCard
+                  ? onNavigateCard("all", "invoices")
+                  : onNavigateToInvoices && onNavigateToInvoices()
+              }
+              className="flex items-center justify-between text-xs font-bold text-slate-600 cursor-pointer hover:text-[#183BB0] transition-colors"
+            >
               <span className="flex items-center gap-1.5">
-                <span>Portefeuille Global</span>
+                <span>Portefeuille Global ({invoices.length} facture{invoices.length > 1 ? "s" : ""})</span>
                 <span className="text-[10px] text-slate-400 font-normal">
-                  (Survolez la barre pour inspecter les flux)
+                  (Survolez ou cliquez pour ouvrir)
                 </span>
               </span>
               <span className="text-slate-900 font-black text-sm">
@@ -285,9 +297,14 @@ export default function DashboardForecast({
               </div>
             )}
 
-            {/* 3 Cartes interactives détaillées au survol */}
+            {/* 3 Cartes interactives détaillées au survol & cliquables */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
               <div
+                onClick={() =>
+                  onNavigateCard
+                    ? onNavigateCard("payee", "invoices")
+                    : onNavigateToInvoices && onNavigateToInvoices()
+                }
                 onMouseEnter={() => setHoveredSegment("paid")}
                 onMouseLeave={() => setHoveredSegment(null)}
                 className={`p-3 rounded-2xl border transition-all cursor-pointer ${
@@ -308,12 +325,17 @@ export default function DashboardForecast({
                 <p className="font-black text-base text-slate-900 mt-1 truncate">
                   {formatFCFA(metrics.totalPaid, currency)}
                 </p>
-                <p className="text-[10px] text-emerald-700/80 mt-0.5">
-                  Sécurisé sur les comptes bancaires
+                <p className="text-[10px] text-emerald-700/80 mt-0.5 font-semibold">
+                  {countPaid} facture{countPaid > 1 ? "s" : ""} payée{countPaid > 1 ? "s" : ""} • Voir →
                 </p>
               </div>
 
               <div
+                onClick={() =>
+                  onNavigateCard
+                    ? onNavigateCard("envoyee", "invoices")
+                    : onNavigateToInvoices && onNavigateToInvoices()
+                }
                 onMouseEnter={() => setHoveredSegment("pending")}
                 onMouseLeave={() => setHoveredSegment(null)}
                 className={`p-3 rounded-2xl border transition-all cursor-pointer ${
@@ -334,12 +356,17 @@ export default function DashboardForecast({
                 <p className="font-black text-base text-slate-900 mt-1 truncate">
                   {formatFCFA(metrics.totalPending, currency)}
                 </p>
-                <p className="text-[10px] text-blue-700/80 mt-0.5">
-                  Prochaines entrées de trésorerie
+                <p className="text-[10px] text-blue-700/80 mt-0.5 font-semibold">
+                  {countPending} facture{countPending > 1 ? "s" : ""} en cours • Voir →
                 </p>
               </div>
 
               <div
+                onClick={() =>
+                  onNavigateCard
+                    ? onNavigateCard("all", "payments")
+                    : onNavigateToInvoices && onNavigateToInvoices()
+                }
                 onMouseEnter={() => setHoveredSegment("other")}
                 onMouseLeave={() => setHoveredSegment(null)}
                 className={`p-3 rounded-2xl border transition-all cursor-pointer ${
@@ -360,8 +387,8 @@ export default function DashboardForecast({
                 <p className="font-black text-base text-slate-900 mt-1">
                   {metrics.recoveryRate}%
                 </p>
-                <p className="text-[10px] text-purple-700/80 mt-0.5">
-                  Performance globale de recouvrement
+                <p className="text-[10px] text-purple-700/80 mt-0.5 font-semibold">
+                  Journal des règlements • Voir →
                 </p>
               </div>
             </div>

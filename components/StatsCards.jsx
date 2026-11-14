@@ -228,6 +228,7 @@ export default function StatsCards({
   companyInfo = null,
   invoices = [],
   payments = [],
+  onNavigateCard = null,
 }) {
   const currency = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
 
@@ -235,6 +236,12 @@ export default function StatsCards({
   const totalPaid = Number(metrics?.totalPaid) || 0;
   const totalPending = Number(metrics?.totalPending) || 0;
   const recoveryRate = Number(metrics?.recoveryRate) || 0;
+
+  const totalCount = (invoices || []).length;
+  const paidCount = (invoices || []).filter((i) => i.status === "payee").length;
+  const pendingCount = (invoices || []).filter(
+    (i) => i.status === "envoyee" || i.status === "en_attente"
+  ).length;
 
   // Agrégation hebdomadaire réelle (Sem 1 à Sem 4) basée sur les dates d'émission et d'encaissement
   const validInvoices = (invoices || []).filter((inv) => inv.status !== "brouillon");
@@ -344,6 +351,9 @@ export default function StatsCards({
       id: "total",
       label: "Total Facturé",
       value: formatFCFA(totalBilled, currency),
+      countBadge: `${totalCount} facture${totalCount > 1 ? "s" : ""} émise${totalCount > 1 ? "s" : ""}`,
+      targetFilter: "all",
+      targetTab: "invoices",
       change: computeWeekOverWeekChange(billedPoints),
       isPositive: (billedPoints[3]?.val || 0) >= (billedPoints[2]?.val || 0),
       icon: FileText,
@@ -357,6 +367,9 @@ export default function StatsCards({
       id: "paid",
       label: "Montant Encaissé (Payé)",
       value: formatFCFA(totalPaid, currency),
+      countBadge: `${paidCount} facture${paidCount > 1 ? "s" : ""} payée${paidCount > 1 ? "s" : ""}`,
+      targetFilter: "payee",
+      targetTab: "invoices",
       change: computeWeekOverWeekChange(paidPoints),
       isPositive: (paidPoints[3]?.val || 0) >= (paidPoints[2]?.val || 0),
       icon: CheckCircle2,
@@ -370,6 +383,9 @@ export default function StatsCards({
       id: "pending",
       label: "En Attente & Retard",
       value: formatFCFA(totalPending, currency),
+      countBadge: `${pendingCount} facture${pendingCount > 1 ? "s" : ""} en attente`,
+      targetFilter: "envoyee",
+      targetTab: "invoices",
       change: computeWeekOverWeekChange(pendingPoints),
       isPositive: totalPending === 0,
       icon: Clock,
@@ -383,6 +399,9 @@ export default function StatsCards({
       id: "net",
       label: "Taux de Recouvrement",
       value: `${recoveryRate}%`,
+      countBadge: `${paidCount}/${totalCount} soldée${paidCount > 1 ? "s" : ""} • Règlements`,
+      targetFilter: "all",
+      targetTab: "payments",
       change: computeWeekOverWeekChange(ratePoints, "vs sem. 3"),
       isPositive: (ratePoints[3]?.val || 0) >= (ratePoints[2]?.val || 0),
       icon: Wallet,
@@ -402,9 +421,22 @@ export default function StatsCards({
         return (
           <div
             key={card.id}
-            className={`bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-lg transition-all duration-300 flex flex-col justify-between group ${card.accentHover} hover:-translate-y-0.5`}
+            role={onNavigateCard ? "button" : undefined}
+            tabIndex={onNavigateCard ? 0 : undefined}
+            onClick={() =>
+              onNavigateCard && onNavigateCard(card.targetFilter, card.targetTab)
+            }
+            onKeyDown={(e) => {
+              if (onNavigateCard && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                onNavigateCard(card.targetFilter, card.targetTab);
+              }
+            }}
+            className={`bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-lg transition-all duration-300 flex flex-col justify-between group ${
+              card.accentHover
+            } hover:-translate-y-0.5 ${onNavigateCard ? "cursor-pointer" : ""}`}
           >
-            {/* Rangée supérieure : Icône à gauche, Libellé & Grand Montant à droite */}
+            {/* Rangée supérieure : Icône à gauche, Libellé, Grand Montant & Nombre de factures à droite */}
             <div className="flex items-center gap-3.5">
               <div
                 className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${card.iconBg} shadow-xs transition-transform duration-300 group-hover:scale-105 group-hover:rotate-1`}
@@ -413,9 +445,14 @@ export default function StatsCards({
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-slate-500 truncate tracking-wide">
-                  {card.label}
-                </p>
+                <div className="flex items-center justify-between gap-1.5">
+                  <p className="text-xs font-semibold text-slate-500 truncate tracking-wide">
+                    {card.label}
+                  </p>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-700 transition-colors shrink-0">
+                    {card.countBadge}
+                  </span>
+                </div>
                 <h3 className="text-xl lg:text-[22px] font-black text-slate-900 tracking-tight leading-tight mt-0.5 truncate">
                   {card.value}
                 </h3>
