@@ -78,7 +78,13 @@ export default function SettingsView({
   onApplyTheme,
   currentTheme = "light",
   onOpenOnboardingPreview = null,
+  subscriptionPlan = "free",
+  onNavigateToPricing = null,
 }) {
+  const isFreePlan = (subscriptionPlan || "free") === "free";
+  const isSettingsTabRestrictedOnFree = (tabId) =>
+    isFreePlan &&
+    ["gateways", "notifications", "templates", "team", "audit_data"].includes(tabId);
   // Navigation entre les sous-onglets des paramètres
   const [activeSettingsTab, setActiveSettingsTab] = useState("appearance");
   const [copiedKey, setCopiedKey] = useState(false);
@@ -726,22 +732,65 @@ export default function SettingsView({
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSettingsTab === tab.id;
+          const isLocked = isSettingsTabRestrictedOnFree(tab.id);
           return (
             <button
               key={tab.id}
               onClick={() => setActiveSettingsTab(tab.id)}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold transition-all sm:shrink-0 cursor-pointer min-w-0 ${
+              className={`flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold transition-all sm:shrink-0 cursor-pointer min-w-0 ${
                 isActive
                   ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
                   : "bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/60"
               }`}
             >
-              <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-slate-500"}`} />
-              <span className="truncate">{tab.label}</span>
+              <span className="flex items-center gap-2 min-w-0">
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-slate-500"}`} />
+                <span className="truncate">{tab.label}</span>
+              </span>
+              {isLocked && (
+                <Lock className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-amber-200" : "text-rose-500"}`} />
+              )}
             </button>
           );
         })}
       </div>
+
+      {/* Écran de restriction des paramètres avancés pour l'Offre Free */}
+      {isSettingsTabRestrictedOnFree(activeSettingsTab) ? (
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-12 text-center max-w-2xl mx-auto my-6 space-y-5 animate-in fade-in duration-200">
+          <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto border border-rose-200 shadow-xs">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div>
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-700 bg-rose-100 px-3 py-1 rounded-full border border-rose-200">
+              Paramètre Restreint • Offre Free (0 $)
+            </span>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-3">
+              Ce module de paramétrage nécessite une offre supérieure
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-2 leading-relaxed">
+              Dans l&apos;offre gratuite (limitée à <strong>3 factures</strong>, sans relances et
+              sans employés), la configuration avancée des{" "}
+              <strong>relances automatiques, modèles WhatsApp/Email, passerelles et équipes</strong>{" "}
+              est verrouillée. Passez à l&apos;offre{" "}
+              <strong className="text-slate-900">Stargate (14 $/mois)</strong> ou débloquez
+              l&apos;accès intégral avec{" "}
+              <strong className="text-[#183BB0]">Business (34 $/mois)</strong>.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => onNavigateToPricing && onNavigateToPricing()}
+              className="w-full sm:w-auto px-6 py-3 bg-[#183BB0] hover:bg-[#122F8C] text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>Passer à Stargate (14 $) ou Business (34 $)</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+      <>
 
       {/* 3. Contenu de chaque onglet */}
 
@@ -2474,6 +2523,8 @@ export default function SettingsView({
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

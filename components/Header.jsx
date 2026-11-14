@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Clock,
   ShieldCheck,
+  Crown,
 } from "lucide-react";
 
 import CalendarDropdown from "./CalendarDropdown";
@@ -462,6 +463,21 @@ export default function Header({
                   <p className="text-[11px] text-slate-500 mt-0.5">{userProfile?.email || ""}</p>
                 </div>
                 <div className="py-1">
+                  <button
+                    onClick={() => {
+                      if (onNavigate) onNavigate("pricing");
+                      setShowProfileMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-xs text-amber-700 hover:bg-amber-50 flex items-center justify-between font-bold transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <Crown className="w-4 h-4 text-amber-500" />
+                      <span>Abonnement & Tarifs</span>
+                    </span>
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                      {(companyInfo?.subscriptionPlan || "free").toUpperCase()}
+                    </span>
+                  </button>
                   {userProfile?.role === "admin" && (
                     <button
                       onClick={() => {

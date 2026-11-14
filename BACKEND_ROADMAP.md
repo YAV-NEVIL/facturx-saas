@@ -191,7 +191,14 @@ graph TD
   - Apposition automatique du **QR Code officiel DGI RDC (21×21 vectoriel)** et du cartouche de sécurité `CODE DEF / DGI` sur les factures PDF ([lib/pdf-generator.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/pdf-generator.js)) et l'aperçu ([components/InvoiceDetailModal.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/InvoiceDetailModal.jsx)).
 - [x] **6.2 Courbes Hebdomadaires & Tendances Calculées sur les Dates Réelles** :
   - Calcul dynamique des points `Sem 1` à `Sem 4` et des pourcentages d'évolution hebdomadaire dans [components/StatsCards.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/StatsCards.jsx) à partir des dates d'émission et de règlement réelles des factures.
-- [ ] **6.3 Nom de Domaine Personnalisé & Serveur SMTP Dédié** :
+- [x] **6.3 Système d'Abonnements SaaS, Quotas & Tarification (`PricingView.jsx`)** :
+  - Migration Supabase `add_subscription_plan_to_companies` (`subscription_plan`, `subscription_billing_cycle`, `subscription_updated_at`).
+  - Moteur central de quotas et permissions ([lib/subscription-plans.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/subscription-plans.js)) et page complète d'abonnement ([components/PricingView.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/PricingView.jsx)) avec 4 offres :
+    1. **Free (`0 $ / mois`)** : limité à **3 factures générées**, **aucune relance client** autorisée, **aucun employé/collaborateur** supplémentaire autorisé, et **restrictions sur les paramètres avancés** ([components/SettingsView.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/SettingsView.jsx)).
+    2. **Stargate (`14 $ / mois`)** : jusqu'à **100 factures générées**, déblocage des relances clients (WhatsApp & Email) et jusqu'à **3 employés/collaborateurs** ([components/EmployeesView.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/EmployeesView.jsx)).
+    3. **Business (`34 $ / mois` — Recommandé)** : **factures illimitées** et **accès intégral à tout sans aucune restriction** (relances illimitées, employés RBAC illimités, tous les paramètres, rapports OHADA, DGI e-MCF Live).
+    4. **Gold (`Contactez-nous`)** : offre sur mesure pour holdings, banques et grandes entreprises avec formulaire dédié de prise de contact direct.
+- [ ] **6.4 Nom de Domaine Personnalisé & Serveur SMTP Dédié** :
   - Connexion d'un domaine personnalisé (ex. `app.facturx.cd`) sur Vercel avec certificat SSL automatique.
   - Branchement d'un serveur SMTP transactionnel (Resend / Brevo) sur Supabase Auth et sur l'API de notification KYB pour lever la limite d'envoi d'emails par heure.
 
@@ -206,7 +213,7 @@ graph TD
 | **3** | **Analytique & Rapports Fiscaux en Direct** | <span style="color:green;font-weight:bold;">✅ Complète</span> | DSO, trésorerie, journal TVA 16%/18%, exports |
 | **4** | **Authentification & Rôles Multi-Tenant** | <span style="color:green;font-weight:bold;">✅ Complète</span> | Login Supabase Auth, rôles équipe, isolation RLS |
 | **5** | **Tests E2E, Mode Hors-Ligne, KYB 48h, Multi-Devises & Prod** | <span style="color:green;font-weight:bold;">✅ Complète</span> | PWA hors-ligne, Onboarding KYB, devise unique, déploiement Vercel |
-| **6** | **Facture Normalisée DGI RDC (e-MCF), Domaine & SMTP Pro** | <span style="color:green;font-weight:bold;">✅ 6.1 & 6.2 Complètes</span> | QR Code DGI / Code DEF, courbes réelles (6.3 Domaine/SMTP optionnel) |
+| **6** | **Facture Normalisée DGI RDC (e-MCF), Pricing SaaS & Domaine Pro** | <span style="color:green;font-weight:bold;">✅ 6.1 à 6.3 Complètes</span> | QR Code DGI / Code DEF, Abonnements (Free, Stargate 14$, Business 34$, Gold) |
 
 ---
 

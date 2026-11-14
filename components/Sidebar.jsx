@@ -18,6 +18,7 @@ import {
   Building2,
   Briefcase,
   Lock,
+  Crown,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -29,8 +30,11 @@ export default function Sidebar({
   invoiceCount = 8,
   userRole = "admin",
   userProfile = null,
+  subscriptionPlan = "free",
 }) {
+  const planBadge = String(subscriptionPlan || "free").toUpperCase();
   const isRestrictedForRole = (itemId) => {
+    if (itemId === "employees" && subscriptionPlan === "free") return true;
     if (userRole === "admin") return false;
     if (userRole === "comptable") {
       return itemId === "settings" || itemId === "company" || itemId === "employees";
@@ -54,6 +58,7 @@ export default function Sidebar({
     { id: "employees", label: "Employés", icon: ShieldCheck },
     { id: "analytics", label: "Analytique", icon: BarChart3 },
     { id: "reports", label: "Rapports", icon: FileSpreadsheet },
+    { id: "pricing", label: "Abonnement & Tarifs", icon: Crown, badge: planBadge },
     { id: "settings", label: "Paramètres", icon: Settings },
   ];
 

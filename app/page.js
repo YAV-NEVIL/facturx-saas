@@ -30,6 +30,12 @@ import AuthModal from "@/components/AuthModal";
 import LoginScreen from "@/components/LoginScreen";
 import CompanyOnboardingGate from "@/components/CompanyOnboardingGate";
 import EmployeesView from "@/components/EmployeesView";
+import PricingView from "@/components/PricingView";
+import {
+  canCreateInvoice,
+  canSendReminder,
+  getPlanConfig,
+} from "@/lib/subscription-plans";
 import {
   fetchCompanyProfile,
   upsertCompanyProfile,
@@ -838,6 +844,71 @@ export default function App() {
     setTimeout(() => setFeedbackToast(null), 3500);
   };
 
+  // Gestion des offres d'abonnement (Free: 3 factures/pas de relance/pas d'employés, Stargate: 14$/100 factures, Business: 34$/illimité, Gold: sur mesure)
+  const activeSubscriptionPlan = companyInfo?.subscriptionPlan || "free";
+  const activeBillingCycle = companyInfo?.subscriptionBillingCycle || "monthly";
+
+  const handleOpenCreateInvoiceWithLimit = (preselectedClient = null) => {
+    const quota = canCreateInvoice(activeSubscriptionPlan, invoices.length);
+    if (!quota.allowed) {
+      showToast(
+        `Limite de l'offre ${quota.plan.name} atteinte (${quota.max} factures max). Passez à Stargate (14 $) ou Business (34 $) pour générer plus de factures.`,
+        "info"
+      );
+      setActiveTab("pricing");
+      return;
+    }
+    if (preselectedClient && preselectedClient.name) {
+      setClientForInvoice(preselectedClient);
+    }
+    setIsCreateModalOpen(true);
+  };
+
+  const handleOpenReminderWithLimit = (inv) => {
+    const check = canSendReminder(activeSubscriptionPlan);
+    if (!check.allowed) {
+      showToast(
+        "Les relances clients ne sont pas incluses dans l'offre Free (0 $). Passez à Stargate (14 $) ou Business (34 $) pour débloquer les relances.",
+        "info"
+      );
+      setActiveTab("pricing");
+      return;
+    }
+    setReminderInvoice(inv);
+  };
+
+  const handleSelectSubscriptionPlan = async (newPlanId, newCycle = "monthly") => {
+    const planObj = getPlanConfig(newPlanId);
+    const updatedCompany = {
+      ...companyInfo,
+      subscriptionPlan: planObj.id,
+      subscriptionBillingCycle: newCycle,
+    };
+    setCompanyInfo(updatedCompany);
+    setCompanyForm((prev) => ({
+      ...prev,
+      subscriptionPlan: planObj.id,
+      subscriptionBillingCycle: newCycle,
+    }));
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_KEY_COMPANY, JSON.stringify(updatedCompany));
+      } catch (e) {}
+    }
+    showToast(
+      `Offre ${planObj.name} (${planObj.priceLabel}) activée avec succès pour ${
+        companyInfo?.name || "votre entreprise"
+      } !`,
+      "success"
+    );
+    try {
+      await upsertCompanyProfile(updatedCompany);
+    } catch (err) {
+      console.warn("Sauvegarde plan abonnement Supabase:", err);
+      enqueueOfflineAction("UPSERT_COMPANY", updatedCompany, userProfile?.companyId);
+    }
+  };
+
   // Add new client to global directory
   const handleAddNewClient = async (newClient) => {
     setClients((prev) => {
@@ -971,6 +1042,17 @@ export default function App() {
 
   // Add new invoice
   const handleCreateInvoice = async (newInvoice) => {
+    const quota = canCreateInvoice(activeSubscriptionPlan, invoices.length);
+    if (!quota.allowed) {
+      showToast(
+        `Limite de l'offre ${quota.plan.name} atteinte (${quota.max} factures maximum). Passez à l'offre Stargate (14 $) ou Business (34 $).`,
+        "info"
+      );
+      setIsCreateModalOpen(false);
+      setActiveTab("pricing");
+      return;
+    }
+
     const activeCompId = userProfile?.companyId || companyInfo?.id || newInvoice.companyId || null;
     const invoiceToSave = {
       ...newInvoice,
@@ -1464,6 +1546,15 @@ export default function App() {
   // 4. Conversion magique d'un devis en facture officielle
   const handleConvertQuoteToInvoice = async (quote) => {
     if (!quote) return;
+    const quota = canCreateInvoice(activeSubscriptionPlan, invoices.length);
+    if (!quota.allowed) {
+      showToast(
+        `Limite de l'offre ${quota.plan.name} atteinte (${quota.max} factures max). Passez à Stargate (14 $) ou Business (34 $) pour convertir ce devis en facture.`,
+        "info"
+      );
+      setActiveTab("pricing");
+      return;
+    }
     if (
       quote.convertedToInvoiceId ||
       invoices.some((inv) => inv.convertedFromQuoteId === quote.id)
@@ -1931,10 +2022,11 @@ export default function App() {
         setActiveTab={setActiveTab}
         isMobileOpen={isMobileMenuOpen}
         setIsMobileOpen={setIsMobileMenuOpen}
-        onOpenCreateModal={() => setIsCreateModalOpen(true)}
+        onOpenCreateModal={() => handleOpenCreateInvoiceWithLimit()}
         invoiceCount={invoices.length}
         userRole={userProfile?.role || "admin"}
         userProfile={userProfile}
+        subscriptionPlan={activeSubscriptionPlan}
       />
 
       {/* 2. Main Content Area */}
@@ -2194,7 +2286,7 @@ export default function App() {
                   />
 
                   <button
-                    onClick={() => setIsCreateModalOpen(true)}
+                    onClick={() => handleOpenCreateInvoiceWithLimit()}
                     className="px-4 py-2 bg-[#183BB0] hover:bg-[#122F8C] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md shadow-blue-900/20 transition-all hover:scale-[1.02]"
                   >
                     <Plus className="w-4 h-4" />
@@ -2247,9 +2339,9 @@ export default function App() {
                 companyInfo={companyInfo}
                 onNavigateToInvoices={() => handleNavigateFromDashboardCard("all", "invoices")}
                 onNavigateCard={handleNavigateFromDashboardCard}
-                onOpenCreateInvoice={() => setIsCreateModalOpen(true)}
+                onOpenCreateInvoice={() => handleOpenCreateInvoiceWithLimit()}
                 onOpenCreateClient={() => setIsCreateClientModalOpen(true)}
-                onOpenReminder={(inv) => setReminderInvoice(inv)}
+                onOpenReminder={(inv) => handleOpenReminderWithLimit(inv)}
               />
 
               {/* Dernières factures récentes (compact, 4 factures max avec lien vers le registre complet) */}
@@ -2257,9 +2349,9 @@ export default function App() {
                 invoices={displayedInvoices}
                 onSelectInvoice={(inv) => setSelectedInvoice(inv)}
                 onNavigateToInvoices={() => handleNavigateFromDashboardCard("all", "invoices")}
-                onOpenCreateInvoice={() => setIsCreateModalOpen(true)}
+                onOpenCreateInvoice={() => handleOpenCreateInvoiceWithLimit()}
                 onMarkAsPaid={handleMarkAsPaid}
-                onOpenReminder={(inv) => setReminderInvoice(inv)}
+                onOpenReminder={(inv) => handleOpenReminderWithLimit(inv)}
                 companyInfo={companyInfo}
                 onToast={showToast}
               />
@@ -2300,7 +2392,7 @@ export default function App() {
                   />
 
                   <button
-                    onClick={() => setIsCreateModalOpen(true)}
+                    onClick={() => handleOpenCreateInvoiceWithLimit()}
                     className="px-4 py-2 bg-[#183BB0] hover:bg-[#122F8C] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md shadow-blue-900/20 transition-all hover:scale-[1.02]"
                   >
                     <Plus className="w-4 h-4" />
@@ -2350,11 +2442,11 @@ export default function App() {
                 invoices={displayedInvoices}
                 clients={clients}
                 onSelectInvoice={(inv) => setSelectedInvoice(inv)}
-                onOpenCreateModal={() => setIsCreateModalOpen(true)}
+                onOpenCreateModal={() => handleOpenCreateInvoiceWithLimit()}
                 onMarkAsPaid={handleMarkAsPaid}
                 onUpdateInvoice={handleUpdateInvoice}
                 onDeleteInvoice={handleDeleteInvoice}
-                onOpenReminder={(inv) => setReminderInvoice(inv)}
+                onOpenReminder={(inv) => handleOpenReminderWithLimit(inv)}
                 searchQuery={searchQuery}
                 onToast={showToast}
                 companyInfo={companyInfo}
@@ -3522,10 +3614,7 @@ export default function App() {
                         {/* Footer Actions */}
                         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
                           <button
-                            onClick={() => {
-                              setClientForInvoice(client);
-                              setIsCreateModalOpen(true);
-                            }}
+                            onClick={() => handleOpenCreateInvoiceWithLimit(client)}
                             className="py-2.5 px-3 text-xs font-bold bg-[#183BB0] hover:bg-[#122F8C] text-white rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 hover:scale-[1.03] active:scale-95 cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5" />
@@ -3720,10 +3809,7 @@ export default function App() {
                               <td className="py-3.5 px-4 sm:px-6 text-right">
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
-                                    onClick={() => {
-                                      setClientForInvoice(client);
-                                      setIsCreateModalOpen(true);
-                                    }}
+                                    onClick={() => handleOpenCreateInvoiceWithLimit(client)}
                                     className="px-2.5 py-1.5 bg-[#183BB0] hover:bg-[#122F8C] text-white rounded-lg text-xs font-bold transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1"
                                     title="Facturer cette entreprise"
                                   >
@@ -3791,6 +3877,8 @@ export default function App() {
               currentUser={userProfile}
               teamMembers={teamMembers}
               companyInfo={companyInfo}
+              subscriptionPlan={activeSubscriptionPlan}
+              onNavigateToPricing={() => setActiveTab("pricing")}
               onCreateMember={async (newMember) => {
                 const created = await apiCreateTeamMember(newMember, userProfile?.companyId);
                 if (created) {
@@ -3821,6 +3909,8 @@ export default function App() {
               onToast={showToast}
               onApplyTheme={applyTheme}
               currentTheme={currentTheme}
+              subscriptionPlan={activeSubscriptionPlan}
+              onNavigateToPricing={() => setActiveTab("pricing")}
               onOpenOnboardingPreview={() => setIsOnboardingPreviewOpen(true)}
               onResetAllData={() => {
                 if (typeof window !== "undefined") {
@@ -3828,6 +3918,22 @@ export default function App() {
                   window.location.reload();
                 }
               }}
+            />
+          )}
+
+          {/* TAB: ABONNEMENT & TARIFS (PRICING: FREE 0$, STARGATE 14$, BUSINESS 34$, GOLD SUR MESURE) */}
+          {activeTab === "pricing" && (
+            <PricingView
+              currentPlanId={activeSubscriptionPlan}
+              billingCycle={activeBillingCycle}
+              invoiceCount={invoices.length}
+              quoteCount={quotes.length}
+              employeeCount={teamMembers.length || 1}
+              companyInfo={companyInfo}
+              userProfile={userProfile}
+              onSelectPlan={handleSelectSubscriptionPlan}
+              onNavigate={(tab) => setActiveTab(tab)}
+              onToast={showToast}
             />
           )}
 
@@ -3864,8 +3970,8 @@ export default function App() {
               companyInfo={companyInfo}
               onOpenInvoice={(inv) => setSelectedInvoice(inv)}
               onOpenClientProfile={(clientObj) => setSelectedClientForProfile(clientObj)}
-              onOpenReminder={(inv) => setReminderInvoice(inv)}
-              onOpenCreateInvoice={() => setIsCreateModalOpen(true)}
+              onOpenReminder={(inv) => handleOpenReminderWithLimit(inv)}
+              onOpenCreateInvoice={() => handleOpenCreateInvoiceWithLimit()}
               onNavigateToTab={(tab) => setActiveTab(tab)}
               onToast={showToast}
             />
@@ -3882,9 +3988,9 @@ export default function App() {
               userProfile={userProfile}
               onOpenInvoice={(inv) => setSelectedInvoice(inv)}
               onOpenClientProfile={(clientObj) => setSelectedClientForProfile(clientObj)}
-              onOpenReminder={(inv) => setReminderInvoice(inv)}
+              onOpenReminder={(inv) => handleOpenReminderWithLimit(inv)}
               onOpenQuote={(quoteObj) => setSelectedQuote(quoteObj)}
-              onOpenCreateInvoice={() => setIsCreateModalOpen(true)}
+              onOpenCreateInvoice={() => handleOpenCreateInvoiceWithLimit()}
               onRecordPayment={(inv) => {
                 if (inv) {
                   setSelectedInvoice(inv);
@@ -3931,7 +4037,7 @@ export default function App() {
         isOpen={!!selectedInvoice}
         onClose={() => setSelectedInvoice(null)}
         onMarkAsPaid={handleMarkAsPaid}
-        onOpenReminder={(inv) => setReminderInvoice(inv)}
+        onOpenReminder={(inv) => handleOpenReminderWithLimit(inv)}
         onEditInvoice={(inv) => {
           setSelectedInvoice(null);
           setInvoiceForEdit(inv);
@@ -3964,10 +4070,7 @@ export default function App() {
         invoices={invoices}
         payments={payments}
         companyInfo={companyInfo}
-        onNewInvoice={(cl) => {
-          setClientForInvoice(cl);
-          setIsCreateModalOpen(true);
-        }}
+        onNewInvoice={(cl) => handleOpenCreateInvoiceWithLimit(cl)}
         onSelectInvoice={(inv) => setSelectedInvoice(inv)}
         onEditClient={(cl) => setClientForEdit(cl)}
         avatarGradient={

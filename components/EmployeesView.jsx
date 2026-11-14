@@ -32,6 +32,8 @@ export default function EmployeesView({
   onUpdateMember,
   onDeleteMember,
   companyInfo = null,
+  subscriptionPlan = "free",
+  onNavigateToPricing = null,
   onToast,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -66,6 +68,43 @@ export default function EmployeesView({
           actuel ({currentUser?.fullName} — {currentUser?.badge || currentUser?.role}) ne dispose
           pas des privilèges nécessaires pour consulter ou modifier l&apos;équipe.
         </p>
+      </div>
+    );
+  }
+
+  // Restriction stricte sur l'offre Free : pas de droit d'inclure des employés
+  if (subscriptionPlan === "free") {
+    return (
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-12 text-center max-w-xl mx-auto my-8 space-y-5 animate-in fade-in duration-200">
+        <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto border border-rose-200 shadow-xs">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div>
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-700 bg-rose-100 px-3 py-1 rounded-full border border-rose-200">
+            Restriction Offre Free (0 $)
+          </span>
+          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-3">
+            L&apos;inclusion d&apos;employés n&apos;est pas autorisée dans l&apos;offre Free
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-2 leading-relaxed">
+            L&apos;offre gratuite est limitée à <strong>1 seul accès (Propriétaire)</strong> et{" "}
+            <strong>3 factures</strong>. Passez à l&apos;offre{" "}
+            <strong className="text-slate-900">Stargate (14 $/mois)</strong> pour inclure jusqu&apos;à
+            3 employés, ou à l&apos;offre{" "}
+            <strong className="text-[#183BB0]">Business (34 $/mois)</strong> pour un nombre illimité
+            de collaborateurs.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => onNavigateToPricing && onNavigateToPricing()}
+            className="w-full sm:w-auto px-6 py-3 bg-[#183BB0] hover:bg-[#122F8C] text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>Voir les abonnements Stargate (14 $) & Business (34 $)</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -213,7 +252,19 @@ export default function EmployeesView({
         </div>
 
         <button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => {
+            if (subscriptionPlan === "stargate" && totalEmployees >= 3) {
+              if (onToast) {
+                onToast(
+                  "Limite Stargate atteinte (3/3 employés). Passez à l'offre Business (34 $) pour des employés illimités.",
+                  "info"
+                );
+              }
+              if (onNavigateToPricing) onNavigateToPricing();
+              return;
+            }
+            setIsCreateModalOpen(true);
+          }}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-bold shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
         >
           <UserPlus className="w-4 h-4" />
