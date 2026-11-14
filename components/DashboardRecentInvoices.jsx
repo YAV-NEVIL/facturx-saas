@@ -105,45 +105,43 @@ export default function DashboardRecentInvoices({
         </button>
       </div>
 
-      {/* Table compacte pour le Dashboard */}
-      <div className="overflow-x-auto overflow-y-visible">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-              <th className="py-3 px-4 sm:px-6">N° Facture</th>
-              <th className="py-3 px-4">Client Émetteur</th>
-              <th className="py-3 px-4">Date Émission</th>
-              <th className="py-3 px-4">Échéance</th>
-              <th className="py-3 px-4">Montant TTC</th>
-              <th className="py-3 px-4">Statut</th>
-              <th className="py-3 px-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {recentInvoices.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="py-12 px-4 text-center">
-                  <div className="flex flex-col items-center justify-center max-w-sm mx-auto">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 border border-blue-100">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <p className="text-sm font-bold text-slate-800">Aucune facture enregistrée pour le moment</p>
-                    <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
-                      Votre espace d&apos;entreprise est prêt. Créez votre premier client ou émettez votre première facture en 1 clic.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={onOpenCreateInvoice}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Émettre ma 1ère facture</span>
-                    </button>
-                  </div>
-                </td>
+      {/* Table compacte pour le Dashboard ou État Vide Centré */}
+      {recentInvoices.length === 0 ? (
+        <div className="py-12 px-4 text-center">
+          <div className="flex flex-col items-center justify-center max-w-sm mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 border border-blue-100">
+              <FileText className="w-6 h-6" />
+            </div>
+            <p className="text-sm font-bold text-slate-800">Aucune facture enregistrée pour le moment</p>
+            <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
+              Votre espace d&apos;entreprise est prêt. Créez votre premier client ou émettez votre première facture en 1 clic.
+            </p>
+            <button
+              type="button"
+              onClick={onOpenCreateInvoice}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Émettre ma 1ère facture</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto overflow-y-visible">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="py-3 px-4 sm:px-6">N° Facture</th>
+                <th className="py-3 px-4">Client Émetteur</th>
+                <th className="py-3 px-4">Date Émission</th>
+                <th className="py-3 px-4">Échéance</th>
+                <th className="py-3 px-4">Montant TTC</th>
+                <th className="py-3 px-4">Statut</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
-            ) : (
-              recentInvoices.map((inv, idx) => {
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {recentInvoices.map((inv, idx) => {
               const { total } = calculateInvoiceTotals(inv.items, inv.vatRate);
               const isNearBottom = idx >= Math.max(1, recentInvoices.length - 2);
 
@@ -271,19 +269,20 @@ export default function DashboardRecentInvoices({
                   </td>
                 </tr>
               );
-            }))}
-          </tbody>
-        </table>
-      </div>
+            })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Footer incitatif vers la page Factures */}
       <div className="p-4 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <p className="text-slate-500 text-center sm:text-left">
-          Vous consultez une synthèse de <strong>4 factures</strong> sur un total de{" "}
-          <strong>{invoices.length} factures</strong> enregistrées.
+          Vous consultez une synthèse de <strong>{recentInvoices.length} facture(s)</strong> sur un total de{" "}
+          <strong>{invoices.length} facture(s)</strong> enregistrée(s).
         </p>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <button
             onClick={onOpenCreateInvoice}
             className="px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-white rounded-lg border border-slate-200 transition-colors flex items-center gap-1.5"

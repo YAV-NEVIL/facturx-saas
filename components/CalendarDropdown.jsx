@@ -172,76 +172,88 @@ export default function CalendarDropdown({
         />
       </button>
 
-      {/* Popover Calendrier Interactif */}
+      {/* Popover Calendrier Interactif (100% centré sur mobile, aligné sur desktop) */}
       {isOpen && (
-        <div
-          className={`absolute ${
-            align === "left" ? "left-0" : "right-0"
-          } mt-2 z-50 w-[340px] sm:w-[480px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200`}
-        >
-          {/* Header du Popover */}
-          <div className="px-4 py-3 bg-gradient-to-r from-[#1A44B8] to-[#183BB0] text-white flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-white/15">
-                <CalendarIcon className="w-4 h-4 text-white" />
+        <>
+          {/* Fond semi-transparent sur mobile pour fermer au toucher et mettre en évidence le calendrier centré */}
+          <div
+            className="fixed inset-0 bg-slate-900/45 backdrop-blur-[1px] z-40 sm:hidden"
+            onClick={() => setIsOpen(false)}
+          />
+          <div
+            className={`fixed inset-x-3 top-20 mx-auto w-[calc(100vw-1.5rem)] max-w-[355px] max-h-[82vh] overflow-y-auto z-50 sm:absolute sm:inset-auto sm:top-auto sm:mx-0 sm:max-h-none sm:overflow-hidden ${
+              align === "left" ? "sm:left-0" : "sm:right-0"
+            } sm:mt-2 sm:w-[480px] sm:max-w-none bg-white rounded-2xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200`}
+          >
+            {/* Header du Popover */}
+            <div className="px-3.5 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-[#1A44B8] to-[#183BB0] text-white flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1.5 rounded-lg bg-white/15 shrink-0">
+                  <CalendarIcon className="w-4 h-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold tracking-tight truncate">
+                    Historique & Filtre par Date
+                  </h4>
+                  <p className="text-[10px] text-blue-200 truncate">
+                    Sélectionnez un jour ou une période
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-bold tracking-tight">
-                  Historique & Filtre par Date
-                </h4>
-                <p className="text-[10px] text-blue-200">
-                  Sélectionnez un jour ou une période pour filtrer vos factures
-                </p>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => handlePresetClick("Toutes les dates")}
+                className="px-2.5 py-1 text-[11px] font-semibold bg-white/15 hover:bg-white/25 rounded-lg transition-colors flex items-center gap-1 shrink-0 whitespace-nowrap"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Tout réinitialiser</span>
+              </button>
             </div>
 
-            <button
-              onClick={() => handlePresetClick("Toutes les dates")}
-              className="px-2.5 py-1 text-[11px] font-semibold bg-white/15 hover:bg-white/25 rounded-lg transition-colors flex items-center gap-1"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Tout réinitialiser</span>
-            </button>
-          </div>
+            <div className="flex flex-col sm:flex-row">
+              {/* Colonne latérale des raccourcis de période (grille compacte 2 colonnes sur mobile) */}
+              <div className="w-full sm:w-44 p-3 bg-slate-50 border-b sm:border-b-0 sm:border-r border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-1 sm:px-2 mb-1.5 text-center sm:text-left">
+                  Périodes rapides
+                </span>
+                <div className="grid grid-cols-2 sm:flex sm:flex-col gap-1.5 sm:gap-1">
+                  {presets.map((preset) => {
+                    const isActive =
+                      selectedPeriod === preset.label ||
+                      (preset.label === "Aujourd'hui" && selectedDate === "21/10/2026") ||
+                      (preset.label === "Hier" && selectedDate === "20/10/2026") ||
+                      (preset.label === "Avant-hier" && selectedDate === "19/10/2026");
 
-          <div className="flex flex-col sm:flex-row">
-            {/* Colonne latérale des raccourcis de période */}
-            <div className="w-full sm:w-44 p-3 bg-slate-50 border-b sm:border-b-0 sm:border-r border-slate-100 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-2 mb-1.5">
-                Périodes
-              </span>
-              {presets.map((preset) => {
-                const isActive =
-                  selectedPeriod === preset.label ||
-                  (preset.label === "Aujourd'hui" && selectedDate === "21/10/2026") ||
-                  (preset.label === "Hier" && selectedDate === "20/10/2026") ||
-                  (preset.label === "Avant-hier" && selectedDate === "19/10/2026");
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => handlePresetClick(preset.label)}
+                        className={`w-full text-center sm:text-left px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex flex-col items-center sm:items-start justify-center ${
+                          preset.label === "Toutes les dates" ? "col-span-2 sm:col-span-1" : ""
+                        } ${
+                          isActive
+                            ? "bg-[#183BB0] text-white shadow-sm"
+                            : "text-slate-600 hover:bg-slate-200/60"
+                        }`}
+                      >
+                        <span className="truncate max-w-full">{preset.label}</span>
+                        <span
+                          className={`text-[9px] font-normal truncate max-w-full ${
+                            isActive ? "text-blue-100" : "text-slate-400"
+                          }`}
+                        >
+                          {preset.desc}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-                return (
-                  <button
-                    key={preset.label}
-                    onClick={() => handlePresetClick(preset.label)}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex flex-col ${
-                      isActive
-                        ? "bg-[#183BB0] text-white shadow-sm"
-                        : "text-slate-600 hover:bg-slate-200/60"
-                    }`}
-                  >
-                    <span>{preset.label}</span>
-                    <span
-                      className={`text-[9px] font-normal ${
-                        isActive ? "text-blue-100" : "text-slate-400"
-                      }`}
-                    >
-                      {preset.desc}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Grille du Calendrier interactif avec dates antérieures et futures */}
-            <div className="flex-1 p-4">
+              {/* Grille du Calendrier interactif avec dates antérieures et futures */}
+              <div className="flex-1 p-3.5 sm:p-4">
               {/* Navigateur Mois / Année */}
               <div className="flex items-center justify-between mb-3 px-1">
                 <button
@@ -368,7 +380,8 @@ export default function CalendarDropdown({
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

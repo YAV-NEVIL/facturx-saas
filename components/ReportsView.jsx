@@ -629,54 +629,60 @@ export default function ReportsView({
             </button>
 
             {isExportMenuOpen && (
-              <div
-                className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-30 animate-in fade-in zoom-in-95 duration-150"
-                onClick={() => setIsExportMenuOpen(false)}
-              >
-                <button
-                  onClick={handleExportCurrentView}
-                  className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2.5"
+              <>
+                <div
+                  className="fixed inset-0 bg-slate-900/35 backdrop-blur-[1px] z-40 sm:bg-transparent sm:backdrop-blur-none sm:z-20"
+                  onClick={() => setIsExportMenuOpen(false)}
+                />
+                <div
+                  className="fixed inset-x-4 top-1/3 mx-auto w-[calc(100vw-2rem)] max-w-[290px] z-50 sm:absolute sm:inset-auto sm:top-auto sm:mx-0 sm:left-0 lg:left-auto lg:right-0 sm:mt-2 sm:w-64 sm:max-w-none bg-white rounded-2xl shadow-xl border border-slate-100 py-2 sm:z-30 animate-in fade-in zoom-in-95 duration-150"
+                  onClick={() => setIsExportMenuOpen(false)}
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                  <span>Exporter la vue active (XLSX)</span>
-                </button>
-                <button
-                  onClick={handleExportPdfCurrentView}
-                  className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-rose-600 flex items-center gap-2.5"
-                >
-                  <FileDown className="w-4 h-4 text-rose-600" />
-                  <span>Télécharger en format PDF</span>
-                </button>
-                <button
-                  onClick={() => exportRecoveryReportToXLSX(overdueInvoices, companyInfo)}
-                  className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-rose-600 flex items-center gap-2.5"
-                >
-                  <AlertTriangle className="w-4 h-4 text-rose-600" />
-                  <span>Rapport de Recouvrement (Créances échues)</span>
-                </button>
-                <button
-                  onClick={() => exportPendingPaymentsReportToXLSX(pendingInvoices, companyInfo)}
-                  className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-amber-600 flex items-center gap-2.5"
-                >
-                  <Clock className="w-4 h-4 text-amber-600" />
-                  <span>Paiements en attente (Prévisionnel)</span>
-                </button>
-                <button
-                  onClick={() => exportFiscalReportToXLSX(invoices, companyInfo)}
-                  className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2.5"
-                >
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  <span>Déclaration Fiscale OHADA / DGI</span>
-                </button>
-                <div className="my-1 border-t border-slate-100" />
-                <button
-                  onClick={handleExportFullAuditWorkbook}
-                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-blue-700 hover:bg-blue-50 flex items-center gap-2.5"
-                >
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                  <span>Grand Livre Complet d&apos;Audit (Multi-feuilles)</span>
-                </button>
-              </div>
+                  <button
+                    onClick={handleExportCurrentView}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2.5"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    <span>Exporter la vue active (XLSX)</span>
+                  </button>
+                  <button
+                    onClick={handleExportPdfCurrentView}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-rose-600 flex items-center gap-2.5"
+                  >
+                    <FileDown className="w-4 h-4 text-rose-600" />
+                    <span>Télécharger en format PDF</span>
+                  </button>
+                  <button
+                    onClick={() => exportRecoveryReportToXLSX(overdueInvoices, companyInfo)}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-rose-600 flex items-center gap-2.5"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <span>Rapport de Recouvrement (Créances échues)</span>
+                  </button>
+                  <button
+                    onClick={() => exportPendingPaymentsReportToXLSX(pendingInvoices, companyInfo)}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-amber-600 flex items-center gap-2.5"
+                  >
+                    <Clock className="w-4 h-4 text-amber-600" />
+                    <span>Paiements en attente (Prévisionnel)</span>
+                  </button>
+                  <button
+                    onClick={() => exportFiscalReportToXLSX(invoices, companyInfo)}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2.5"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <span>Déclaration Fiscale OHADA / DGI</span>
+                  </button>
+                  <div className="my-1 border-t border-slate-100" />
+                  <button
+                    onClick={handleExportFullAuditWorkbook}
+                    className="w-full px-4 py-2.5 text-left text-xs font-bold text-blue-700 hover:bg-blue-50 flex items-center gap-2.5"
+                  >
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span>Grand Livre Complet d&apos;Audit (Multi-feuilles)</span>
+                  </button>
+                </div>
+              </>
             )}
           </div>
 

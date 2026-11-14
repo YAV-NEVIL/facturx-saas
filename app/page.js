@@ -2054,9 +2054,9 @@ export default function App() {
 
               {/* Bannière de filtre historique actif */}
               {(selectedDate || (selectedPeriod && selectedPeriod !== "Toutes les dates")) && (
-                <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50/90 border border-blue-200 rounded-2xl text-xs font-semibold text-blue-900 animate-in fade-in">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-2.5 bg-blue-50/90 border border-blue-200 rounded-2xl text-xs font-semibold text-blue-900 animate-in fade-in text-center sm:text-left">
+                  <div className="flex items-center justify-center sm:justify-start gap-2.5">
+                    <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
                       <Calendar className="w-3.5 h-3.5" />
                     </div>
                     <span>
@@ -2072,7 +2072,7 @@ export default function App() {
                       setSelectedDate(null);
                       setSelectedPeriod("Toutes les dates");
                     }}
-                    className="px-2.5 py-1 text-xs text-blue-700 hover:text-white hover:bg-blue-600 font-bold rounded-lg transition-colors flex items-center gap-1.5"
+                    className="px-2.5 py-1 text-xs text-blue-700 hover:text-white hover:bg-blue-600 font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0"
                   >
                     <RotateCcw className="w-3 h-3" />
                     <span>Afficher tout l&apos;historique</span>
@@ -2150,9 +2150,9 @@ export default function App() {
 
               {/* Bannière de filtre historique actif */}
               {(selectedDate || (selectedPeriod && selectedPeriod !== "Toutes les dates")) && (
-                <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50/90 border border-blue-200 rounded-2xl text-xs font-semibold text-blue-900 animate-in fade-in">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-2.5 bg-blue-50/90 border border-blue-200 rounded-2xl text-xs font-semibold text-blue-900 animate-in fade-in text-center sm:text-left">
+                  <div className="flex items-center justify-center sm:justify-start gap-2.5">
+                    <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
                       <Calendar className="w-3.5 h-3.5" />
                     </div>
                     <span>
@@ -2168,7 +2168,7 @@ export default function App() {
                       setSelectedDate(null);
                       setSelectedPeriod("Toutes les dates");
                     }}
-                    className="px-2.5 py-1 text-xs text-blue-700 hover:text-white hover:bg-blue-600 font-bold rounded-lg transition-colors flex items-center gap-1.5"
+                    className="px-2.5 py-1 text-xs text-blue-700 hover:text-white hover:bg-blue-600 font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0"
                   >
                     <RotateCcw className="w-3 h-3" />
                     <span>Afficher tout l&apos;historique</span>

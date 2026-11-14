@@ -188,13 +188,13 @@ export default function InvoiceTable({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-visible relative">
       {/* Top Header of Table Card matching screenshot */}
       <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         {/* Left: Title + Status Filter Tabs */}
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <FileText className="w-4 h-4" />
             </div>
             <div>
@@ -273,14 +273,14 @@ export default function InvoiceTable({
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
-            {/* Quick Filter Menu */}
+            {/* Quick Filter Menu (centré sur mobile, aligné sur tablette/desktop) */}
             {isFilterDropdownOpen && (
               <>
                 <div
-                  className="fixed inset-0 z-20"
+                  className="fixed inset-0 bg-slate-900/35 backdrop-blur-[1px] z-40 sm:bg-transparent sm:backdrop-blur-none sm:z-20"
                   onClick={() => setIsFilterDropdownOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-100 rounded-2xl shadow-xl py-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+                <div className="fixed inset-x-4 top-1/3 mx-auto w-[calc(100vw-2rem)] max-w-[290px] z-50 sm:absolute sm:inset-auto sm:top-auto sm:mx-0 sm:left-0 lg:left-auto lg:right-0 sm:mt-2 sm:w-64 sm:max-w-none bg-white border border-slate-100 rounded-2xl shadow-xl py-2 sm:z-30 animate-in fade-in zoom-in-95 duration-150">
                   <div className="px-3.5 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-50 mb-1">
                     <span>Trier / Filtrer par</span>
                     {sortBy !== "date_desc" && (
@@ -336,36 +336,36 @@ export default function InvoiceTable({
         </div>
       </div>
 
-      {/* Responsive Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          {/* Header Row matching screenshot light blue-gray bar (#EEF4FD) */}
-          <thead>
-            <tr className="bg-[#EEF4FD] text-slate-600 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
-              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">N° Facture</th>
-              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Client</th>
-              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Localisation</th>
-              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Date Émission</th>
-              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Échéance</th>
-              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Montant Total</th>
-              <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Statut</th>
-              <th className="py-3 px-3.5 sm:px-6 text-center whitespace-nowrap">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-slate-100 text-sm">
-            {currentInvoices.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400">
-                  <FileText className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-                  <p className="font-semibold text-slate-600">Aucune facture trouvée</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Modifiez vos critères de recherche ou créez une nouvelle facture.
-                  </p>
-                </td>
+      {/* Responsive Table or Centered Empty State */}
+      {currentInvoices.length === 0 ? (
+        <div className="py-12 px-4 text-center flex flex-col items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 border border-blue-100">
+            <FileText className="w-6 h-6" />
+          </div>
+          <p className="font-bold text-sm text-slate-700">Aucune facture trouvée</p>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+            Modifiez vos critères de recherche ou créez une nouvelle facture.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            {/* Header Row matching screenshot light blue-gray bar (#EEF4FD) */}
+            <thead>
+              <tr className="bg-[#EEF4FD] text-slate-600 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
+                <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">N° Facture</th>
+                <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Client</th>
+                <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Localisation</th>
+                <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Date Émission</th>
+                <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Échéance</th>
+                <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Montant Total</th>
+                <th className="py-3 px-3.5 sm:px-6 whitespace-nowrap">Statut</th>
+                <th className="py-3 px-3.5 sm:px-6 text-center whitespace-nowrap">Actions</th>
               </tr>
-            ) : (
-              currentInvoices.map((inv, idx) => {
+            </thead>
+
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {currentInvoices.map((inv, idx) => {
                 const { total } = calculateInvoiceTotals(inv.items, inv.vatRate);
                 const isNearBottom = idx >= Math.max(1, currentInvoices.length - 2);
 
@@ -548,11 +548,11 @@ export default function InvoiceTable({
                     </td>
                   </tr>
                 );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Table Footer / Pagination matching screenshot */}
       <div className="p-4 sm:p-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500">
