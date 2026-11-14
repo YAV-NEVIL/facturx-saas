@@ -112,39 +112,39 @@ export default function DashboardForecast({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
       {/* 1. Widget Prévision de Trésorerie & Encaissements Interactif (2 colonnes) */}
-      <div className="lg:col-span-2 bg-white rounded-[16px] p-5 sm:p-6 border border-slate-100 flex flex-col justify-between transition-colors duration-150">
+      <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-lg transition-all duration-300 flex flex-col justify-between group">
         <div>
           {/* Header avec switch d'horizons interactifs */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-[10px] bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
-                <TrendingUp className="w-4 h-4 stroke-[1.5]" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#183BB0] to-[#2D60FF] text-white flex items-center justify-center font-bold shadow-md shadow-blue-900/15 group-hover:scale-105 transition-transform">
+                <TrendingUp className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-[16px] font-medium text-slate-900">
-                    Prévisions et trésorerie
+                  <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
+                    Prévisions & Trésorerie Prévisionnelle
                   </h2>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                    Temps réel
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Temps Réel
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Encaissements attendus en {sym} pour {companyInfo?.name || "votre entreprise"}
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Simulation des encaissements attendus en {sym} pour {companyInfo?.name || "votre entreprise"}
                 </p>
               </div>
             </div>
 
             {/* Sélecteur interactif d'horizon */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-[10px] self-start sm:self-auto border border-slate-200/80">
+            <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl self-start sm:self-auto border border-slate-200/80">
               {["7j", "15j", "30j", "90j"].map((h) => (
                 <button
                   key={h}
                   onClick={() => setForecastHorizon(h)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-[7px] transition-colors duration-150 ${
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
                     forecastHorizon === h
-                      ? "bg-white text-slate-900 shadow-2xs"
+                      ? "bg-white text-[#183BB0] shadow-xs scale-102"
                       : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
@@ -155,30 +155,30 @@ export default function DashboardForecast({
           </div>
 
           {/* Bannière de projection dynamique selon horizon */}
-          <div className="mt-4 p-3.5 bg-slate-50 rounded-[12px] border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-800 transition-colors">
+          <div className="mt-4 p-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-blue-50/90 rounded-2xl border border-blue-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-blue-950 transition-all">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-[8px] bg-white border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
-                <Zap className="w-3.5 h-3.5 stroke-[1.5]" />
+              <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <Zap className="w-3.5 h-3.5" />
               </div>
               <div>
-                <p className="font-medium text-slate-900 tabular-nums">
+                <p className="font-bold">
                   Projection à {currentProjection.label} :{" "}
-                  <span className="text-emerald-600 font-semibold text-sm">
+                  <span className="text-emerald-700 font-extrabold text-sm">
                     +{formatFCFA(currentProjection.expectedInflow, currency)}
                   </span>
                 </p>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-[11px] text-blue-800/80 mt-0.5">
                   {currentProjection.statusText} • Fiabilité :{" "}
-                  <span className="font-medium text-slate-700">{currentProjection.confidence}</span>
+                  <span className="font-semibold">{currentProjection.confidence}</span>
                 </p>
               </div>
             </div>
 
-            <div className="sm:text-right shrink-0">
-              <span className="text-xs text-slate-500 block">
-                Délai moyen (DSO)
+            <div className="text-right shrink-0">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                DSO moyen
               </span>
-              <span className="text-xs font-mono font-medium text-slate-900 tabular-nums">
+              <span className="text-xs font-black text-slate-900">
                 {currentProjection.dso}
               </span>
             </div>
@@ -455,13 +455,13 @@ export default function DashboardForecast({
             })}
 
             {overdueInvoices.length === 0 && (
-              <div className="p-6 text-center text-slate-400 space-y-2 bg-slate-50 rounded-[12px] border border-slate-200/80">
-                <CheckCircle2 className="w-6 h-6 stroke-[1.5] text-emerald-600 mx-auto" />
-                <p className="text-xs font-medium text-slate-700">
-                  Toutes les créances sont à jour
+              <div className="p-6 text-center text-slate-400 space-y-2 bg-emerald-50/30 rounded-2xl border border-emerald-100">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                <p className="text-xs font-semibold text-slate-700">
+                  Toutes les créances sont saines !
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  Aucun retard d&apos;échéance constaté
+                  Aucun retard d&apos;échéance constaté actuellement.
                 </p>
               </div>
             )}

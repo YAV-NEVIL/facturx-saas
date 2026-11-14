@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   Settings,
   Receipt,
+  Sparkles,
   ArrowRight,
   X,
   FilePlus,
@@ -35,22 +36,10 @@ export default function Sidebar({
       return itemId === "settings" || itemId === "company" || itemId === "employees";
     }
     if (userRole === "commercial") {
-      return (
-        itemId === "payments" ||
-        itemId === "reports" ||
-        itemId === "settings" ||
-        itemId === "company" ||
-        itemId === "employees"
-      );
+      return itemId === "payments" || itemId === "reports" || itemId === "settings" || itemId === "company" || itemId === "employees";
     }
     if (userRole === "gestionnaire_stock") {
-      return (
-        itemId === "payments" ||
-        itemId === "reports" ||
-        itemId === "settings" ||
-        itemId === "company" ||
-        itemId === "employees"
-      );
+      return itemId === "payments" || itemId === "reports" || itemId === "settings" || itemId === "company" || itemId === "employees";
     }
     return false;
   };
@@ -58,9 +47,9 @@ export default function Sidebar({
   const navItems = [
     { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
     { id: "invoices", label: "Factures", icon: FileText, badge: invoiceCount },
-    { id: "company", label: "Mon entreprise", icon: Building2 },
+    { id: "company", label: "Mon Entreprise", icon: Building2 },
     { id: "clients", label: "Clients", icon: Users },
-    { id: "quotes", label: "Devis et estimations", icon: Briefcase },
+    { id: "quotes", label: "Devis & Estimations", icon: Briefcase },
     { id: "payments", label: "Paiements", icon: CreditCard },
     { id: "employees", label: "Employés", icon: ShieldCheck },
     { id: "analytics", label: "Analytique", icon: BarChart3 },
@@ -68,131 +57,135 @@ export default function Sidebar({
     { id: "settings", label: "Paramètres", icon: Settings },
   ];
 
-  const roleName =
-    userRole === "admin"
-      ? "Direction"
-      : userRole === "comptable"
-      ? "Comptabilité"
-      : userRole === "gestionnaire_stock"
-      ? "Logistique"
-      : "Commercial";
-
   return (
     <>
       {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity duration-150"
+          className="fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-sm transition-opacity"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
 
-      {/* Sidebar Container — Pass 1 & Pass 2: 260px wide, deepest graphite #0f0f10, hairline border */}
+      {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-[260px] max-w-[85vw] overflow-y-auto overscroll-contain bg-[#0f0f10] text-[#ededed] border-r border-white/[0.08] flex flex-col justify-between transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-50 w-[272px] max-w-[85vw] sm:w-64 overflow-y-auto overscroll-contain bg-gradient-to-b from-[#1A44B8] via-[#163DA9] to-[#112F85] text-white flex flex-col justify-between transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none lg:translate-x-0 ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Top Header & Brand */}
-        <div className="p-4">
-          <div className="flex items-center justify-between h-9 px-1">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-[7px] bg-[#19191b] border border-white/[0.08] flex items-center justify-center shrink-0">
-                <Receipt className="w-4 h-4 stroke-[1.5] text-[#ededed]" />
+        <div className="p-4 sm:p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shadow-inner shrink-0">
+                <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-semibold text-[17px] leading-none text-[#ededed]">
-                  FacturX
-                </span>
-                <span className="text-xs text-[#85858b] font-mono">
-                  {roleName}
-                </span>
+              <div>
+                <h1 className="font-extrabold text-lg sm:text-xl tracking-tight text-white flex items-center gap-1.5">
+                  Factur<span className="text-blue-200">X</span>
+                </h1>
+                <p className="text-[10px] sm:text-[11px] text-blue-200/80 font-medium tracking-wide uppercase">
+                  Gestion & Facturation
+                </p>
               </div>
             </div>
 
             {/* Mobile Close Button */}
             <button
               onClick={() => setIsMobileOpen(false)}
-              className="lg:hidden p-1.5 rounded-[8px] text-[#85858b] hover:text-[#ededed] hover:bg-[#19191b] transition-colors duration-150"
+              className="lg:hidden p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-white/10"
               aria-label="Fermer le menu"
             >
-              <X className="w-4 h-4 stroke-[1.5]" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Navigation — Pass 1: 36px rows (h-9), 4px gap (space-y-1), 18px icons in one column */}
-          <div className="mt-6">
-            <span className="px-3 text-xs text-[#85858b] block mb-2">
-              Navigation
+          {/* Rôle Actif Badge sous le logo */}
+          <div className="mt-3.5 px-3 py-1.5 bg-white/10 rounded-xl border border-white/15 flex items-center justify-between text-[11px]">
+            <span className="text-blue-200">
+              Espace {userRole === "admin" ? "Direction" : userRole === "comptable" ? "Finance" : userRole === "gestionnaire_stock" ? "Logistique" : "Commercial"}
             </span>
-            <nav className="space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                const isRestricted = isRestrictedForRole(item.id);
-
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      if (isMobileOpen) setIsMobileOpen(false);
-                    }}
-                    className={`w-full h-9 flex items-center justify-between px-3 rounded-[8px] text-[14px] transition-colors duration-150 ${
-                      isActive
-                        ? "bg-[#232325] text-[#ededed] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                        : isRestricted
-                        ? "text-[#85858b]/60 hover:text-[#a1a1a6] hover:bg-[#19191b]"
-                        : "text-[#a1a1a6] hover:text-[#ededed] hover:bg-[#19191b]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Icon
-                        className={`w-[18px] h-[18px] stroke-[1.5] shrink-0 ${
-                          isActive
-                            ? "text-[#ededed]"
-                            : isRestricted
-                            ? "text-[#85858b]/50"
-                            : "text-[#85858b]"
-                        }`}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {isRestricted && (
-                        <Lock className="w-3.5 h-3.5 stroke-[1.5] text-[#85858b]/60" />
-                      )}
-
-                      {item.badge !== undefined && (
-                        <span
-                          className={`text-xs font-mono tabular-nums ${
-                            isActive ? "text-[#ededed]" : "text-[#85858b]"
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </nav>
+            <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider text-[10px] ${
+              userRole === "commercial"
+                ? "bg-emerald-400/20 text-emerald-300"
+                : userRole === "comptable"
+                ? "bg-cyan-400/20 text-cyan-200"
+                : userRole === "gestionnaire_stock"
+                ? "bg-orange-400/20 text-orange-200"
+                : "bg-amber-400/20 text-amber-200"
+            }`}>
+              {userRole === "admin" ? "Admin" : userRole === "comptable" ? "Comptable" : userRole === "gestionnaire_stock" ? "Stock" : "Commercial"}
+            </span>
           </div>
+
+          {/* Nav List */}
+          <nav className="mt-4 sm:mt-5 space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              const isRestricted = isRestrictedForRole(item.id);
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    if (isMobileOpen) setIsMobileOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] sm:text-sm font-medium transition-all duration-200 group ${
+                    isActive
+                      ? "bg-[#2D60FF] text-white shadow-lg shadow-blue-900/40"
+                      : isRestricted
+                      ? "text-blue-200/50 hover:text-white/80 hover:bg-white/5"
+                      : "text-blue-100/85 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon
+                      className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                        isActive ? "text-white" : isRestricted ? "text-blue-300/50" : "text-blue-200/90"
+                      }`}
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isRestricted && (
+                      <Lock className="w-3.5 h-3.5 text-blue-300/60" />
+                    )}
+
+                    {item.badge !== undefined && (
+                      <span
+                        className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                          isActive
+                            ? "bg-white text-blue-700"
+                            : "bg-white/15 text-blue-100"
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
-        {/* Bottom Card — Quiet surface #19191b, off-white primary button */}
+        {/* Bottom Card */}
         <div className="p-4 pt-2">
-          <div className="bg-[#19191b] border border-white/[0.08] rounded-[12px] p-3.5">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#4cc38a]" />
-              <span className="text-xs text-[#a1a1a6]">
-                Conforme OHADA et DGI
+          <div className="relative overflow-hidden bg-gradient-to-br from-white/15 to-white/5 border border-white/20 backdrop-blur-md rounded-2xl p-3.5 text-white shadow-inner">
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="p-1 rounded-md bg-blue-400/20 text-blue-200">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              </div>
+              <span className="text-[11px] font-semibold text-blue-100 uppercase tracking-wider">
+                Conforme OHADA / RDC
               </span>
             </div>
 
-            <p className="text-xs text-[#85858b] leading-relaxed mb-3">
-              Facturation certifiée TVA et suivi multi-devises
+            <p className="text-xs font-semibold text-white leading-snug mb-2.5">
+              Facturation certifiée TVA & multi-devises en temps réel
             </p>
 
             <button
@@ -200,20 +193,21 @@ export default function Sidebar({
                 if (onOpenCreateModal) onOpenCreateModal();
                 if (isMobileOpen) setIsMobileOpen(false);
               }}
-              className="w-full h-9 px-3 bg-[#ededed] hover:bg-white active:scale-[0.98] text-[#0f0f10] font-medium text-xs rounded-[8px] flex items-center justify-center gap-2 transition-[background-color,transform] duration-150"
+              className="w-full py-2 px-3 bg-white hover:bg-blue-50 text-[#183DA9] font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all duration-200 shadow-md hover:shadow-lg group"
             >
-              <FilePlus className="w-4 h-4 stroke-[1.5]" />
-              <span>Nouvelle facture</span>
-              <ArrowRight className="w-3.5 h-3.5 stroke-[1.5] ml-auto" />
+              <FilePlus className="w-3.5 h-3.5" />
+              <span>Créer une facture</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-1" />
             </button>
           </div>
 
-          <div className="mt-3 px-1 flex items-center justify-between text-xs text-[#85858b] font-mono tabular-nums">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 stroke-[1.5] text-[#4cc38a]" />
-              <span>Chiffré</span>
+          {/* Footer small note */}
+          <div className="mt-3 px-1 flex items-center justify-between text-[10px] text-blue-300/75 font-medium">
+            <span className="flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              Données chiffrées
             </span>
-            <span>v1.0</span>
+            <span>v1.0 Pro</span>
           </div>
         </div>
       </aside>

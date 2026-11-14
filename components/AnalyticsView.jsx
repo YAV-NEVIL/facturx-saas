@@ -1648,7 +1648,7 @@ export default function AnalyticsView({
                           className="flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer group-hover:scale-105"
                         >
                           <Send className="w-3 h-3 text-white" />
-                          Relance express
+                          Relance Express ⚡
                         </button>
 
                         {/* Bouton Voir Facture */}
@@ -1911,36 +1911,33 @@ export default function AnalyticsView({
               </button>
               <button
                 onClick={() => setTableFilter("overdue")}
-                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-lg transition-all ${
                   tableFilter === "overdue"
                     ? "bg-rose-600 text-white shadow-2xs"
                     : "text-rose-700 hover:text-rose-900"
                 }`}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                <span>Retard ({analyticsData.countOverdue})</span>
+                🔴 Retard ({analyticsData.countOverdue})
               </button>
               <button
                 onClick={() => setTableFilter("pending")}
-                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-lg transition-all ${
                   tableFilter === "pending"
                     ? "bg-amber-500 text-white shadow-2xs"
                     : "text-amber-700 hover:text-amber-900"
                 }`}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                <span>En attente ({analyticsData.countPending})</span>
+                🟠 En attente ({analyticsData.countPending})
               </button>
               <button
                 onClick={() => setTableFilter("payee")}
-                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-lg transition-all ${
                   tableFilter === "payee"
                     ? "bg-emerald-600 text-white shadow-2xs"
                     : "text-emerald-700 hover:text-emerald-900"
                 }`}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                <span>Payées ({analyticsData.countPaid})</span>
+                🟢 Payées ({analyticsData.countPaid})
               </button>
             </div>
           </div>
@@ -2067,8 +2064,8 @@ export default function AnalyticsView({
                         </span>
                       )}
                       {isOverdue && (
-                        <span className="text-[11px] text-rose-700 font-semibold bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                          Relance requise
+                        <span className="text-[11px] text-rose-700 font-extrabold bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          ⚠️ Relance requise
                         </span>
                       )}
                       {inv.status === "brouillon" && (

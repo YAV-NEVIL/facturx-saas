@@ -169,7 +169,7 @@ export default function QuotesPipelineView({
     if (onUpdateStatus) {
       onUpdateStatus(quote.id, "accepte");
       if (onToast) {
-        onToast(`Accord commercial validé pour le devis ${quote.id} — prêt à facturer`, "success");
+        onToast(`🎉 Accord commercial validé pour le devis ${quote.id} ! Prêt à facturer.`, "success");
       }
     }
   };
@@ -857,7 +857,7 @@ export default function QuotesPipelineView({
                       {/* Contact & Localisation */}
                       {q.contactPerson && (
                         <p className="text-[11px] text-slate-500 font-medium truncate">
-                          {q.contactPerson}
+                          👤 {q.contactPerson}
                         </p>
                       )}
 

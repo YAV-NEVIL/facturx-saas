@@ -109,18 +109,18 @@ export default function ReportPreviewModal({
 
   // 2. Action : Message WhatsApp pré-formaté
   const getWhatsAppMessage = () => {
-    return `*RAPPORT OFFICIEL FACTURX — CERTIFIÉ OHADA / DGI*
-*Entreprise :* ${compName}
-*Intitulé :* ${reportTitle}
-*Réf. Audit :* ${auditId}
-*Date :* ${printDate}
-*Lignes analysées :* ${data.length} enregistrements
-*Total consolidé :* ${formatAmount(totalConsolidated, currency)}
+    return `📊 *RAPPORT OFFICIEL FACTURX — CERTIFIÉ OHADA / DGI*
+🏢 *Entreprise :* ${compName}
+📋 *Intitulé :* ${reportTitle}
+🔢 *Réf. Audit :* ${auditId}
+📅 *Date :* ${printDate}
+👥 *Lignes analysées :* ${data.length} enregistrements
+💰 *Total consolidé :* ${formatAmount(totalConsolidated, currency)}
 
-*Statut :* Document conforme et validé par l'Administration FacturX
-Le rapport PDF officiel a été généré et peut être transmis en pièce jointe
+✅ *Statut :* Document conforme et validé par l'Administration FacturX.
+📄 Le rapport PDF officiel haute fidélité a été généré et peut être transmis en pièce jointe.
 
-_Généré via FacturX SaaS — Système de Gestion et Facturation OHADA_`;
+_Généré via FacturX SaaS — Système de Gestion & Facturation OHADA_`;
   };
 
   const handleOpenWhatsApp = () => {
@@ -572,7 +572,7 @@ Tél : ${compPhone} • Email : ${compEmail}`;
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Laissez vide pour sélectionner librement un contact ou groupe dans WhatsApp
+                  💡 Laissez vide pour sélectionner librement un contact ou groupe dans WhatsApp.
                 </p>
               </div>
 
