@@ -1,20 +1,22 @@
-# 📘 FacturX — Plan Directeur Backend Supabase (Les 5 Étapes)
+# 📘 FacturX — Plan Directeur Backend & Production (Les 6 Étapes)
 
 > **Document de Référence & Suivi Permanent**  
-> **Dernière mise à jour :** 24 Octobre 2026  
-> **Projet :** FacturX (Plateforme de Facturation & Recouvrement B2B - RDC / OHADA / UEMOA)  
+> **Dernière mise à jour :** 14 Novembre 2026  
+> **Projet :** FacturX (Plateforme SaaS de Facturation & Recouvrement B2B - RDC / OHADA / UEMOA)  
+> **Production Live :** `https://facturx-saas.vercel.app`  
 > **Fichier :** `BACKEND_ROADMAP.md`
 
-Ce document constitue la feuille de route officielle et immuable de FacturX. Les **5 étapes** ci-dessous sont ordonnées chronologiquement de 1 à 5 pour garantir une transparence totale et un suivi précis.
+Ce document constitue la feuille de route officielle et immuable de FacturX. Les **6 étapes** ci-dessous sont ordonnées chronologiquement de 1 à 6 pour garantir une transparence totale et un suivi précis.
 
 ---
 
 ```mermaid
 graph TD
     E1["ÉTAPE 1 : Infrastructure & Base de Données Supabase\n(✅ TERMINÉE & 100% OPÉRATIONNELLE)"] --> E2["ÉTAPE 2 : Élargissement & Synchronisation de Toutes les Vues\n(✅ TERMINÉE & 100% OPÉRATIONNELLE)"]
-    E2 --> E3["ÉTAPE 3 : Analytique, Trésorerie & Rapports Fiscaux en Direct\n(🎯 EN COURS / IMMÉDIATE)"]
-    E3 --> E4["ÉTAPE 4 : Authentification, Rôles Équipe & Sécurité Multi-Tenant\n(📅 PLANIFIÉE)"]
-    E4 --> E5["ÉTAPE 5 : Tests Bout-en-Bout, Mode Hors-Ligne & Déploiement Prod\n(🚀 PHASE FINALE)"]
+    E2 --> E3["ÉTAPE 3 : Analytique, Trésorerie & Rapports Fiscaux en Direct\n(✅ TERMINÉE & 100% OPÉRATIONNELLE)"]
+    E3 --> E4["ÉTAPE 4 : Authentification, Rôles Équipe & Sécurité Multi-Tenant\n(✅ TERMINÉE & 100% OPÉRATIONNELLE)"]
+    E4 --> E5["ÉTAPE 5 : Tests E2E, Mode Hors-Ligne, KYB 48h, Multi-Devises & Prod Vercel\n(✅ TERMINÉE & EN LIGNE)"]
+    E5 --> E6["ÉTAPE 6 : Facture Normalisée DGI RDC (SFE / e-MCF), Domaine & SMTP Pro\n(🎯 PROCHAINE ÉTAPE)"]
 ```
 
 ---
@@ -136,11 +138,11 @@ graph TD
 
 ---
 
-## 🟡 ÉTAPE 5 : Tests Bout-en-Bout, Résilience Hors-Ligne & Déploiement Production
-> **Statut actuel :** `[ ] PROCHAINE ÉTAPE / PHASE FINALE`  
-> **Livrables :** Plateforme 100% testée, mode hors-ligne fonctionnel, build optimisé et mise en ligne.
+## 🟢 ÉTAPE 5 : Tests Bout-en-Bout, Résilience Hors-Ligne, Onboarding KYB & Déploiement Production
+> **Statut actuel :** `[x] TERMINÉE ET DÉPLOYÉE EN PRODUCTION SUR VERCEL (100% OPÉRATIONNELLE)`  
+> **Livrables :** Plateforme auditée de bout en bout, mode hors-ligne PWA, onboarding KYB 24h–48h non-bloquant, uniformisation multi-devises et mise en ligne sur Vercel.
 
-### Ce que comprend cette étape :
+### Ce qui a été réalisé, audité et déployé en production :
 - [x] **Audit du cycle complet en situation réelle (100% VALIDÉ & AUDITÉ)** :
   - Enchaînement complet exécuté avec succès via [scripts/test_e2e_sales_cycle.mjs](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/scripts/test_e2e_sales_cycle.mjs) :
     1. Nouveau client CRM (*Société Minière du Katanga SAS - SMK Mining*).
@@ -161,21 +163,50 @@ graph TD
   - **Rejeu automatique vers Supabase** : Rejeu séquentiel ordonné avec suppression atomique après confirmation et conservation des actions en échec pour nouvel essai.
   - **Expérience Utilisateur Transparente** : Indicateur de connectivité dans [components/Header.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/Header.jsx) (pastille ambre / émeraude, compteur d'actions en attente, bouton de synchronisation manuelle forcée) et bandeau de notification dans [app/page.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/app/page.js).
   - **Validation formelle 5/5** via [scripts/test_offline_sync.mjs](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/scripts/test_offline_sync.mjs) (audit PWA, enfilement hors-ligne, protection sans réseau, rejeu automatique, tolérance aux pannes).
-- [ ] **Déploiement en Production** :
-  - Déploiement sur hébergement haute disponibilité (Vercel ou serveur dédié).
-  - Configuration du nom de domaine personnalisé (`app.facturx.cd` ou équivalent) avec certificat SSL (HTTPS).
+- [x] **Déploiement Cloud sur Vercel & CI/CD GitHub (`commits 4f32897` & `91cbc9d`)** :
+  - Mise à niveau de sécurité Next.js (`15.5.29`) et déploiement continu sur `https://facturx-saas.vercel.app` relié au dépôt GitHub `YAV-NEVIL/facturx-saas` (`main`).
+  - Prise en charge hybride de la vérification email Supabase (code OTP à 6 chiffres et lien de confirmation avec `emailRedirectTo` dynamique).
+- [x] **Nettoyage Multi-Tenant « Compte Vierge » & White-Label (`commit aa8fb41`)** :
+  - Éradication des données de démonstration (*Horizon Groupe*, employés pré-remplis, mentions techniques Supabase) dans [components/LoginScreen.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/LoginScreen.jsx) et [app/page.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/app/page.js) pour que chaque administrateur démarre avec sa propre entreprise et crée ses propres collaborateurs.
+- [x] **Refonte Mobile-First (`360px`) & Contrastes Mode Sombre WCAG AA (`commits 8be44a5` & `a838de1`)** :
+  - Adaptation responsive complète sur smartphone (`360×800`, zéro débordement horizontal) et lisibilité renforcée en thème sombre et sur toutes les couleurs d'accentuation dans [app/globals.css](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/app/globals.css).
+- [x] **Portail Obligatoire de Paramétrage Entreprise & Vérification KYB 24h–48h Non-Bloquante (`commits 387d5e4` & `7ab9cd2`)** :
+  - Migration Supabase `onboarding_and_kyb_verification_system` et bucket privé `kyb-documents`.
+  - Assistant en 3 étapes ([components/CompanyOnboardingGate.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/CompanyOnboardingGate.jsx)) à la création du compte avec dépôt des pièces légales (RCCM, Numéro d'Impôt / NIF, Id. Nat, pièce d'identité).
+  - **Accès immédiat non-bloquant** au tableau de bord dès l'envoi du dossier, avec bandeau de statut de vérification sous 48h, console de validation dans [components/SettingsView.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/SettingsView.jsx) et notifications email via [app/api/kyb-notify/route.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/app/api/kyb-notify/route.js).
+- [x] **Uniformisation Intégrale de la Devise de l'Entreprise (`commit 035d9ce`)** :
+  - Propagation de la devise choisie par l'entreprise (`FC`, `$`, `€`, `FCFA`, `£`) sur 100 % des composants ([components/StatsCards.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/StatsCards.jsx), [components/DashboardForecast.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/DashboardForecast.jsx), [components/AnalyticsView.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/AnalyticsView.jsx), [lib/export-utils.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/export-utils.js), factures, paiements, quittances et relances) et suppression des faux montants en `FCFA` dans les courbes et infobulles.
 
 ---
 
-## 📊 Tableau Récapitulatif des 5 Étapes
+## 🟡 ÉTAPE 6 : Facture Normalisée DGI RDC (SFE / e-MCF), Analytique Temps Réel & Domaine Pro
+> **Statut actuel :** `[ ] PROCHAINE ÉTAPE / ÉVOLUTION MÉTIER & INFRASTRUCTURE`  
+> **Livrables :** Conformité fiscale électronique DGI RDC (QR Code DEF/e-MCF), agrégation hebdomadaire réelle des courbes, domaine personnalisé et SMTP dédié.
+
+### Ce que comprend cette étape :
+- [ ] **6.1 Intégration de la Facture Normalisée DGI RDC (`SFE` / `e-MCF` / `DEF`)** :
+  - Ajout des champs réglementaires DGI dans la table `companies` et les paramètres : **NIM** (Numéro d'Identification de la Machine fiscale), **ISF** (Identifiant du Système de Facturation) et token API `e-MCF` (modes *Sandbox Test* et *Production*).
+  - Support des groupes de taxation officiels DGI RDC (**Groupe A** : Exonéré 0%, **Groupe B** : Taxable TVA 16%, **Groupe C** : Exportation 0%) et des types de factures (**FV** Facture de Vente, **FA** Facture d'Avoir, **FP** Proforma).
+  - Route serveur sécurisée (`app/api/dgi-sign/route.js`) générant ou récupérant la signature électronique DGI (**Code DEF/DGI**, compteurs de sécurité, horodatage officiel).
+  - Apposition automatique du **QR Code officiel DGI RDC** et du cartouche de sécurité `CODE DEF / DGI` sur les factures PDF ([lib/pdf-generator.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/pdf-generator.js)) et l'aperçu ([components/InvoiceDetailModal.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/InvoiceDetailModal.jsx)).
+- [ ] **6.2 Courbes Hebdomadaires & Tendances Calculées sur les Dates Réelles** :
+  - Calcul dynamique des points `Sem 1` à `Sem 4` et des pourcentages d'évolution hebdomadaire dans [components/StatsCards.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/StatsCards.jsx) à partir des dates d'émission et de règlement réelles des factures.
+- [ ] **6.3 Nom de Domaine Personnalisé & Serveur SMTP Dédié** :
+  - Connexion d'un domaine personnalisé (ex. `app.facturx.cd`) sur Vercel avec certificat SSL automatique.
+  - Branchement d'un serveur SMTP transactionnel (Resend / Brevo) sur Supabase Auth et sur l'API de notification KYB pour lever la limite d'envoi d'emails par heure.
+
+---
+
+## 📊 Tableau Récapitulatif des 6 Étapes
 
 | Étape | Intitulé Officiel | Statut | Objectif Principal |
 | :---: | :--- | :---: | :--- |
-| **1** | **Infrastructure & Base de Données Supabase** | <span style="color:green;font-weight:bold;">✅ Complète</span> | Schéma 7 tables, RLS, service API, Seed initial |
-| **2** | **Élargissement de Toutes les Vues Métier** | <span style="color:green;font-weight:bold;">✅ Complète</span> | Raccorder Devis, Paiements, CRM, Factures |
+| **1** | **Infrastructure & Base de Données Supabase** | <span style="color:green;font-weight:bold;">✅ Complète</span> | Schéma relationnel, RLS, service API, Seed initial |
+| **2** | **Élargissement de Toutes les Vues Métier** | <span style="color:green;font-weight:bold;">✅ Complète</span> | Raccorder Devis, Paiements, CRM 360°, Factures |
 | **3** | **Analytique & Rapports Fiscaux en Direct** | <span style="color:green;font-weight:bold;">✅ Complète</span> | DSO, trésorerie, journal TVA 16%/18%, exports |
 | **4** | **Authentification & Rôles Multi-Tenant** | <span style="color:green;font-weight:bold;">✅ Complète</span> | Login Supabase Auth, rôles équipe, isolation RLS |
-| **5** | **Tests Globaux & Déploiement Production** | <span style="color:#2563EB;font-weight:bold;">🎯 En cours</span> | Audit de bout en bout, mode hors-ligne, mise en ligne |
+| **5** | **Tests E2E, Mode Hors-Ligne, KYB 48h, Multi-Devises & Prod** | <span style="color:green;font-weight:bold;">✅ Complète</span> | PWA hors-ligne, Onboarding KYB, devise unique, déploiement Vercel |
+| **6** | **Facture Normalisée DGI RDC (e-MCF), Domaine & SMTP Pro** | <span style="color:#2563EB;font-weight:bold;">🎯 Prochaine étape</span> | QR Code DGI / Code DEF, courbes réelles, domaine & SMTP |
 
 ---
 
