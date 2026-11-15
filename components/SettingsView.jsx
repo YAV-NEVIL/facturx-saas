@@ -94,7 +94,7 @@ export default function SettingsView({
   const [isSaving, setIsSaving] = useState(false);
 
   // Console Super-Admin de validation légale KYB (24h-48h)
-  const isPlatformSuperAdmin = userProfile?.email?.toLowerCase() === "loumalabs@gmail.com";
+  const isPlatformSuperAdmin = userProfile?.email?.toLowerCase() === "facturx01@gmail.com";
   const [kybDossiers, setKybDossiers] = useState([]);
   const [isLoadingKyb, setIsLoadingKyb] = useState(false);
   const [kybFilter, setKybFilter] = useState("all");
@@ -2452,7 +2452,7 @@ export default function SettingsView({
                         </div>
 
                         {/* Actions d'approbation / rejet */}
-                        {dossier.email?.toLowerCase() !== "loumalabs@gmail.com" && (
+                        {dossier.email?.toLowerCase() !== "facturx01@gmail.com" && (
                           <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                             <input
                               type="text"

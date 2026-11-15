@@ -1894,7 +1894,7 @@ export default function App() {
   // Portail initial obligatoire de Paramétrage d'Entreprise (Étapes 1 à 3) :
   // Dès que l'utilisateur a paramétré son entreprise et déposé ses documents (onboardingCompleted === true),
   // son accès à FacturX est IMMÉDIAT et JAMAIS bloqué (même pendant les 24h-48h de vérification ou en cas de document à revoir).
-  const isPlatformSuperAdmin = userProfile?.email?.toLowerCase() === "loumalabs@gmail.com";
+  const isPlatformSuperAdmin = userProfile?.email?.toLowerCase() === "facturx01@gmail.com";
   const effectiveOnboardingCompleted =
     typeof companyInfo?.onboardingCompleted === "boolean"
       ? companyInfo.onboardingCompleted

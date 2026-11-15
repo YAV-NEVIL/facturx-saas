@@ -39,7 +39,7 @@ export async function POST(request) {
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL || "https://facturx-saas.vercel.app";
     const adminEmail =
-      process.env.FACTURX_ADMIN_EMAIL || "loumalabs@gmail.com";
+      process.env.FACTURX_ADMIN_EMAIL || "facturx01@gmail.com";
 
     // =========================================================================
     // 1. DEMANDE OFFRE GOLD ("Contactez-nous")
