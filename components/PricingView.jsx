@@ -47,6 +47,7 @@ export default function PricingView({
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const [isGoldContactOpen, setIsGoldContactOpen] = useState(false);
+  const [isSendingGold, setIsSendingGold] = useState(false);
   const [goldForm, setGoldForm] = useState({
     companyName: companyInfo?.name || "",
     contactName: userProfile?.fullName || "",
@@ -100,14 +101,54 @@ export default function PricingView({
     }, 900);
   };
 
-  const handleGoldSubmit = (e) => {
+  const handleGoldSubmit = async (e) => {
     e.preventDefault();
-    setIsGoldContactOpen(false);
-    if (onToast) {
-      onToast(
-        `Votre demande pour l'offre Gold (${goldForm.companyName || "Entreprise"}) a été transmise à notre équipe Grands Comptes !`,
-        "success"
-      );
+    if (isSendingGold) return;
+    setIsSendingGold(true);
+    try {
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "gold_inquiry",
+          goldForm,
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result?.ok) {
+        if (onToast) {
+          onToast(result?.error || "Impossible de transmettre la demande Gold pour le moment.", "error");
+        }
+        return;
+      }
+
+      setIsGoldContactOpen(false);
+      if (result.sentAutomatically) {
+        if (onToast) {
+          onToast(
+            `Demande Offre Gold (${goldForm.companyName || "Entreprise"}) envoyée par email à notre équipe Grands Comptes !`,
+            "success"
+          );
+        }
+      } else {
+        if (result.mailtoUrl && typeof window !== "undefined") {
+          window.open(result.mailtoUrl, "_blank", "noopener,noreferrer");
+        }
+        if (onToast) {
+          onToast(
+            result.message ||
+              `Aucun fournisseur SMTP configuré : ouverture de votre messagerie pour transmettre la demande Gold (${goldForm.companyName || "Entreprise"}).`,
+            "info"
+          );
+        }
+      }
+    } catch (err) {
+      if (onToast) {
+        onToast(`Erreur réseau lors de l'envoi Gold : ${err?.message || "inconnue"}`, "error");
+      }
+    } finally {
+      setIsSendingGold(false);
     }
   };
 
@@ -928,10 +969,11 @@ export default function PricingView({
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-extrabold shadow-md flex items-center gap-1.5 cursor-pointer"
+                    disabled={isSendingGold}
+                    className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-amber-300 font-extrabold shadow-md flex items-center gap-1.5 cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>Envoyer la demande Gold</span>
+                    <span>{isSendingGold ? "Envoi en cours..." : "Envoyer la demande Gold"}</span>
                   </button>
                 </div>
               </div>

@@ -36,6 +36,7 @@ export default function InvoiceTable({
   onUpdateInvoice,
   onDeleteInvoice,
   onOpenReminder,
+  onSendInvoiceEmail = null,
   searchQuery = "",
   onToast,
   companyInfo = null,
@@ -527,6 +528,19 @@ export default function InvoiceTable({
                               <Download className="w-3.5 h-3.5 text-blue-600" />
                               <span>Télécharger reçu / PDF</span>
                             </button>
+
+                            {onSendInvoiceEmail && (
+                              <button
+                                onClick={() => {
+                                  onSendInvoiceEmail(inv);
+                                  setActiveMenuId(null);
+                                }}
+                                className="w-full px-3.5 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 flex items-center gap-2"
+                              >
+                                <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Envoyer par Email (PDF)</span>
+                              </button>
+                            )}
 
                             <button
                               onClick={() => {

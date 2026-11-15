@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Printer,
@@ -20,9 +20,13 @@ import {
   QrCode,
   Copy,
   Check,
+  Paperclip,
+  Loader2,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 import { calculateInvoiceTotals, defaultCompanyInfo, formatFCFA } from "@/lib/mock-data";
-import { generateInvoicePdf } from "@/lib/pdf-generator";
+import { generateInvoicePdf, generateInvoicePdfBase64 } from "@/lib/pdf-generator";
 import {
   ensureInvoiceDgiCertification,
   generateDgiQrMatrix,
@@ -36,9 +40,42 @@ export default function InvoiceDetailModal({
   onOpenReminder,
   onEditInvoice,
   companyInfo = defaultCompanyInfo,
+  onToast = null,
+  initialOpenEmail = false,
 }) {
-  const [copiedCodeDef, setCopiedCodeDef] = React.useState(false);
+  const [copiedCodeDef, setCopiedCodeDef] = useState(false);
+  const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(Boolean(initialOpenEmail));
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [attachPdf, setAttachPdf] = useState(true);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailStatusFeedback, setEmailStatusFeedback] = useState(null);
+
   const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
+
+  useEffect(() => {
+    if (!isOpen || !invoice) return;
+    const comp = invoice.company || companyInfo || defaultCompanyInfo;
+    const { total: calcTotal } = calculateInvoiceTotals(invoice.items, invoice.vatRate);
+    const cert = ensureInvoiceDgiCertification(
+      { ...invoice, total: calcTotal },
+      comp
+    );
+    const coName = comp.name || "Notre entreprise";
+    setEmailTo(invoice.clientEmail || "");
+    setEmailSubject(`Facture normalisée ${invoice.id} — ${coName}`);
+    setEmailBody(
+      `Bonjour ${invoice.contactPerson || invoice.clientName || ""},\n\nVeuillez trouver ci-joint votre facture normalisée ${invoice.id} d'un montant total TTC de ${formatFCFA(
+        calcTotal,
+        comp?.defaultCurrency || comp?.currencySymbol || "FC"
+      )} (échéance le ${invoice.dueDate}).\n\nCode de certification DGI (DEF) : ${cert.dgiCodeDef}\n\nCordialement,\n${coName}`
+    );
+    setAttachPdf(true);
+    setEmailStatusFeedback(null);
+    setIsEmailComposerOpen(Boolean(initialOpenEmail));
+  }, [isOpen, invoice?.id, initialOpenEmail]);
+
   if (!isOpen || !invoice) return null;
 
   const effectiveCompany = invoice.company || companyInfo || defaultCompanyInfo;
@@ -62,6 +99,85 @@ export default function InvoiceDetailModal({
       navigator.clipboard.writeText(dgiCert.dgiCodeDef);
       setCopiedCodeDef(true);
       setTimeout(() => setCopiedCodeDef(false), 2000);
+    }
+  };
+
+  const handleSendInvoiceEmail = async (e) => {
+    e.preventDefault();
+    if (!emailTo || !emailTo.includes("@")) {
+      setEmailStatusFeedback({
+        type: "error",
+        message: "Veuillez saisir une adresse email client valide.",
+      });
+      return;
+    }
+
+    setIsSendingEmail(true);
+    setEmailStatusFeedback(null);
+    try {
+      let pdfAttachment = null;
+      if (attachPdf) {
+        const pdfResult = generateInvoicePdfBase64(invoice, effectiveCompany);
+        if (pdfResult && pdfResult.base64) {
+          pdfAttachment = {
+            filename: pdfResult.filename,
+            base64: pdfResult.base64,
+          };
+        }
+      }
+
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "invoice_pdf",
+          to: emailTo.trim(),
+          toName: invoice.clientName,
+          subject: emailSubject,
+          message: emailBody,
+          replyTo: effectiveCompany?.email || "",
+          companyInfo: effectiveCompany,
+          invoice: {
+            id: invoice.id,
+            clientName: invoice.clientName,
+            dueDate: invoice.dueDate,
+            totalFormatted: formatFCFA(total, __cur),
+            dgiCodeDef: dgiCert.dgiCodeDef,
+          },
+          attachment: pdfAttachment,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.sentAutomatically) {
+        const msg = `Facture ${invoice.id}${attachPdf ? " (avec PDF joint)" : ""} envoyée par email à ${emailTo} !`;
+        setEmailStatusFeedback({
+          type: "success",
+          message: msg,
+          provider: data.providerUsed,
+        });
+        if (onToast) onToast(msg, "success");
+      } else {
+        setEmailStatusFeedback({
+          type: "warning",
+          message:
+            data.error ||
+            "Aucune passerelle SMTP/Resend/Brevo configurée sur le serveur. Utilisez le bouton ci-dessous pour ouvrir votre messagerie.",
+          mailtoUrl: data.mailtoUrl,
+        });
+        if (onToast) {
+          onToast("Passerelle SMTP non configurée : ouverture de l'email préparé.", "info");
+        }
+      }
+    } catch (err) {
+      console.error("Erreur envoi facture email:", err);
+      setEmailStatusFeedback({
+        type: "error",
+        message: "Impossible de joindre le serveur d'envoi d'emails.",
+      });
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -165,6 +281,19 @@ export default function InvoiceDetailModal({
             </button>
 
             <button
+              type="button"
+              onClick={() => setIsEmailComposerOpen((prev) => !prev)}
+              className={`px-3 py-1.5 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-sm ${
+                isEmailComposerOpen
+                  ? "bg-emerald-700 ring-2 ring-emerald-300"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>Envoyer par Email</span>
+            </button>
+
+            <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors ml-2"
             >
@@ -172,6 +301,136 @@ export default function InvoiceDetailModal({
             </button>
           </div>
         </div>
+
+        {/* Panneau d'envoi réel d'email avec PDF joint */}
+        {isEmailComposerOpen && (
+          <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 animate-in fade-in duration-150">
+            <form onSubmit={handleSendInvoiceEmail} className="space-y-3.5 max-w-3xl mx-auto">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                      Envoyer la facture {invoice.id} par email avec PDF officiel
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Transmission directe au client avec le document normalisé DGI en pièce jointe
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEmailComposerOpen(false)}
+                  className="text-xs font-bold text-slate-500 hover:text-slate-800 px-2.5 py-1 rounded-lg hover:bg-slate-200/70"
+                >
+                  Fermer
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Email du client destinataire
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={emailTo}
+                    onChange={(e) => setEmailTo(e.target.value)}
+                    placeholder="comptabilite@client.cd"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:border-[#183BB0]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Objet de l&apos;email
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:border-[#183BB0]"
+                  />
+                </div>
+              </div>
+
+              <div className="text-xs">
+                <label className="block font-bold text-slate-700 mb-1">
+                  Message d&apos;accompagnement
+                </label>
+                <textarea
+                  rows={3}
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-[#183BB0]"
+                />
+              </div>
+
+              {emailStatusFeedback && (
+                <div
+                  className={`p-3 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                    emailStatusFeedback.type === "success"
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                      : emailStatusFeedback.type === "warning"
+                      ? "bg-amber-50 border-amber-200 text-amber-900"
+                      : "bg-rose-50 border-rose-200 text-rose-800"
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {emailStatusFeedback.type === "success" ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    )}
+                    <span>{emailStatusFeedback.message}</span>
+                  </div>
+                  {emailStatusFeedback.mailtoUrl && (
+                    <a
+                      href={emailStatusFeedback.mailtoUrl}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] inline-flex items-center gap-1.5 shrink-0"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Ouvrir dans la messagerie</span>
+                    </a>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={attachPdf}
+                    onChange={(e) => setAttachPdf(e.target.checked)}
+                    className="w-4 h-4 text-[#183BB0] rounded"
+                  />
+                  <Paperclip className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Joindre la facture normalisée PDF</span>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isSendingEmail}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSendingEmail ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  <span>
+                    {isSendingEmail
+                      ? "Envoi en cours..."
+                      : "Envoyer la facture par email"}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Printable Invoice Sheet */}
         <div className="p-8 sm:p-12 max-h-[80vh] overflow-y-auto bg-white">

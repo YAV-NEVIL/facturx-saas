@@ -100,6 +100,76 @@ export default function SettingsView({
   const [kybFilter, setKybFilter] = useState("all");
   const [kybActionId, setKybActionId] = useState(null);
   const [rejectDrafts, setRejectDrafts] = useState({});
+  const [emailGatewayStatus, setEmailGatewayStatus] = useState(null);
+  const [testEmailTarget, setTestEmailTarget] = useState(
+    companyInfo?.email || userProfile?.email || ""
+  );
+  const [isTestingEmail, setIsTestingEmail] = useState(false);
+
+  const checkEmailGatewayStatus = async () => {
+    try {
+      const res = await fetch("/api/send-email");
+      if (!res.ok) return;
+      const data = await res.json();
+      setEmailGatewayStatus(data);
+    } catch {
+      // Silencieux si hors-ligne
+    }
+  };
+
+  useEffect(() => {
+    if (activeSettingsTab === "notifications") {
+      checkEmailGatewayStatus();
+      if (!testEmailTarget && (companyInfo?.email || userProfile?.email)) {
+        setTestEmailTarget(companyInfo?.email || userProfile?.email || "");
+      }
+    }
+  }, [activeSettingsTab, companyInfo?.email, userProfile?.email]);
+
+  const handleSendTestEmail = async () => {
+    const target = (testEmailTarget || "").trim();
+    if (!target) {
+      if (onToast) onToast("Veuillez saisir une adresse email de destination pour le test.", "error");
+      return;
+    }
+    setIsTestingEmail(true);
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "test",
+          to: target,
+          companyName: companyInfo?.name || "FacturX",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        if (onToast) onToast(data?.error || "Échec du test d'envoi email.", "error");
+        return;
+      }
+      if (data.sentAutomatically) {
+        if (onToast) {
+          onToast(`Email de test réel envoyé à ${target} via ${data.provider} !`, "success");
+        }
+        checkEmailGatewayStatus();
+      } else {
+        if (data.mailtoUrl && typeof window !== "undefined") {
+          window.open(data.mailtoUrl, "_blank", "noopener,noreferrer");
+        }
+        if (onToast) {
+          onToast(
+            data.message || "Aucun serveur SMTP/Resend/Brevo actif : ouverture de votre messagerie.",
+            "info"
+          );
+        }
+      }
+    } catch (err) {
+      if (onToast) onToast(`Erreur réseau test email : ${err?.message || "inconnue"}`, "error");
+    } finally {
+      setIsTestingEmail(false);
+    }
+  };
 
   const loadKybDossiers = async () => {
     if (!isPlatformSuperAdmin) return;
@@ -1572,6 +1642,75 @@ export default function SettingsView({
                 <span className="text-[11px] text-slate-500">
                   Envoie automatiquement un message WhatsApp au contact financier du client.
                 </span>
+              </div>
+            </div>
+
+            {/* Diagnostic & Test en direct de la passerelle Email Transactionnelle */}
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/40 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-2 uppercase tracking-wider">
+                      <Mail className="w-4 h-4 text-blue-600" />
+                      Passerelle d&apos;Envoi Réel d&apos;Emails (PDF, Relances, KYB &amp; Gold)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Prend en charge Resend, Brevo ou tout serveur SMTP dédié (OVH, Gmail App Password, Zoho) sans coupure.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {emailGatewayStatus?.configured ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Actif ({[
+                          emailGatewayStatus.providers?.resend && "Resend",
+                          emailGatewayStatus.providers?.brevo && "Brevo",
+                          emailGatewayStatus.providers?.smtp && "SMTP",
+                        ]
+                          .filter(Boolean)
+                          .join(" / ")})
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-extrabold border border-amber-200">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Mode Secours (Mailto)
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={checkEmailGatewayStatus}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer"
+                      title="Actualiser le diagnostic"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  <input
+                    type="email"
+                    value={testEmailTarget}
+                    onChange={(e) => setTestEmailTarget(e.target.value)}
+                    placeholder="adresse.test@entreprise.cd"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendTestEmail}
+                    disabled={isTestingEmail}
+                    className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-xs font-extrabold shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isTestingEmail ? "Envoi test..." : "Tester l'envoi d'email réel"}</span>
+                  </button>
+                </div>
+
+                {!emailGatewayStatus?.configured && (
+                  <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200/80 rounded-xl px-3 py-2 font-medium">
+                    Astuce Vercel / Production : ajoutez <code className="font-mono font-bold">RESEND_API_KEY</code>, <code className="font-mono font-bold">BREVO_API_KEY</code> ou vos variables <code className="font-mono font-bold">SMTP_HOST</code> / <code className="font-mono font-bold">SMTP_USER</code> / <code className="font-mono font-bold">SMTP_PASS</code> dans les variables d&apos;environnement pour activer l&apos;envoi 100 % automatique en arrière-plan.
+                  </p>
+                )}
               </div>
             </div>
           </div>

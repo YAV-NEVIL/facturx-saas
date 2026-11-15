@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Send,
@@ -19,8 +19,12 @@ import {
   History,
   FileText,
   BadgeAlert,
+  Paperclip,
+  Loader2,
 } from "lucide-react";
 import { calculateInvoiceTotals, formatFCFA } from "@/lib/mock-data";
+import { generateInvoicePdfBase64 } from "@/lib/pdf-generator";
+import { ensureInvoiceDgiCertification } from "@/lib/dgi-service";
 
 export default function ClientReminderModal({
   invoice,
@@ -28,6 +32,7 @@ export default function ClientReminderModal({
   onClose,
   onSaveReminder,
   companyInfo = null,
+  onToast = null,
 }) {
   const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const [activeChannel, setActiveChannel] = useState("whatsapp"); // 'whatsapp' | 'email' | 'phone'
@@ -35,6 +40,18 @@ export default function ClientReminderModal({
   const [copied, setCopied] = useState(false);
   const [customNote, setCustomNote] = useState("");
   const [phoneCallNotes, setPhoneCallNotes] = useState("");
+  const [emailRecipient, setEmailRecipient] = useState("");
+  const [attachPdfCopy, setAttachPdfCopy] = useState(true);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSendResult, setEmailSendResult] = useState(null);
+
+  useEffect(() => {
+    if (isOpen && invoice) {
+      setEmailRecipient(invoice.clientEmail || "");
+      setEmailSendResult(null);
+      setAttachPdfCopy(true);
+    }
+  }, [isOpen, invoice?.id]);
 
   if (!isOpen || !invoice) return null;
 
@@ -87,10 +104,114 @@ export default function ClientReminderModal({
   };
 
   const handleOpenEmail = () => {
-    const mailto = `mailto:${invoice.clientEmail}?subject=${encodeURIComponent(
+    const targetEmail = emailRecipient || invoice.clientEmail || "";
+    const mailto = `mailto:${targetEmail}?subject=${encodeURIComponent(
       emailData.subject
     )}&body=${encodeURIComponent(emailData.body)}`;
     window.location.href = mailto;
+  };
+
+  const handleSendRealReminderEmail = async () => {
+    const targetEmail = (emailRecipient || invoice.clientEmail || "").trim();
+    if (!targetEmail || !targetEmail.includes("@")) {
+      setEmailSendResult({
+        type: "error",
+        message: "Veuillez saisir une adresse email client valide.",
+      });
+      return;
+    }
+
+    setIsSendingEmail(true);
+    setEmailSendResult(null);
+    try {
+      const effectiveCompany = invoice.company || companyInfo || {};
+      const cert = ensureInvoiceDgiCertification(
+        { ...invoice, total },
+        effectiveCompany
+      );
+      let pdfAttachment = null;
+      if (attachPdfCopy) {
+        const pdfResult = generateInvoicePdfBase64(invoice, effectiveCompany);
+        if (pdfResult && pdfResult.base64) {
+          pdfAttachment = {
+            filename: pdfResult.filename,
+            base64: pdfResult.base64,
+          };
+        }
+      }
+
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "reminder",
+          to: targetEmail,
+          toName: invoice.clientName,
+          subject: emailData.subject,
+          message: emailData.body,
+          replyTo: effectiveCompany?.email || "",
+          companyInfo: effectiveCompany,
+          reminderLevel,
+          invoice: {
+            id: invoice.id,
+            clientName: invoice.clientName,
+            dueDate: invoice.dueDate,
+            totalFormatted: formatFCFA(total, __cur),
+            dgiCodeDef: cert.dgiCodeDef,
+          },
+          attachment: pdfAttachment,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.sentAutomatically) {
+        const now = new Date();
+        const formattedDate = `${String(now.getDate()).padStart(2, "0")}/${String(
+          now.getMonth() + 1
+        ).padStart(2, "0")}/${now.getFullYear()} à ${String(now.getHours()).padStart(
+          2,
+          "0"
+        )}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+        onSaveReminder(invoice.id, {
+          id: Date.now(),
+          date: formattedDate,
+          channel: "email",
+          author: "Service Recouvrement (Email Auto)",
+          note: `Email de relance (${reminderLevel})${
+            attachPdfCopy ? " avec duplicata PDF" : ""
+          } envoyé à ${targetEmail}`,
+          status: "Envoyé",
+        });
+
+        setEmailSendResult({
+          type: "success",
+          message: `Relance envoyée par email à ${targetEmail}${
+            attachPdfCopy ? " (duplicata PDF joint)" : ""
+          } !`,
+        });
+        if (onToast) {
+          onToast(`Email de relance envoyé avec succès à ${targetEmail} !`, "success");
+        }
+      } else {
+        setEmailSendResult({
+          type: "warning",
+          message:
+            data.error ||
+            "Aucun fournisseur email/SMTP configuré sur le serveur. Cliquez sur « Ouvrir dans la messagerie » ci-dessous.",
+          mailtoUrl: data.mailtoUrl,
+        });
+      }
+    } catch (err) {
+      console.error("Erreur envoi relance email:", err);
+      setEmailSendResult({
+        type: "error",
+        message: "Erreur réseau lors de l'envoi de la relance.",
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const handleConfirmReminder = () => {
@@ -393,6 +514,18 @@ export default function ClientReminderModal({
                 </div>
               </div>
 
+              {/* Recipient */}
+              <div className="bg-white p-2.5 rounded-xl border border-blue-100 text-xs flex items-center gap-2">
+                <span className="font-semibold text-slate-400 shrink-0">Destinataire :</span>
+                <input
+                  type="email"
+                  value={emailRecipient}
+                  onChange={(e) => setEmailRecipient(e.target.value)}
+                  placeholder="client@entreprise.cd"
+                  className="flex-1 font-bold text-slate-800 focus:outline-none bg-transparent"
+                />
+              </div>
+
               {/* Subject */}
               <div className="bg-white p-2.5 rounded-xl border border-blue-100 text-xs">
                 <span className="font-semibold text-slate-400">Objet : </span>
@@ -404,24 +537,76 @@ export default function ClientReminderModal({
                 {emailData.body}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => handleCopyText(`${emailData.subject}\n\n${emailData.body}`)}
-                  className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5"
+              {/* Attachment toggle */}
+              <label className="inline-flex items-center gap-2 text-xs font-bold text-blue-900 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={attachPdfCopy}
+                  onChange={(e) => setAttachPdfCopy(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+                <Paperclip className="w-3.5 h-3.5 text-blue-600" />
+                <span>Joindre automatiquement le duplicata PDF de la facture {invoice.id}</span>
+              </label>
+
+              {emailSendResult && (
+                <div
+                  className={`p-3 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                    emailSendResult.type === "success"
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                      : emailSendResult.type === "warning"
+                      ? "bg-amber-50 border-amber-200 text-amber-900"
+                      : "bg-rose-50 border-rose-200 text-rose-800"
+                  }`}
                 >
-                  <Copy className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Copier l&apos;email</span>
-                </button>
+                  <span>{emailSendResult.message}</span>
+                  {emailSendResult.mailtoUrl && (
+                    <a
+                      href={emailSendResult.mailtoUrl}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] inline-flex items-center gap-1 shrink-0"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Ouvrir messagerie</span>
+                    </a>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(`${emailData.subject}\n\n${emailData.body}`)}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Copier l&apos;email</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenEmail}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Client mail local</span>
+                  </button>
+                </div>
 
                 <button
                   type="button"
-                  onClick={handleOpenEmail}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-sm transition-all"
+                  disabled={isSendingEmail}
+                  onClick={handleSendRealReminderEmail}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
                 >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Ouvrir dans la messagerie</span>
-                  <ExternalLink className="w-3 h-3 ml-0.5 opacity-70" />
+                  {isSendingEmail ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  <span>
+                    {isSendingEmail ? "Envoi en cours..." : "Envoyer l'email maintenant"}
+                  </span>
                 </button>
               </div>
             </div>

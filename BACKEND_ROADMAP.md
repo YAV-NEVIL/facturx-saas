@@ -198,9 +198,14 @@ graph TD
     2. **Starter (`14 $ / mois`)** : jusqu'à **100 factures générées**, déblocage des relances clients (WhatsApp & Email) et jusqu'à **3 employés/collaborateurs** ([components/EmployeesView.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/EmployeesView.jsx)).
     3. **Business (`34 $ / mois` — Recommandé)** : **factures illimitées** et **accès intégral à tout sans aucune restriction** (relances illimitées, employés RBAC illimités, tous les paramètres, rapports OHADA, DGI e-MCF Live).
     4. **Gold (`Contactez-nous`)** : offre sur mesure pour holdings, banques et grandes entreprises avec formulaire dédié de prise de contact direct.
-- [ ] **6.4 Nom de Domaine Personnalisé & Serveur SMTP Dédié** :
-  - Connexion d'un domaine personnalisé (ex. `app.facturx.cd`) sur Vercel avec certificat SSL automatique.
-  - Branchement d'un serveur SMTP transactionnel (Resend / Brevo) sur Supabase Auth et sur l'API de notification KYB pour lever la limite d'envoi d'emails par heure.
+- [x] **6.4 Système d'Envoi Réel d'Emails Transactionnels (`Resend`, `Brevo`, `Nodemailer SMTP` & Secours `mailto:`)** :
+  - Passerelle serveur centralisée ([lib/server-email.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/server-email.js)) et route [app/api/send-email/route.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/app/api/send-email/route.js) prenant en charge Resend, Brevo et SMTP classique (`nodemailer`) avec pièces jointes Base64.
+  - Export PDF en mémoire (`generateInvoicePdfBase64` dans [lib/pdf-generator.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/pdf-generator.js)) permettant l'envoi réel des factures normalisées PDF depuis [components/InvoiceDetailModal.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/InvoiceDetailModal.jsx) et [components/InvoiceTable.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/InvoiceTable.jsx).
+  - Envoi réel des relances clients avec duplicata PDF depuis [components/ClientReminderModal.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/ClientReminderModal.jsx).
+  - Notifications KYB automatiques lors du dépôt initial du dossier (`submitted` vers Super-Admin + accusé de réception entreprise dans [lib/supabaseService.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/lib/supabaseService.js) & [app/api/kyb-notify/route.js](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/app/api/kyb-notify/route.js)) et lors de la décision Super-Admin (`approved` / `rejected`).
+  - Transmission directe des demandes **Offre Gold** ([components/PricingView.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/PricingView.jsx)) avec accusé de réception automatique au prospect, et outil de diagnostic/test email dans [components/SettingsView.jsx](file:///c:/Users/IR%20KIOVI/Desktop/fact%20app/components/SettingsView.jsx).
+- [ ] **6.5 Nom de Domaine Personnalisé** :
+  - Connexion d'un domaine personnalisé (ex. `app.facturx.cd`) sur Vercel avec certificat SSL automatique et configuration des clés DNS SPF/DKIM associées.
 
 ---
 

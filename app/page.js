@@ -158,6 +158,7 @@ export default function App() {
   const [quoteViewMode, setQuoteViewMode] = useState("grid");
   const [copiedFieldId, setCopiedFieldId] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [openInvoiceEmailInitially, setOpenInvoiceEmailInitially] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [reminderInvoice, setReminderInvoice] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -2442,7 +2443,14 @@ export default function App() {
               <InvoiceTable
                 invoices={displayedInvoices}
                 clients={clients}
-                onSelectInvoice={(inv) => setSelectedInvoice(inv)}
+                onSelectInvoice={(inv) => {
+                  setOpenInvoiceEmailInitially(false);
+                  setSelectedInvoice(inv);
+                }}
+                onSendInvoiceEmail={(inv) => {
+                  setOpenInvoiceEmailInitially(true);
+                  setSelectedInvoice(inv);
+                }}
                 onOpenCreateModal={() => handleOpenCreateInvoiceWithLimit()}
                 onMarkAsPaid={handleMarkAsPaid}
                 onUpdateInvoice={handleUpdateInvoice}
@@ -4036,14 +4044,20 @@ export default function App() {
       <InvoiceDetailModal
         invoice={selectedInvoice}
         isOpen={!!selectedInvoice}
-        onClose={() => setSelectedInvoice(null)}
+        initialOpenEmail={openInvoiceEmailInitially}
+        onClose={() => {
+          setSelectedInvoice(null);
+          setOpenInvoiceEmailInitially(false);
+        }}
         onMarkAsPaid={handleMarkAsPaid}
         onOpenReminder={(inv) => handleOpenReminderWithLimit(inv)}
         onEditInvoice={(inv) => {
           setSelectedInvoice(null);
+          setOpenInvoiceEmailInitially(false);
           setInvoiceForEdit(inv);
         }}
         companyInfo={companyInfo}
+        onToast={showToast}
       />
 
       <EditInvoiceModal
@@ -4061,6 +4075,7 @@ export default function App() {
         onClose={() => setReminderInvoice(null)}
         onSaveReminder={handleSaveReminder}
         companyInfo={companyInfo}
+        onToast={showToast}
       />
 
       {/* Fiche Client 360° (Tiroir latéral immersif avec synthèse financière et historique) */}
