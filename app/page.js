@@ -1786,6 +1786,12 @@ export default function App() {
           if (typeof window !== "undefined") {
             localStorage.setItem(STORAGE_KEY_USER_PROFILE, JSON.stringify(profile));
           }
+          if (profile.acceptedInvitation) {
+            showToast(
+              `Invitation acceptée ! Bienvenue dans l'équipe ${profile.companyName || "FacturX"}.`,
+              "success"
+            );
+          }
           if (profile.companyId) {
             setCompanyInfo((prev) => ({
               ...prev,
@@ -2031,7 +2037,7 @@ export default function App() {
     );
   }
 
-  // Notifications dynamiques de conformité légale dans la cloche du Header
+  // Notifications dynamiques (conformité KYB + invitations équipe envoyées / acceptées)
   const kybHeaderNotifications = !isPlatformSuperAdmin
     ? effectiveKybStatus === "pending_review"
       ? [
@@ -2041,6 +2047,7 @@ export default function App() {
             title: "Documents en cours de vérification",
             desc: "Dans 48 heures, vous serez informé par email de l'état de validation.",
             time: "Vérification 24h–48h",
+            action: "kyb",
           },
         ]
       : effectiveKybStatus === "rejected"
@@ -2051,6 +2058,7 @@ export default function App() {
             title: "Documents non conformes — À revoir",
             desc: companyInfo?.kybRejectionReason || "Veuillez revoir et remplacer vos documents.",
             time: "Action recommandée",
+            action: "kyb",
           },
         ]
       : effectiveKybStatus === "approved"
@@ -2061,10 +2069,41 @@ export default function App() {
             title: "Documents légaux validés",
             desc: "Votre entreprise est officiellement vérifiée sur FacturX.",
             time: "Conforme",
+            action: "kyb",
           },
         ]
       : []
     : [];
+
+  const teamInvitationNotifications = (teamMembers || [])
+    .filter((m) => m.email && m.email.toLowerCase() !== (userProfile?.email || "").toLowerCase())
+    .slice(0, 6)
+    .map((m) => {
+      const isPending = m.status === "Invité";
+      const isOnline = m.status === "En ligne";
+      return isPending
+        ? {
+            id: `invite-pending-${m.id || m.email}`,
+            type: "info",
+            title: `Invitation envoyée à ${m.name}`,
+            desc: `Poste : ${m.badge || m.role} • En attente d'acceptation (${m.email})`,
+            time: "Invitation en cours",
+            targetTab: userProfile?.role === "admin" ? "employees" : "dashboard",
+          }
+        : {
+            id: `invite-accepted-${m.id || m.email}`,
+            type: "success",
+            title: `Invitation acceptée : ${m.name}`,
+            desc: `${m.badge || m.role} • A rejoint votre organisation`,
+            time: isOnline ? "En ligne maintenant" : "Collaborateur actif",
+            targetTab: userProfile?.role === "admin" ? "employees" : "dashboard",
+          };
+    });
+
+  const combinedHeaderNotifications = [
+    ...teamInvitationNotifications,
+    ...kybHeaderNotifications,
+  ];
 
   return (
     <div className="min-h-screen bg-[#F6F8FC] flex text-slate-800">
@@ -2103,7 +2142,7 @@ export default function App() {
           userProfile={userProfile}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onSignOut={handleSignOut}
-          notifications={kybHeaderNotifications}
+          notifications={combinedHeaderNotifications}
           kybStatus={!isPlatformSuperAdmin ? effectiveKybStatus : null}
           onOpenKybDocuments={() => setIsKybRevisionOpen(true)}
         />
@@ -3944,6 +3983,7 @@ export default function App() {
                 if (created) {
                   setTeamMembers((prev) => [created, ...prev]);
                 }
+                return created;
               }}
               onDeleteMember={async (memberId) => {
                 await apiDeleteTeamMember(memberId);

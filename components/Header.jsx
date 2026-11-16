@@ -321,6 +321,14 @@ export default function Header({
                     notifications.map((item) => (
                       <div
                         key={item.id}
+                        onClick={() => {
+                          setShowNotifications(false);
+                          if (item.action === "kyb" && onOpenKybDocuments) {
+                            onOpenKybDocuments();
+                          } else if (item.targetTab && onNavigate) {
+                            onNavigate(item.targetTab);
+                          }
+                        }}
                         className="px-4 py-3 hover:bg-slate-50/80 transition-colors flex items-start gap-3 cursor-pointer"
                       >
                         <div className="mt-0.5 shrink-0">
@@ -389,15 +397,16 @@ export default function Header({
                 </p>
                 <div className="flex items-center gap-1">
                   <p className="text-[11px] text-slate-500">
-                    {userProfile?.role === "admin"
-                      ? "Propriétaire"
-                      : userProfile?.role === "comptable"
-                        ? "Comptabilité"
-                        : userProfile?.role === "commercial"
-                          ? "Commercial"
-                          : userProfile?.role === "gestionnaire_stock"
-                            ? "Gestionnaire stock"
-                            : userProfile?.badge || "Utilisateur"}
+                    {userProfile?.badge ||
+                      (userProfile?.role === "admin"
+                        ? "Propriétaire"
+                        : userProfile?.role === "comptable"
+                          ? "Comptabilité"
+                          : userProfile?.role === "commercial"
+                            ? "Commercial"
+                            : userProfile?.role === "gestionnaire_stock"
+                              ? "Gestionnaire stock"
+                              : "Utilisateur")}
                   </p>
                 </div>
               </div>

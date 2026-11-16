@@ -66,7 +66,28 @@ export default function LoginScreen({
   const [pendingProfile, setPendingProfile] = useState(null);
   const [otpCode, setOtpCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [inviteContext, setInviteContext] = useState(null);
   const autoLoginHandledRef = useRef(false);
+
+  // Détection d'un lien d'invitation collaborateur (?invite=email&company=...&role=...)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const inviteEmail = (params.get("invite") || "").trim().toLowerCase();
+      if (inviteEmail && inviteEmail.includes("@")) {
+        setInviteContext({
+          email: inviteEmail,
+          company: params.get("company") || "votre organisation",
+          role: params.get("role") || "Collaborateur",
+        });
+        setLoginEmail(inviteEmail);
+        setActiveTab("signin");
+      }
+    } catch {
+      // Ignorer
+    }
+  }, []);
 
   // Détection automatique du retour depuis le lien de confirmation email Supabase (#access_token=...)
   useEffect(() => {
@@ -185,11 +206,9 @@ export default function LoginScreen({
         authUser = authData?.user;
         userMeta = authUser?.user_metadata || {};
       } catch (authErr) {
+        const lowerErr = (authErr?.message || "").toLowerCase();
         // Si l'erreur indique que l'email n'est pas encore confirmé
-        if (
-          authErr?.message?.toLowerCase().includes("email not confirmed") ||
-          authErr?.message?.toLowerCase().includes("non confirmé")
-        ) {
+        if (lowerErr.includes("email not confirmed") || lowerErr.includes("non confirmé")) {
           setPendingEmail(loginEmail.trim().toLowerCase());
           setActiveTab("otp_verify");
           setErrorMessage(
@@ -198,7 +217,34 @@ export default function LoginScreen({
           setIsLoading(false);
           return;
         }
-        throw new Error("Identifiants incorrects. Veuillez vérifier votre adresse email et votre mot de passe.");
+        // Si le collaborateur arrive via un lien d'invitation et que son compte Auth n'a pas encore été provisionné
+        if (inviteContext && loginEmail.trim().toLowerCase() === inviteContext.email) {
+          try {
+            const signUpRes = await signUpWithEmail(
+              loginEmail.trim().toLowerCase(),
+              loginPassword,
+              loginEmail.trim().split("@")[0],
+              "comptable"
+            );
+            if (signUpRes?.session?.user) {
+              authUser = signUpRes.session.user;
+              userMeta = authUser?.user_metadata || {};
+            } else if (signUpRes?.user) {
+              setPendingEmail(loginEmail.trim().toLowerCase());
+              setActiveTab("otp_verify");
+              setSuccessNotice(
+                `Un code de vérification vient d'être envoyé à ${loginEmail.trim().toLowerCase()} pour activer votre invitation.`
+              );
+              setIsLoading(false);
+              return;
+            }
+          } catch {
+            // Poursuivre vers le message d'erreur standard
+          }
+        }
+        if (!authUser) {
+          throw new Error("Identifiants incorrects. Veuillez vérifier votre adresse email et votre mot de passe.");
+        }
       }
 
       // Résoudre le profil depuis Supabase team_members ou finaliser l'onboarding si l'email vient d'être confirmé par lien
@@ -240,13 +286,14 @@ export default function LoginScreen({
       const resolvedRole = matchedMember?.role || userMeta.role || "comptable";
 
       const roleBadge =
-        resolvedRole === "admin"
+        matchedMember?.badge ||
+        (resolvedRole === "admin"
           ? "Propriétaire"
           : resolvedRole === "comptable"
             ? "Comptabilité"
             : resolvedRole === "commercial"
               ? "Commercial"
-              : "Gestionnaire Stock";
+              : "Gestionnaire Stock");
 
       const initials = resolvedName
         .split(" ")
@@ -276,7 +323,17 @@ export default function LoginScreen({
         kybStatus: matchedMember?.kybStatus || undefined,
         kybSubmittedAt: matchedMember?.kybSubmittedAt || null,
         isNewOrganization: Boolean(matchedMember?.isNewOrganization),
+        acceptedInvitation: Boolean(inviteContext || matchedMember?.wasInvited),
       };
+
+      // Nettoyer les paramètres d'invitation de l'URL après acceptation
+      if (typeof window !== "undefined" && window.location.search.includes("invite=")) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("invite");
+        url.searchParams.delete("company");
+        url.searchParams.delete("role");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      }
 
       // Mettre à jour le statut "En ligne" sur Supabase
       await updateMemberOnlineStatus(profile.email, true);
@@ -645,6 +702,24 @@ export default function LoginScreen({
 
           {/* CONTENU DE LA CARTE */}
           <div className="p-6 sm:p-8">
+            {/* Bannière d'invitation collaborateur */}
+            {inviteContext && activeTab !== "otp_verify" && (
+              <div className="mb-5 p-4 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-3 animate-fadeIn">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="text-xs leading-relaxed">
+                  <p className="font-extrabold text-blue-950">
+                    Invitation reçue pour rejoindre {inviteContext.company}
+                  </p>
+                  <p className="text-blue-800 mt-0.5">
+                    Poste attribué : <strong>{inviteContext.role}</strong>. Connectez-vous avec le
+                    mot de passe provisoire reçu par email pour accepter l&apos;invitation.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Notification de succès */}
             {successNotice && (
               <div className="mb-5 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-start gap-2.5 text-xs sm:text-sm animate-fadeIn">

@@ -25,6 +25,9 @@ import {
   Package,
   Send,
   Loader2,
+  Plus,
+  Copy,
+  Check,
 } from "lucide-react";
 
 const EMPLOYEE_ROLE_META = {
@@ -58,6 +61,14 @@ const EMPLOYEE_ROLE_META = {
   },
 };
 
+const CUSTOM_ROLE_PRESETS = [
+  "Caissier Principal",
+  "Assistant RH",
+  "Directeur Technique",
+  "Magasinier",
+  "Auditeur Interne",
+];
+
 export default function EmployeesView({
   currentUser,
   teamMembers = [],
@@ -81,10 +92,14 @@ export default function EmployeesView({
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberPhone, setNewMemberPhone] = useState("+243 ");
   const [newMemberRole, setNewMemberRole] = useState("comptable");
+  const [customRoleTitle, setCustomRoleTitle] = useState("");
+  const [customRbacRole, setCustomRbacRole] = useState("comptable");
   const [newMemberPassword, setNewMemberPassword] = useState("");
   const [sendInviteEmail, setSendInviteEmail] = useState(true);
-  const [includePasswordInInvite, setIncludePasswordInInvite] = useState(false);
+  const [includePasswordInInvite, setIncludePasswordInInvite] = useState(true);
   const [resendingMemberId, setResendingMemberId] = useState(null);
+  const [lastInviteResult, setLastInviteResult] = useState(null);
+  const [copiedInviteLink, setCopiedInviteLink] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Vérification stricte du rôle Administrateur
@@ -150,47 +165,77 @@ export default function EmployeesView({
     const matchesSearch =
       (m.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (m.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (m.badge || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (m.phone || "").toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesRole = roleFilter === "all" || m.role === roleFilter;
 
     const isOnline = m.status === "En ligne";
+    const isInvited = m.status === "Invité";
     const matchesStatus =
       statusFilter === "all"
         ? true
         : statusFilter === "online"
         ? isOnline
+        : statusFilter === "invited"
+        ? isInvited
         : !isOnline;
 
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  // Postes personnalisés déjà utilisés dans l'entreprise + suggestions par défaut
+  const standardBadges = new Set(Object.values(EMPLOYEE_ROLE_META).map((r) => r.badge.toLowerCase()));
+  const customRoleSuggestions = Array.from(
+    new Set([
+      ...teamMembers
+        .map((m) => (m.badge || "").trim())
+        .filter((b) => b && !standardBadges.has(b.toLowerCase())),
+      ...CUSTOM_ROLE_PRESETS,
+    ])
+  ).slice(0, 6);
+
   // Métriques d'équipe
   const totalEmployees = teamMembers.length;
   const onlineEmployees = teamMembers.filter((m) => m.status === "En ligne").length;
+  const invitedPendingCount = teamMembers.filter((m) => m.status === "Invité").length;
   const adminEmployees = teamMembers.filter((m) => m.role === "admin").length;
   const operationalEmployees = totalEmployees - adminEmployees;
 
-  const sendEmployeeInvitationEmail = async (memberData, temporaryPassword = "") => {
-    const roleMeta = EMPLOYEE_ROLE_META[memberData.role] || EMPLOYEE_ROLE_META.comptable;
-    const companyName = companyInfo?.name || currentUser?.companyName || "FacturX";
-    const inviterName = currentUser?.fullName || currentUser?.name || "L'administrateur";
-    const loginUrl =
+  const buildInviteUrl = (email, roleTitle) => {
+    const origin =
       typeof window !== "undefined" && window.location?.origin
         ? window.location.origin
         : "https://facturx-saas.vercel.app";
+    const companyName = companyInfo?.name || currentUser?.companyName || "FacturX";
+    const params = new URLSearchParams({
+      invite: (email || "").trim().toLowerCase(),
+      company: companyName,
+      role: roleTitle || "Collaborateur",
+    });
+    return `${origin}/?${params.toString()}`;
+  };
+
+  const sendEmployeeInvitationEmail = async (memberData, temporaryPassword = "") => {
+    const roleMeta = EMPLOYEE_ROLE_META[memberData.role] || EMPLOYEE_ROLE_META.comptable;
+    const isCustomBadge =
+      memberData.badge && !standardBadges.has(memberData.badge.toLowerCase());
+    const roleDisplayTitle = isCustomBadge ? memberData.badge : roleMeta.fullTitle;
+    const companyName = companyInfo?.name || currentUser?.companyName || "FacturX";
+    const inviterName = currentUser?.fullName || currentUser?.name || "L'administrateur";
+    const inviteUrl = buildInviteUrl(memberData.email, roleDisplayTitle);
 
     const messageLines = [
       `Bonjour ${memberData.name},`,
       "",
-      `${inviterName} vous a ajouté comme collaborateur au sein de l'espace FacturX de « ${companyName} ».`,
-      `Votre poste attribué est : ${roleMeta.fullTitle} (${roleMeta.desc}).`,
+      `${inviterName} vous a invité(e) à rejoindre l'espace FacturX de « ${companyName} ».`,
+      `Poste attribué : ${roleDisplayTitle} (Habilitations : ${roleMeta.desc}).`,
       "",
       temporaryPassword
-        ? `Vous pouvez vous connecter dès maintenant avec votre email (${memberData.email}) et votre mot de passe provisoire indiqué ci-dessous.`
-        : `Connectez-vous avec votre adresse email (${memberData.email}) et le mot de passe provisoire communiqué par votre administrateur.`,
+        ? `Vous pouvez accepter l'invitation dès maintenant en vous connectant avec votre email (${memberData.email}) et votre mot de passe provisoire indiqué ci-dessous.`
+        : `Cliquez sur le lien ci-dessous puis connectez-vous avec votre adresse email (${memberData.email}) et le mot de passe provisoire communiqué par votre administrateur pour accepter l'invitation.`,
       "",
-      `Lien de connexion : ${loginUrl}`,
+      `Accepter l'invitation : ${inviteUrl}`,
     ];
 
     const res = await fetch("/api/send-email", {
@@ -200,7 +245,7 @@ export default function EmployeesView({
         type: "employee_invite",
         to: memberData.email,
         toName: memberData.name,
-        subject: `Invitation FacturX — Rejoignez ${companyName}`,
+        subject: `Invitation FacturX — Rejoignez ${companyName} (${roleDisplayTitle})`,
         message: messageLines.join("\n"),
         replyTo: companyInfo?.email || currentUser?.email || "",
         companyInfo: companyInfo || { name: companyName },
@@ -208,17 +253,17 @@ export default function EmployeesView({
           name: memberData.name,
           email: memberData.email,
           role: memberData.role,
-          roleLabel: roleMeta.fullTitle,
+          roleLabel: roleDisplayTitle,
           permissionsDesc: roleMeta.desc,
           invitedBy: inviterName,
-          loginUrl,
+          loginUrl: inviteUrl,
           temporaryPassword: temporaryPassword || undefined,
         },
       }),
     });
 
     const data = await res.json().catch(() => ({}));
-    return { ok: res.ok && Boolean(data.sentAutomatically), data };
+    return { ok: res.ok && Boolean(data.sentAutomatically), data, inviteUrl, roleDisplayTitle };
   };
 
   const handleResendInvite = async (member) => {
@@ -227,6 +272,13 @@ export default function EmployeesView({
     try {
       const result = await sendEmployeeInvitationEmail(member);
       if (result.ok) {
+        setLastInviteResult({
+          name: member.name,
+          email: member.email,
+          roleLabel: result.roleDisplayTitle,
+          inviteUrl: result.inviteUrl,
+          sent: true,
+        });
         if (onToast) {
           onToast(`Invitation renvoyée par email à ${member.email} !`, "success");
         }
@@ -252,20 +304,31 @@ export default function EmployeesView({
       return;
     }
 
+    const isCustom = newMemberRole === "custom";
+    if (isCustom && !customRoleTitle.trim()) {
+      if (onToast) onToast("Veuillez saisir l'intitulé du poste personnalisé.", "error");
+      return;
+    }
+
+    const effectiveRbacRole = isCustom ? customRbacRole : newMemberRole;
+    const roleMeta = EMPLOYEE_ROLE_META[effectiveRbacRole] || EMPLOYEE_ROLE_META.comptable;
+    const effectiveBadge = isCustom ? customRoleTitle.trim() : roleMeta.badge;
+    const effectiveDisplayRole = isCustom ? customRoleTitle.trim() : roleMeta.fullTitle;
+
     setIsSubmitting(true);
     try {
-      const roleMeta = EMPLOYEE_ROLE_META[newMemberRole] || EMPLOYEE_ROLE_META.comptable;
       const memberPayload = {
         name: newMemberName.trim(),
         email: newMemberEmail.trim().toLowerCase(),
         phone: newMemberPhone.trim(),
         password: newMemberPassword.trim(),
-        role: newMemberRole,
-        badge: roleMeta.badge,
+        role: effectiveRbacRole,
+        badge: effectiveBadge,
         status: "Invité",
       };
 
-      await onCreateMember(memberPayload);
+      const createdMember = await onCreateMember(memberPayload);
+      const inviteUrl = buildInviteUrl(memberPayload.email, effectiveDisplayRole);
 
       let inviteSent = false;
       let inviteError = null;
@@ -284,14 +347,25 @@ export default function EmployeesView({
         }
       }
 
+      setLastInviteResult({
+        name: memberPayload.name,
+        email: memberPayload.email,
+        roleLabel: effectiveDisplayRole,
+        inviteUrl,
+        sent: sendInviteEmail ? inviteSent : false,
+        error: inviteError || createdMember?.authWarning || null,
+      });
+
       setIsCreateModalOpen(false);
       setNewMemberName("");
       setNewMemberEmail("");
       setNewMemberPhone("+243 ");
       setNewMemberPassword("");
       setNewMemberRole("comptable");
+      setCustomRoleTitle("");
+      setCustomRbacRole("comptable");
       setSendInviteEmail(true);
-      setIncludePasswordInInvite(false);
+      setIncludePasswordInInvite(true);
 
       if (onToast) {
         if (sendInviteEmail && inviteSent) {
@@ -331,39 +405,24 @@ export default function EmployeesView({
     }
   };
 
-  const roleLabel = (role) => {
-    switch (role) {
-      case "admin":
-        return (
-          <>
-            <Shield className="w-3.5 h-3.5 shrink-0" />
-            <span>Administrateur Général</span>
-          </>
-        );
-      case "comptable":
-        return (
-          <>
-            <BarChart3 className="w-3.5 h-3.5 shrink-0" />
-            <span>Responsable Comptable</span>
-          </>
-        );
-      case "commercial":
-        return (
-          <>
-            <Briefcase className="w-3.5 h-3.5 shrink-0" />
-            <span>Chargé Commercial</span>
-          </>
-        );
-      case "gestionnaire_stock":
-        return (
-          <>
-            <Package className="w-3.5 h-3.5 shrink-0" />
-            <span>Gestionnaire de Stock</span>
-          </>
-        );
-      default:
-        return "Membre de l'équipe";
-    }
+  const roleLabel = (role, customBadge = "") => {
+    const meta = EMPLOYEE_ROLE_META[role];
+    const hasCustomTitle = customBadge && !standardBadges.has(customBadge.toLowerCase());
+    const labelText = hasCustomTitle ? customBadge : meta ? meta.fullTitle : "Membre de l'équipe";
+    const IconComp =
+      role === "admin"
+        ? Shield
+        : role === "comptable"
+        ? BarChart3
+        : role === "gestionnaire_stock"
+        ? Package
+        : Briefcase;
+    return (
+      <>
+        <IconComp className="w-3.5 h-3.5 shrink-0" />
+        <span>{labelText}</span>
+      </>
+    );
   };
 
   return (
@@ -479,6 +538,74 @@ export default function EmployeesView({
         </div>
       </div>
 
+      {/* Résultat immédiat d'invitation envoyée + lien à partager */}
+      {lastInviteResult && (
+        <div
+          className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            lastInviteResult.sent
+              ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+              : "bg-amber-50 border-amber-200 text-amber-900"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                lastInviteResult.sent
+                  ? "bg-emerald-600 text-white"
+                  : "bg-amber-600 text-white"
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+            </div>
+            <div className="text-xs space-y-0.5">
+              <p className="font-extrabold">
+                {lastInviteResult.sent
+                  ? `Invitation envoyée par email à ${lastInviteResult.name} (${lastInviteResult.email})`
+                  : `Collaborateur ajouté (${lastInviteResult.name}) — Invitation à partager`}
+              </p>
+              <p className="opacity-85">
+                Poste : <strong>{lastInviteResult.roleLabel}</strong> • Statut :{" "}
+                <strong>En attente d&apos;acceptation</strong>
+                {lastInviteResult.error ? ` (${lastInviteResult.error})` : ""}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof navigator !== "undefined" && navigator.clipboard) {
+                  navigator.clipboard.writeText(lastInviteResult.inviteUrl);
+                  setCopiedInviteLink(true);
+                  setTimeout(() => setCopiedInviteLink(false), 2000);
+                }
+              }}
+              className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+            >
+              {copiedInviteLink ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700">Lien copié !</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copier le lien</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLastInviteResult(null)}
+              className="p-1.5 rounded-lg hover:bg-black/5 cursor-pointer"
+              aria-label="Fermer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Barre de Recherche et Filtres */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         <div className="relative flex-1">
@@ -487,20 +614,21 @@ export default function EmployeesView({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher par nom, email, téléphone..."
+            placeholder="Rechercher par nom, email, poste, téléphone..."
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 transition-all placeholder:text-slate-400"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Filtre Présence */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filtre Présence / Invitation */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600/30 cursor-pointer"
+            className="flex-1 sm:flex-initial py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600/30 cursor-pointer"
           >
-            <option value="all">Tous les statuts</option>
-            <option value="online">En ligne</option>
+            <option value="all">Tous les statuts ({totalEmployees})</option>
+            <option value="online">En ligne ({onlineEmployees})</option>
+            <option value="invited">En attente ({invitedPendingCount})</option>
             <option value="offline">Hors ligne</option>
           </select>
 
@@ -519,8 +647,129 @@ export default function EmployeesView({
         </div>
       </div>
 
-      {/* Tableau des Collaborateurs */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      {/* Vue Mobile-First (Cartes collaborateurs sur petit écran) */}
+      <div className="grid grid-cols-1 gap-3 sm:hidden">
+        {filteredMembers.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center text-slate-400 text-xs">
+            Aucun collaborateur ne correspond à vos critères de recherche.
+          </div>
+        ) : (
+          filteredMembers.map((member) => {
+            const isOnline = member.status === "En ligne";
+            const isInvited = member.status === "Invité";
+            const isCurrentUser = member.email === currentUser?.email;
+            const roleMeta = EMPLOYEE_ROLE_META[member.role];
+            const hasCustomTitle =
+              member.badge && !standardBadges.has(member.badge.toLowerCase());
+
+            return (
+              <div
+                key={`mob-${member.id}`}
+                className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-extrabold text-xs flex items-center justify-center shadow-sm">
+                        {member.initials || "FX"}
+                      </div>
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
+                          isOnline
+                            ? "bg-emerald-500 animate-pulse"
+                            : isInvited
+                            ? "bg-amber-400"
+                            : "bg-slate-300"
+                        }`}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-bold text-slate-900 truncate">
+                          {member.name}
+                        </span>
+                        {isCurrentUser && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            Vous
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${roleBadgeStyle(
+                      member.role
+                    )}`}
+                  >
+                    {roleLabel(member.role, member.badge)}
+                  </span>
+                  {hasCustomTitle && roleMeta && (
+                    <span className="text-[10px] font-semibold text-slate-500">
+                      Accès : {roleMeta.badge}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <div>
+                    {isOnline ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Acceptée • En ligne
+                      </span>
+                    ) : isInvited ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                        <Clock className="w-3 h-3 text-amber-600" />
+                        En attente d&apos;acceptation
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-50 text-slate-600 border border-slate-200">
+                        <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                        Acceptée • Hors ligne
+                      </span>
+                    )}
+                  </div>
+
+                  {!isCurrentUser && (
+                    <div className="flex items-center gap-1.5">
+                      {member.email && (
+                        <button
+                          type="button"
+                          onClick={() => handleResendInvite(member)}
+                          disabled={resendingMemberId === (member.id || member.email)}
+                          className="px-2.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          {resendingMemberId === (member.id || member.email) ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Send className="w-3.5 h-3.5" />
+                          )}
+                          <span>Inviter</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setMemberToDelete(member)}
+                        className="p-1.5 rounded-xl text-rose-600 bg-rose-50 border border-rose-200 cursor-pointer"
+                        title="Révoquer l'accès"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Tableau des Collaborateurs (Desktop / Tablette) */}
+      <div className="hidden sm:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -552,7 +801,11 @@ export default function EmployeesView({
               ) : (
                 filteredMembers.map((member) => {
                   const isOnline = member.status === "En ligne";
+                  const isInvited = member.status === "Invité";
                   const isCurrentUser = member.email === currentUser?.email;
+                  const roleMeta = EMPLOYEE_ROLE_META[member.role];
+                  const hasCustomTitle =
+                    member.badge && !standardBadges.has(member.badge.toLowerCase());
 
                   return (
                     <tr
@@ -568,7 +821,11 @@ export default function EmployeesView({
                             </div>
                             <span
                               className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
-                                isOnline ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
+                                isOnline
+                                  ? "bg-emerald-500 animate-pulse"
+                                  : isInvited
+                                  ? "bg-amber-400"
+                                  : "bg-slate-300"
                               }`}
                             />
                           </div>
@@ -593,30 +850,45 @@ export default function EmployeesView({
 
                       {/* Rôle & Badge */}
                       <td className="py-4 px-6">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${roleBadgeStyle(
-                            member.role
-                          )}`}
-                        >
-                          {roleLabel(member.role)}
-                        </span>
+                        <div className="flex flex-col items-start gap-1">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${roleBadgeStyle(
+                              member.role
+                            )}`}
+                          >
+                            {roleLabel(member.role, member.badge)}
+                          </span>
+                          {hasCustomTitle && roleMeta && (
+                            <span className="text-[10px] font-semibold text-slate-400 pl-1">
+                              Habilitations : {roleMeta.badge}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
-                      {/* Présence en Direct */}
+                      {/* Présence & État d'Invitation */}
                       <td className="py-4 px-6">
                         {isOnline ? (
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                              En ligne
+                              Acceptée • En ligne
                             </span>
                             <span className="text-xs text-slate-400">Actif maintenant</span>
+                          </div>
+                        ) : isInvited ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              En attente d&apos;acceptation
+                            </span>
+                            <span className="text-xs text-slate-400">Invitation envoyée</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-50 text-slate-600 border border-slate-200">
                               <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                              Hors ligne
+                              Acceptée • Hors ligne
                             </span>
                             <span className="text-xs text-slate-400">
                               Dernière : {member.lastLogin || "Inconnue"}
@@ -797,7 +1069,71 @@ export default function EmployeesView({
                       <p className="text-[10px] text-slate-500 mt-0.5">{r.desc}</p>
                     </div>
                   ))}
+
+                  {/* 5e option : Poste personnalisé saisi manuellement par l'admin */}
+                  <div
+                    onClick={() => setNewMemberRole("custom")}
+                    className={`sm:col-span-2 p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      newMemberRole === "custom"
+                        ? "bg-blue-50/80 border-blue-500 shadow-sm"
+                        : "bg-slate-50 border-dashed border-slate-300 hover:border-blue-400"
+                    }`}
+                  >
+                    <p className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Autre poste personnalisé (saisie manuelle)</span>
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Créez n&apos;importe quel poste (Caissier, Assistant RH, Directeur...) et choisissez ses droits
+                    </p>
+                  </div>
                 </div>
+
+                {newMemberRole === "custom" && (
+                  <div className="mt-3 p-3.5 rounded-2xl bg-blue-50/50 border border-blue-200/80 space-y-3 animate-in fade-in duration-150">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Intitulé du poste personnalisé *
+                      </label>
+                      <input
+                        type="text"
+                        value={customRoleTitle}
+                        onChange={(e) => setCustomRoleTitle(e.target.value)}
+                        placeholder="Ex: Caissier Principal, Assistant RH, Livreur..."
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+                        required={newMemberRole === "custom"}
+                      />
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {customRoleSuggestions.map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setCustomRoleTitle(preset)}
+                            className="px-2 py-0.5 rounded-full bg-white hover:bg-blue-100 text-[10px] font-semibold text-slate-700 border border-slate-200 cursor-pointer transition-colors"
+                          >
+                            + {preset}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Habilitations & accès dans l&apos;app *
+                      </label>
+                      <select
+                        value={customRbacRole}
+                        onChange={(e) => setCustomRbacRole(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+                      >
+                        <option value="comptable">Comptabilité — Factures, Devis, Paiements & TVA</option>
+                        <option value="commercial">Commercial — Devis & CRM Clients</option>
+                        <option value="gestionnaire_stock">Stock — Articles, Devis & Facturation</option>
+                        <option value="admin">Administrateur — Accès total sans restriction</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Options d'invitation automatique par email */}

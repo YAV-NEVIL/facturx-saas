@@ -345,7 +345,7 @@ export async function POST(request) {
             <a href="${escapeHtml(
               employee.loginUrl || appUrl
             )}" style="display: inline-block; padding: 12px 22px; background: #183BB0; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 13px;">
-              Accéder à mon espace FacturX
+              Accéder à mon espace &amp; Accepter l&apos;invitation
             </a>
           </div>`
         : "";
