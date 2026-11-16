@@ -105,17 +105,17 @@ export default function QuoteDetailModal({
   const statusInfo = getStatusBadge(quote.status);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Fond obscurci */}
       <div
         className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-in fade-in"
         onClick={onClose}
       />
 
-      {/* Conteneur Modale */}
-      <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-4xl w-full my-8 overflow-hidden z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
+      {/* Conteneur Modale (Mobile-First : scrollable à 100%) */}
+      <div className="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 max-w-4xl w-full sm:my-4 overflow-hidden z-10 animate-in zoom-in-95 duration-200 flex flex-col max-h-[94dvh]">
         {/* Barre d'actions supérieure */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
+        <div className="shrink-0 p-3.5 sm:p-5 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md">
               <FileText className="w-5 h-5" />
@@ -207,37 +207,39 @@ export default function QuoteDetailModal({
           </div>
         </div>
 
-        {/* Panneau d'envoi réel d'email avec PDF du devis */}
-        {isEmailComposerOpen && (
-          <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 animate-in fade-in duration-150">
-            <DocumentEmailComposer
-              title={`Envoyer le devis ${quote.id} par email avec PDF`}
-              subtitle="Transmission directe de la proposition commerciale au client avec pièce jointe PDF"
-              defaultTo={recipientEmail}
-              toName={quote.clientName}
-              defaultSubject={defaultEmailSubject}
-              defaultMessage={defaultEmailMessage}
-              attachmentLabel="Joindre le devis commercial PDF"
-              emailType="quote_pdf"
-              companyInfo={activeCompany}
-              extraPayload={{
-                quote: {
-                  id: quote.id,
-                  clientName: quote.clientName,
-                  validUntil: quote.validUntil,
-                  totalFormatted: formattedTotal,
-                },
-              }}
-              buildPdfAttachment={() => generateQuotePdfBase64(quote, activeCompany)}
-              successToastPrefix={`Devis ${quote.id} envoyé par email`}
-              onClose={() => setIsEmailComposerOpen(false)}
-              onToast={onToast}
-            />
-          </div>
-        )}
+        {/* Corps scrollable unique (composeur email + document devis) */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          {/* Panneau d'envoi réel d'email avec PDF du devis */}
+          {isEmailComposerOpen && (
+            <div className="px-4 sm:px-6 py-4 sm:py-5 bg-slate-50 border-b border-slate-200 animate-in fade-in duration-150">
+              <DocumentEmailComposer
+                title={`Envoyer le devis ${quote.id} par email avec PDF`}
+                subtitle="Transmission directe de la proposition commerciale au client avec pièce jointe PDF"
+                defaultTo={recipientEmail}
+                toName={quote.clientName}
+                defaultSubject={defaultEmailSubject}
+                defaultMessage={defaultEmailMessage}
+                attachmentLabel="Joindre le devis commercial PDF"
+                emailType="quote_pdf"
+                companyInfo={activeCompany}
+                extraPayload={{
+                  quote: {
+                    id: quote.id,
+                    clientName: quote.clientName,
+                    validUntil: quote.validUntil,
+                    totalFormatted: formattedTotal,
+                  },
+                }}
+                buildPdfAttachment={() => generateQuotePdfBase64(quote, activeCompany)}
+                successToastPrefix={`Devis ${quote.id} envoyé par email`}
+                onClose={() => setIsEmailComposerOpen(false)}
+                onToast={onToast}
+              />
+            </div>
+          )}
 
-        {/* Document Officiel du Devis (Format Feuille A4 élégant) */}
-        <div className="p-6 sm:p-8 overflow-y-auto space-y-6 bg-white text-slate-800">
+          {/* Document Officiel du Devis (Format Feuille A4 élégant) */}
+          <div className="p-4 sm:p-8 space-y-6 bg-white text-slate-800">
           {/* Entête du Devis : Émetteur & Date */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-100 pb-6">
             <div className="space-y-1.5">
@@ -425,10 +427,11 @@ export default function QuoteDetailModal({
               </div>
             </div>
           </div>
+          </div>
         </div>
 
         {/* Pied de Modale avec Boutons de Changement d'État */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div className="shrink-0 p-3.5 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-500">Statut du devis :</span>
             {quote.status !== "accepte" && (

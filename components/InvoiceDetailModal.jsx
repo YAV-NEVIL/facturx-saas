@@ -214,10 +214,10 @@ export default function InvoiceDetailModal({
   const statusInfo = getStatusDisplay(invoice.status);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-100 my-8 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-4xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 sm:my-4 max-h-[94dvh] flex flex-col overflow-hidden">
         {/* Top Action Bar */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
+        <div className="shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-extrabold text-base tracking-wide text-white">
               Facture {invoice.id}
@@ -302,9 +302,11 @@ export default function InvoiceDetailModal({
           </div>
         </div>
 
+        {/* Zone scrollable unique (composeur email + feuille facture) */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
         {/* Panneau d'envoi réel d'email avec PDF joint */}
         {isEmailComposerOpen && (
-          <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 animate-in fade-in duration-150">
+          <div className="px-4 sm:px-6 py-4 sm:py-5 bg-slate-50 border-b border-slate-200 animate-in fade-in duration-150">
             <form onSubmit={handleSendInvoiceEmail} className="space-y-3.5 max-w-3xl mx-auto">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -433,7 +435,7 @@ export default function InvoiceDetailModal({
         )}
 
         {/* Printable Invoice Sheet */}
-        <div className="p-8 sm:p-12 max-h-[80vh] overflow-y-auto bg-white">
+        <div className="p-4 sm:p-10 bg-white">
           {/* Company Branding & Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pb-8 border-b border-slate-200">
             <div>
@@ -775,6 +777,7 @@ export default function InvoiceDetailModal({
             </span>
             <span>FacturX SFE v2.0 • Page 1/1</span>
           </div>
+        </div>
         </div>
       </div>
     </div>

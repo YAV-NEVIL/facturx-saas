@@ -672,33 +672,36 @@ export default function EmployeesView({
         </div>
       </div>
 
-      {/* MODALE D'AJOUT DE COLLABORATEUR */}
+      {/* MODALE D'AJOUT DE COLLABORATEUR (Mobile-First : feuille coulissante & scroll fluide) */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-100 shadow-2xl overflow-hidden">
-            <div className="bg-gradient-to-r from-[#1A44B8] via-[#163DA9] to-[#112F85] text-white p-6 relative">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[92dvh] flex flex-col border border-slate-100 shadow-2xl overflow-hidden">
+            <div className="shrink-0 bg-gradient-to-r from-[#1A44B8] via-[#163DA9] to-[#112F85] text-white p-4 sm:p-6 relative">
               <button
+                type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="absolute top-5 right-5 p-1.5 rounded-full text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+                className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
+                aria-label="Fermer"
               >
                 <X className="w-5 h-5" />
               </button>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">
-                  <UserPlus className="w-6 h-6" />
+              <div className="flex items-center gap-3 pr-10">
+                <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+                  <UserPlus className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-extrabold tracking-tight">
+                  <h3 className="text-base sm:text-lg font-extrabold tracking-tight">
                     Ajouter un Nouveau Collaborateur
                   </h3>
-                  <p className="text-xs text-blue-200">
+                  <p className="text-[11px] sm:text-xs text-blue-200">
                     Attribuez un poste et configurez les droits d&apos;accès
                   </p>
                 </div>
               </div>
             </div>
 
-            <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleCreateSubmit} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">
                   Nom Complet du Collaborateur *
@@ -827,18 +830,20 @@ export default function EmployeesView({
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              </div>
+
+              <div className="shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 bg-white border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  className="w-full sm:w-auto px-4 py-3 sm:py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md shadow-blue-600/20 disabled:opacity-50"
+                  className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md shadow-blue-600/20 disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmitting ? "Enregistrement..." : "Créer le Collaborateur"}
                 </button>
@@ -850,8 +855,8 @@ export default function EmployeesView({
 
       {/* MODALE DE CONFIRMATION DE SUPPRESSION */}
       {memberToDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-100 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto overscroll-contain p-5 sm:p-6 border border-slate-100 shadow-2xl">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -863,10 +868,10 @@ export default function EmployeesView({
               seront retirées des collaborateurs autorisés de votre entreprise.
             </p>
 
-            <div className="flex items-center justify-end gap-3 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2.5 sm:gap-3 mt-6">
               <button
                 onClick={() => setMemberToDelete(null)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                className="w-full sm:w-auto px-4 py-3 sm:py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
               >
                 Annuler
               </button>
@@ -876,7 +881,7 @@ export default function EmployeesView({
                   setMemberToDelete(null);
                   if (onToast) onToast("Accès révoqué avec succès.", "success");
                 }}
-                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold shadow-md shadow-rose-600/20"
+                className="w-full sm:w-auto px-4 py-3 sm:py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold shadow-md shadow-rose-600/20 cursor-pointer"
               >
                 Confirmer la Révocation
               </button>

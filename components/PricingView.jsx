@@ -724,8 +724,8 @@ export default function PricingView({
 
       {/* 5. Modal de Paiement / Activation pour Starter (14$) ou Business (34$) */}
       {checkoutPlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-5">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full max-h-[92dvh] overflow-y-auto overscroll-contain p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-5">
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-50 text-[#183BB0] border border-blue-200">
@@ -844,8 +844,8 @@ export default function PricingView({
 
       {/* 6. Modal "Contactez-nous" pour l'Offre Gold */}
       {isGoldContactOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-5">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[92dvh] overflow-y-auto overscroll-contain p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-5">
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-slate-900 text-amber-400 flex items-center justify-center shrink-0">

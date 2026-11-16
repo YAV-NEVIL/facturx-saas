@@ -166,10 +166,10 @@ Tél : ${compPhone} • Email : ${compEmail}`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-4xl w-full max-h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 max-w-4xl w-full max-h-[94dvh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* En-tête de la Modale (Non imprimé) */}
-        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/90 print:hidden">
+        <div className="shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/90 print:hidden">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
               <FileSpreadsheet className="w-5 h-5" />
@@ -516,10 +516,10 @@ Tél : ${compPhone} • Email : ${compEmail}`;
       {/* SOUS-MODALE 1 : TRANSFERT DU RAPPORT VIA WHATSAPP                        */}
       {/* ========================================================================= */}
       {isWhatsAppModalOpen && (
-        <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full max-h-[92dvh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header WhatsApp */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-600 text-white">
+            <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-600 text-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shadow-inner">
                   <MessageCircle className="w-5 h-5 text-white" />
@@ -540,7 +540,7 @@ Tél : ${compPhone} • Email : ${compEmail}`;
             </div>
 
             {/* Contenu */}
-            <div className="p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Numéro WhatsApp du destinataire (facultatif)
@@ -624,10 +624,10 @@ Tél : ${compPhone} • Email : ${compEmail}`;
       {/* SOUS-MODALE 2 : TRANSFERT DU RAPPORT PAR EMAIL                           */}
       {/* ========================================================================= */}
       {isEmailModalOpen && (
-        <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full max-h-[92dvh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header Email */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
+            <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-indigo-600 text-white">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shadow-inner">
                   <Mail className="w-5 h-5 text-white" />
@@ -648,7 +648,7 @@ Tél : ${compPhone} • Email : ${compEmail}`;
             </div>
 
             {/* Contenu */}
-            <div className="p-6">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
               <DocumentEmailComposer
                 title="Envoi officiel du rapport avec PDF OHADA / DGI"
                 subtitle={`Réf. d'audit : ${auditId} • ${data.length} enregistrement(s) • ${formatAmount(

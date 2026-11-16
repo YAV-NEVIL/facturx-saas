@@ -64,11 +64,11 @@ export default function PaymentReceiptModal({
   const amountInWords = numberToFrenchWords(payment.amount);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 print:p-0 print:bg-white">
-      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-4 flex flex-col max-h-[92vh] print:max-h-none print:shadow-none print:border-none print:rounded-none">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 print:p-0 print:bg-white">
+      <div className="relative w-full max-w-3xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden sm:my-4 flex flex-col max-h-[94dvh] print:max-h-none print:shadow-none print:border-none print:rounded-none">
         
         {/* Barre d'outils supérieure (masquée à l'impression) */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white print:hidden">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-900 text-white print:hidden">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
               <Receipt className="w-5 h-5" />
@@ -127,42 +127,44 @@ export default function PaymentReceiptModal({
           </div>
         </div>
 
-        {/* Panneau d'envoi réel par email avec quittance PDF jointe */}
-        {isEmailComposerOpen && (
-          <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 animate-in fade-in duration-150 print:hidden">
-            <DocumentEmailComposer
-              title={`Envoyer la quittance ${receiptRef} par email avec PDF`}
-              subtitle="Confirmation officielle d'encaissement envoyée avec la quittance certifiée en pièce jointe"
-              defaultTo={resolvedRecipientEmail}
-              toName={payment.clientName}
-              defaultSubject={defaultEmailSubject}
-              defaultMessage={defaultEmailMessage}
-              attachmentLabel="Joindre la quittance officielle PDF"
-              emailType="receipt_pdf"
-              companyInfo={effectiveCompany}
-              extraPayload={{
-                receipt: {
-                  id: receiptRef,
-                  invoiceId: payment.invoiceId,
-                  paymentDate: payment.paymentDate,
-                  method: payment.method,
-                  transactionRef: payment.transactionRef || payment.reference || "",
-                  amountFormatted: formattedAmount,
-                },
-              }}
-              buildPdfAttachment={() => generateReceiptPdfBase64(payment, effectiveCompany)}
-              successToastPrefix={`Quittance ${receiptRef} envoyée par email`}
-              onClose={() => setIsEmailComposerOpen(false)}
-              onToast={onToast}
-            />
-          </div>
-        )}
+        {/* Zone scrollable unique (composeur email + quittance) */}
+        <div className="flex-1 overflow-y-auto overscroll-contain print:overflow-visible">
+          {/* Panneau d'envoi réel par email avec quittance PDF jointe */}
+          {isEmailComposerOpen && (
+            <div className="px-4 sm:px-6 py-4 sm:py-5 bg-slate-50 border-b border-slate-200 animate-in fade-in duration-150 print:hidden">
+              <DocumentEmailComposer
+                title={`Envoyer la quittance ${receiptRef} par email avec PDF`}
+                subtitle="Confirmation officielle d'encaissement envoyée avec la quittance certifiée en pièce jointe"
+                defaultTo={resolvedRecipientEmail}
+                toName={payment.clientName}
+                defaultSubject={defaultEmailSubject}
+                defaultMessage={defaultEmailMessage}
+                attachmentLabel="Joindre la quittance officielle PDF"
+                emailType="receipt_pdf"
+                companyInfo={effectiveCompany}
+                extraPayload={{
+                  receipt: {
+                    id: receiptRef,
+                    invoiceId: payment.invoiceId,
+                    paymentDate: payment.paymentDate,
+                    method: payment.method,
+                    transactionRef: payment.transactionRef || payment.reference || "",
+                    amountFormatted: formattedAmount,
+                  },
+                }}
+                buildPdfAttachment={() => generateReceiptPdfBase64(payment, effectiveCompany)}
+                successToastPrefix={`Quittance ${receiptRef} envoyée par email`}
+                onClose={() => setIsEmailComposerOpen(false)}
+                onToast={onToast}
+              />
+            </div>
+          )}
 
-        {/* Corps du Document Quittance (Prêt pour Impression et PDF) */}
-        <div
-          ref={printRef}
-          className="p-6 sm:p-10 overflow-y-auto space-y-6 bg-white text-slate-900 print:p-8"
-        >
+          {/* Corps du Document Quittance (Prêt pour Impression et PDF) */}
+          <div
+            ref={printRef}
+            className="p-4 sm:p-10 space-y-6 bg-white text-slate-900 print:p-8"
+          >
           {/* En-tête officiel de l'Entreprise Émettrice */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b-2 border-slate-100">
             <div className="flex items-start gap-4">
@@ -359,10 +361,11 @@ export default function PaymentReceiptModal({
             </div>
           </div>
 
+          </div>
         </div>
 
         {/* Pied de modale interactif */}
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between print:hidden">
+        <div className="shrink-0 px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 print:hidden">
           <div className="text-xs text-slate-500">
             Quittance horodatée électroniquement le {payment.paymentDate}
           </div>
