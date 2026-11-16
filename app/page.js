@@ -140,9 +140,43 @@ const STORAGE_KEY_INVOICES = "facturx_invoices_v3";
 const STORAGE_KEY_CLIENTS = "facturx_clients_v3";
 const STORAGE_KEY_QUOTES = "facturx_quotes_v3";
 const STORAGE_KEY_PAYMENTS = "facturx_payments_v3";
+const STORAGE_KEY_ACTIVE_TAB = "facturx_active_tab_v3";
+const VALID_TABS = new Set([
+  "dashboard",
+  "invoices",
+  "company",
+  "clients",
+  "quotes",
+  "payments",
+  "employees",
+  "analytics",
+  "reports",
+  "pricing",
+  "settings",
+]);
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTabState] = useState("dashboard");
+
+  const setActiveTab = (nextTab) => {
+    const resolved = typeof nextTab === "function" ? nextTab(activeTab) : nextTab;
+    const validTab = VALID_TABS.has(resolved) ? resolved : "dashboard";
+    setActiveTabState(validTab);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, validTab);
+        const url = new URL(window.location.href);
+        if (validTab === "dashboard") {
+          url.searchParams.delete("tab");
+        } else {
+          url.searchParams.set("tab", validTab);
+        }
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      } catch {
+        // Ignorer si storage/history indisponible
+      }
+    }
+  };
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
@@ -233,6 +267,19 @@ export default function App() {
         const savedAccent = localStorage.getItem("facturx_accent");
         if (savedAccent) {
           document.documentElement.dataset.accent = savedAccent;
+        }
+
+        // Restaurer la page / onglet actif avant le rafraîchissement
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlTab = urlParams.get("tab");
+        const savedTab = localStorage.getItem(STORAGE_KEY_ACTIVE_TAB);
+        const restoredTab = VALID_TABS.has(urlTab)
+          ? urlTab
+          : VALID_TABS.has(savedTab)
+          ? savedTab
+          : "dashboard";
+        if (restoredTab !== "dashboard") {
+          setActiveTabState(restoredTab);
         }
 
         // Initialiser ou charger le profil utilisateur
@@ -1690,9 +1737,12 @@ export default function App() {
         STORAGE_KEY_COMPANY,
         STORAGE_KEY_ACCOUNT_BASELINE,
         "facturx_settings_v3",
+        "facturx_settings_tab_v3",
         "facturx_team_v3",
+        STORAGE_KEY_ACTIVE_TAB,
       ].forEach((k) => localStorage.removeItem(k));
     }
+    setActiveTab("dashboard");
     setUserProfile(null);
     showToast("Session déconnectée. Veuillez vous identifier pour continuer.", "info");
   };

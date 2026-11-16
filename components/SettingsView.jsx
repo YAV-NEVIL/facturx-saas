@@ -85,8 +85,31 @@ export default function SettingsView({
   const isSettingsTabRestrictedOnFree = (tabId) =>
     isFreePlan &&
     ["gateways", "notifications", "templates", "team", "audit_data"].includes(tabId);
-  // Navigation entre les sous-onglets des paramètres
-  const [activeSettingsTab, setActiveSettingsTab] = useState("appearance");
+  // Navigation entre les sous-onglets des paramètres (persistée au rafraîchissement)
+  const [activeSettingsTab, setActiveSettingsTabState] = useState("appearance");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const savedSubTab = localStorage.getItem("facturx_settings_tab_v3");
+      if (savedSubTab) {
+        setActiveSettingsTabState(savedSubTab);
+      }
+    } catch {
+      // Ignorer
+    }
+  }, []);
+
+  const setActiveSettingsTab = (tabId) => {
+    setActiveSettingsTabState(tabId);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("facturx_settings_tab_v3", tabId);
+      } catch {
+        // Ignorer
+      }
+    }
+  };
   const [copiedKey, setCopiedKey] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
