@@ -23,7 +23,40 @@ import {
   UserCheck,
   BarChart3,
   Package,
+  Send,
+  Loader2,
 } from "lucide-react";
+
+const EMPLOYEE_ROLE_META = {
+  admin: {
+    id: "admin",
+    title: "Administrateur",
+    fullTitle: "Administrateur Général",
+    badge: "Propriétaire",
+    desc: "Accès total sans restriction",
+  },
+  comptable: {
+    id: "comptable",
+    title: "Responsable Comptable",
+    fullTitle: "Responsable Comptable",
+    badge: "Comptabilité",
+    desc: "Factures, Devis, Paiements & TVA",
+  },
+  commercial: {
+    id: "commercial",
+    title: "Chargé Commercial",
+    fullTitle: "Chargé Commercial",
+    badge: "Commercial",
+    desc: "Devis, CRM Clients",
+  },
+  gestionnaire_stock: {
+    id: "gestionnaire_stock",
+    title: "Gestionnaire Stock",
+    fullTitle: "Gestionnaire de Stock",
+    badge: "Gestionnaire Stock",
+    desc: "Articles, Devis, Facturation",
+  },
+};
 
 export default function EmployeesView({
   currentUser,
@@ -49,6 +82,9 @@ export default function EmployeesView({
   const [newMemberPhone, setNewMemberPhone] = useState("+243 ");
   const [newMemberRole, setNewMemberRole] = useState("comptable");
   const [newMemberPassword, setNewMemberPassword] = useState("");
+  const [sendInviteEmail, setSendInviteEmail] = useState(true);
+  const [includePasswordInInvite, setIncludePasswordInInvite] = useState(false);
+  const [resendingMemberId, setResendingMemberId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Vérification stricte du rôle Administrateur
@@ -135,6 +171,79 @@ export default function EmployeesView({
   const adminEmployees = teamMembers.filter((m) => m.role === "admin").length;
   const operationalEmployees = totalEmployees - adminEmployees;
 
+  const sendEmployeeInvitationEmail = async (memberData, temporaryPassword = "") => {
+    const roleMeta = EMPLOYEE_ROLE_META[memberData.role] || EMPLOYEE_ROLE_META.comptable;
+    const companyName = companyInfo?.name || currentUser?.companyName || "FacturX";
+    const inviterName = currentUser?.fullName || currentUser?.name || "L'administrateur";
+    const loginUrl =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "https://facturx-saas.vercel.app";
+
+    const messageLines = [
+      `Bonjour ${memberData.name},`,
+      "",
+      `${inviterName} vous a ajouté comme collaborateur au sein de l'espace FacturX de « ${companyName} ».`,
+      `Votre poste attribué est : ${roleMeta.fullTitle} (${roleMeta.desc}).`,
+      "",
+      temporaryPassword
+        ? `Vous pouvez vous connecter dès maintenant avec votre email (${memberData.email}) et votre mot de passe provisoire indiqué ci-dessous.`
+        : `Connectez-vous avec votre adresse email (${memberData.email}) et le mot de passe provisoire communiqué par votre administrateur.`,
+      "",
+      `Lien de connexion : ${loginUrl}`,
+    ];
+
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "employee_invite",
+        to: memberData.email,
+        toName: memberData.name,
+        subject: `Invitation FacturX — Rejoignez ${companyName}`,
+        message: messageLines.join("\n"),
+        replyTo: companyInfo?.email || currentUser?.email || "",
+        companyInfo: companyInfo || { name: companyName },
+        employee: {
+          name: memberData.name,
+          email: memberData.email,
+          role: memberData.role,
+          roleLabel: roleMeta.fullTitle,
+          permissionsDesc: roleMeta.desc,
+          invitedBy: inviterName,
+          loginUrl,
+          temporaryPassword: temporaryPassword || undefined,
+        },
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok && Boolean(data.sentAutomatically), data };
+  };
+
+  const handleResendInvite = async (member) => {
+    if (!member?.email) return;
+    setResendingMemberId(member.id || member.email);
+    try {
+      const result = await sendEmployeeInvitationEmail(member);
+      if (result.ok) {
+        if (onToast) {
+          onToast(`Invitation renvoyée par email à ${member.email} !`, "success");
+        }
+      } else if (onToast) {
+        onToast(
+          result.data?.error || "Impossible d'envoyer l'email d'invitation automatiquement.",
+          "error"
+        );
+      }
+    } catch (err) {
+      console.error("Erreur renvoi invitation:", err);
+      if (onToast) onToast("Erreur réseau lors de l'envoi de l'invitation.", "error");
+    } finally {
+      setResendingMemberId(null);
+    }
+  };
+
   // Soumission du formulaire d'ajout
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
@@ -145,24 +254,35 @@ export default function EmployeesView({
 
     setIsSubmitting(true);
     try {
-      const badge =
-        newMemberRole === "admin"
-          ? "Propriétaire"
-          : newMemberRole === "comptable"
-          ? "Comptabilité"
-          : newMemberRole === "commercial"
-          ? "Commercial"
-          : "Gestionnaire Stock";
-
-      await onCreateMember({
+      const roleMeta = EMPLOYEE_ROLE_META[newMemberRole] || EMPLOYEE_ROLE_META.comptable;
+      const memberPayload = {
         name: newMemberName.trim(),
         email: newMemberEmail.trim().toLowerCase(),
         phone: newMemberPhone.trim(),
         password: newMemberPassword.trim(),
         role: newMemberRole,
-        badge: badge,
+        badge: roleMeta.badge,
         status: "Invité",
-      });
+      };
+
+      await onCreateMember(memberPayload);
+
+      let inviteSent = false;
+      let inviteError = null;
+      if (sendInviteEmail) {
+        try {
+          const inviteRes = await sendEmployeeInvitationEmail(
+            memberPayload,
+            includePasswordInInvite ? newMemberPassword.trim() : ""
+          );
+          inviteSent = inviteRes.ok;
+          if (!inviteRes.ok) {
+            inviteError = inviteRes.data?.error || "Passerelle email indisponible";
+          }
+        } catch (inviteErr) {
+          inviteError = inviteErr.message;
+        }
+      }
 
       setIsCreateModalOpen(false);
       setNewMemberName("");
@@ -170,7 +290,24 @@ export default function EmployeesView({
       setNewMemberPhone("+243 ");
       setNewMemberPassword("");
       setNewMemberRole("comptable");
-      if (onToast) onToast("Collaborateur créé et ajouté à votre organisation !", "success");
+      setSendInviteEmail(true);
+      setIncludePasswordInInvite(false);
+
+      if (onToast) {
+        if (sendInviteEmail && inviteSent) {
+          onToast(
+            `Collaborateur créé et invitation envoyée à ${memberPayload.email} !`,
+            "success"
+          );
+        } else if (sendInviteEmail && inviteError) {
+          onToast(
+            `Collaborateur créé, mais l'email d'invitation n'a pas pu partir (${inviteError}).`,
+            "info"
+          );
+        } else {
+          onToast("Collaborateur créé et ajouté à votre organisation !", "success");
+        }
+      }
     } catch (err) {
       console.error("Erreur création employé:", err);
       if (onToast) onToast(err.message || "Erreur lors de la création de l'employé.", "error");
@@ -499,6 +636,21 @@ export default function EmployeesView({
                       {/* Actions */}
                       <td className="py-4 px-6 text-right">
                         <div className="inline-flex items-center gap-1">
+                          {!isCurrentUser && member.email && (
+                            <button
+                              type="button"
+                              onClick={() => handleResendInvite(member)}
+                              disabled={resendingMemberId === (member.id || member.email)}
+                              className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Envoyer / renvoyer l'email d'invitation"
+                            >
+                              {resendingMemberId === (member.id || member.email) ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
                           {/* Supprimer (si ce n'est pas le compte actif) */}
                           {!isCurrentUser && (
                             <button
@@ -610,28 +762,20 @@ export default function EmployeesView({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[
                     {
-                      id: "admin",
-                      title: "Administrateur",
+                      ...EMPLOYEE_ROLE_META.admin,
                       icon: <Shield className="w-3.5 h-3.5 text-purple-600 shrink-0" />,
-                      desc: "Accès total sans restriction",
                     },
                     {
-                      id: "comptable",
-                      title: "Responsable Comptable",
+                      ...EMPLOYEE_ROLE_META.comptable,
                       icon: <BarChart3 className="w-3.5 h-3.5 text-blue-600 shrink-0" />,
-                      desc: "Factures, Devis, Paiements & TVA",
                     },
                     {
-                      id: "commercial",
-                      title: "Chargé Commercial",
+                      ...EMPLOYEE_ROLE_META.commercial,
                       icon: <Briefcase className="w-3.5 h-3.5 text-emerald-600 shrink-0" />,
-                      desc: "Devis, CRM Clients",
                     },
                     {
-                      id: "gestionnaire_stock",
-                      title: "Gestionnaire Stock",
+                      ...EMPLOYEE_ROLE_META.gestionnaire_stock,
                       icon: <Package className="w-3.5 h-3.5 text-amber-600 shrink-0" />,
-                      desc: "Articles, Devis, Facturation",
                     },
                   ].map((r) => (
                     <div
@@ -651,6 +795,36 @@ export default function EmployeesView({
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Options d'invitation automatique par email */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+                <label className="flex items-start gap-2.5 cursor-pointer text-xs font-bold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={sendInviteEmail}
+                    onChange={(e) => setSendInviteEmail(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span>
+                    Envoyer automatiquement un email d&apos;invitation au collaborateur
+                    <span className="block text-[11px] font-medium text-slate-500 mt-0.5">
+                      Transmet son email de connexion, son poste et le lien vers votre espace FacturX.
+                    </span>
+                  </span>
+                </label>
+
+                {sendInviteEmail && (
+                  <label className="flex items-center gap-2.5 pl-6 cursor-pointer text-[11px] font-semibold text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={includePasswordInInvite}
+                      onChange={(e) => setIncludePasswordInInvite(e.target.checked)}
+                      className="w-3.5 h-3.5 text-blue-600 rounded"
+                    />
+                    <span>Inclure le mot de passe provisoire dans l&apos;email d&apos;invitation</span>
+                  </label>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">

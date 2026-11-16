@@ -34,6 +34,7 @@ export async function POST(request) {
       quote = null,
       receipt = null,
       report = null,
+      employee = null,
       attachment = null, // { filename, base64 }
       reminderLevel = "niveau2",
       goldForm = null,
@@ -200,6 +201,7 @@ export async function POST(request) {
       quote_pdf: quote?.id ? `Devis commercial ${quote.id} — ${coName}` : null,
       receipt_pdf: receipt?.id ? `Quittance officielle ${receipt.id} — ${coName}` : null,
       report_pdf: report?.title ? `[FacturX] ${report.title} — ${coName}` : null,
+      employee_invite: `Invitation à rejoindre ${coName} sur FacturX`,
     };
 
     const finalSubject =
@@ -228,6 +230,11 @@ export async function POST(request) {
         label: "Rapport Financier • Certifié OHADA / DGI",
         bg: "#eef2ff",
         color: "#4338ca",
+      },
+      employee_invite: {
+        label: "Invitation Équipe • Nouvel Accès",
+        bg: "#eff6ff",
+        color: "#1d4ed8",
       },
     };
 
@@ -313,7 +320,35 @@ export async function POST(request) {
         { label: "Volume analysé", value: report.rowCountLabel },
         { label: "Total consolidé", value: report.totalFormatted },
       ]);
+    } else if (employee) {
+      docMetaHtml = buildMetaBox(`Vos identifiants d'accès — ${coName}`, [
+        { label: "Organisation", value: coName },
+        { label: "Email de connexion", value: employee.email || to },
+        { label: "Poste attribué", value: employee.roleLabel || employee.role },
+        { label: "Habilitations", value: employee.permissionsDesc },
+        { label: "Invité par", value: employee.invitedBy },
+        employee.temporaryPassword
+          ? {
+              label: "Mot de passe provisoire",
+              value: employee.temporaryPassword,
+              rawHtml: `<span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 6px; font-weight: 700;">${escapeHtml(
+                employee.temporaryPassword
+              )}</span>`,
+            }
+          : null,
+      ]);
     }
+
+    const employeeActionHtml =
+      employee && (employee.loginUrl || appUrl)
+        ? `<div style="margin: 20px 0;">
+            <a href="${escapeHtml(
+              employee.loginUrl || appUrl
+            )}" style="display: inline-block; padding: 12px 22px; background: #183BB0; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 13px;">
+              Accéder à mon espace FacturX
+            </a>
+          </div>`
+        : "";
 
     const htmlBody = `<div style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 16px; color: #0f172a; background: #ffffff;">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 14px;">
@@ -326,6 +361,7 @@ export async function POST(request) {
         ${safeMessageHtml}
       </div>
       ${docMetaHtml}
+      ${employeeActionHtml}
       ${
         hasAttachment
           ? `<div style="margin-top: 14px; padding: 10px 14px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; font-size: 12px; color: #065f46; font-weight: 700;">
