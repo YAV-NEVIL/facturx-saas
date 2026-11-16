@@ -28,7 +28,8 @@ import {
   Info,
 } from "lucide-react";
 import { formatAmount, getCurrencySymbol, calculateInvoiceTotals } from "@/lib/mock-data";
-import { generateReportPdf } from "@/lib/pdf-generator";
+import { generateReportPdf, generateReportPdfBase64 } from "@/lib/pdf-generator";
+import DocumentEmailComposer from "@/components/DocumentEmailComposer";
 
 export default function ReportPreviewModal({
   isOpen,
@@ -40,6 +41,7 @@ export default function ReportPreviewModal({
   data = [],
   currency = "FC",
   onExportXLSX,
+  onToast,
 }) {
   const printAreaRef = useRef(null);
 
@@ -51,10 +53,7 @@ export default function ReportPreviewModal({
 
   // Formulaires de partage
   const [whatsappPhone, setWhatsappPhone] = useState("");
-  const [emailRecipient, setEmailRecipient] = useState("");
-  const [emailSubject, setEmailSubject] = useState("");
   const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
-  const [copiedEmail, setCopiedEmail] = useState(false);
 
   if (!isOpen) return null;
 
@@ -164,24 +163,6 @@ Cordialement,
 ${userProfile.name || "Administration FacturX"}
 ${compName} — Service Financier & Recouvrement
 Tél : ${compPhone} • Email : ${compEmail}`;
-  };
-
-  const handleOpenEmail = () => {
-    const subject = emailSubject.trim() || defaultEmailSubject;
-    const body = getEmailBody();
-    const recipient = emailRecipient.trim();
-    const mailto = recipient
-      ? `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(
-        subject
-      )}&body=${encodeURIComponent(body)}`
-      : `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailto;
-  };
-
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(getEmailBody());
-    setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2500);
   };
 
   return (
@@ -667,90 +648,46 @@ Tél : ${compPhone} • Email : ${compEmail}`;
             </div>
 
             {/* Contenu */}
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Adresse email du destinataire
-                </label>
-                <input
-                  type="email"
-                  value={emailRecipient}
-                  onChange={(e) => setEmailRecipient(e.target.value)}
-                  placeholder="directeur.financier@entreprise.cd, contact@client.com..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Objet du message
-                </label>
-                <input
-                  type="text"
-                  value={emailSubject || defaultEmailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Corps de l&apos;email officiel
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    Pré-rédigé
-                  </span>
-                </div>
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-[11px] font-mono text-slate-700 whitespace-pre-wrap max-h-44 overflow-y-auto leading-relaxed">
-                  {getEmailBody()}
-                </div>
-              </div>
-
-              <div className="p-3 bg-blue-50/80 border border-blue-200/80 rounded-xl flex items-start gap-2.5">
-                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-blue-800 leading-relaxed">
-                  <strong>Pensez à joindre le PDF :</strong> Téléchargez le PDF du rapport via le
-                  bouton rouge avant de cliquer sur ouvrir pour pouvoir l&apos;attacher à votre
-                  email.
-                </p>
-              </div>
-            </div>
-
-            {/* Footer actions */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-              <button
-                onClick={handleCopyEmail}
-                className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl border border-slate-200 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                {copiedEmail ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-emerald-700 font-bold">Copié !</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copier le texte</span>
-                  </>
-                )}
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsEmailModalOpen(false)}
-                  className="px-3 py-2 text-slate-600 hover:text-slate-800 font-semibold text-xs rounded-xl"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleOpenEmail}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>Ouvrir dans ma messagerie</span>
-                </button>
-              </div>
+            <div className="p-6">
+              <DocumentEmailComposer
+                title="Envoi officiel du rapport avec PDF OHADA / DGI"
+                subtitle={`Réf. d'audit : ${auditId} • ${data.length} enregistrement(s) • ${formatAmount(
+                  totalConsolidated,
+                  currency
+                )}`}
+                defaultTo=""
+                toName="Direction Financière"
+                defaultSubject={defaultEmailSubject}
+                defaultMessage={getEmailBody()}
+                attachmentLabel="Joindre le rapport officiel PDF"
+                emailType="report_pdf"
+                companyInfo={companyInfo}
+                extraPayload={{
+                  report: {
+                    title: reportTitle,
+                    auditId,
+                    printDate,
+                    rowCountLabel: `${data.length} enregistrement(s)`,
+                    totalFormatted: formatAmount(totalConsolidated, currency),
+                  },
+                }}
+                buildPdfAttachment={() =>
+                  generateReportPdfBase64({
+                    title: reportTitle,
+                    reportType,
+                    companyInfo,
+                    userProfile,
+                    data,
+                    currency,
+                    auditId,
+                    printDate,
+                  })
+                }
+                successToastPrefix={`Rapport « ${reportTitle} » envoyé par email`}
+                onToast={onToast}
+                showCopyButton={true}
+                recipientPlaceholder="directeur.financier@entreprise.cd"
+              />
             </div>
           </div>
         </div>

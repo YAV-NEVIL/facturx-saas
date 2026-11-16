@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   X,
   Printer,
@@ -19,23 +19,42 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { formatAmount, numberToFrenchWords, defaultCompanyInfo, getCurrencySymbol } from "@/lib/mock-data";
-import { generateReceiptPdf } from "@/lib/pdf-generator";
+import { generateReceiptPdf, generateReceiptPdfBase64 } from "@/lib/pdf-generator";
+import DocumentEmailComposer from "@/components/DocumentEmailComposer";
 
 export default function PaymentReceiptModal({
   isOpen,
   onClose,
   payment,
   companyInfo = defaultCompanyInfo,
+  defaultRecipientEmail = "",
+  onToast,
   onOpenInvoice,
   onOpenClientProfile,
 }) {
   const printRef = useRef(null);
+  const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
+
+  useEffect(() => {
+    setIsEmailComposerOpen(false);
+  }, [payment?.id, isOpen]);
 
   if (!isOpen || !payment) return null;
 
   const effectiveCompany = companyInfo || defaultCompanyInfo;
   const currencySymbol = getCurrencySymbol(payment.currency || effectiveCompany.defaultCurrency || effectiveCompany.currencySymbol || "FC");
   const currencyWords = { FC: "Francs Congolais", $: "Dollars Américains", "€": "Euros", "£": "Livres Sterling", FCFA: "Francs CFA" }[currencySymbol] || currencySymbol;
+  const receiptRef = payment.receiptNumber || payment.id;
+  const resolvedRecipientEmail = payment.clientEmail || defaultRecipientEmail || "";
+  const formattedAmount = formatAmount(payment.amount, currencySymbol);
+  const defaultEmailSubject = `Quittance officielle ${receiptRef} — ${effectiveCompany.name}`;
+  const defaultEmailMessage = `Bonjour ${
+    payment.contactPerson || payment.clientName || ""
+  },\n\nNous vous confirmons la bonne réception de votre règlement de ${formattedAmount} (${
+    payment.method || "Paiement"
+  }) relatif à la facture ${payment.invoiceId || ""}.\n\nVous trouverez ci-joint votre quittance officielle d'encaissement N° ${receiptRef} au format PDF.\n\nCordialement,\n${
+    effectiveCompany.name
+  }`;
 
   // Impression native de la quittance
   const handlePrint = () => {
@@ -69,31 +88,75 @@ export default function PaymentReceiptModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => generateReceiptPdf(payment, effectiveCompany)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-600/20"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
               title="Télécharger la quittance au format PDF vectoriel officiel"
             >
               <Download className="w-4 h-4" />
               <span>Télécharger PDF</span>
             </button>
             <button
+              type="button"
+              onClick={() => setIsEmailComposerOpen((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer ${
+                isEmailComposerOpen
+                  ? "bg-indigo-700 ring-2 ring-indigo-300"
+                  : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20"
+              }`}
+              title="Envoyer la quittance PDF par email au client"
+            >
+              <Mail className="w-4 h-4" />
+              <span>Envoyer par Email</span>
+            </button>
+            <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/20"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/20 cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               <span>Imprimer</span>
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
               aria-label="Fermer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
+
+        {/* Panneau d'envoi réel par email avec quittance PDF jointe */}
+        {isEmailComposerOpen && (
+          <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 animate-in fade-in duration-150 print:hidden">
+            <DocumentEmailComposer
+              title={`Envoyer la quittance ${receiptRef} par email avec PDF`}
+              subtitle="Confirmation officielle d'encaissement envoyée avec la quittance certifiée en pièce jointe"
+              defaultTo={resolvedRecipientEmail}
+              toName={payment.clientName}
+              defaultSubject={defaultEmailSubject}
+              defaultMessage={defaultEmailMessage}
+              attachmentLabel="Joindre la quittance officielle PDF"
+              emailType="receipt_pdf"
+              companyInfo={effectiveCompany}
+              extraPayload={{
+                receipt: {
+                  id: receiptRef,
+                  invoiceId: payment.invoiceId,
+                  paymentDate: payment.paymentDate,
+                  method: payment.method,
+                  transactionRef: payment.transactionRef || payment.reference || "",
+                  amountFormatted: formattedAmount,
+                },
+              }}
+              buildPdfAttachment={() => generateReceiptPdfBase64(payment, effectiveCompany)}
+              successToastPrefix={`Quittance ${receiptRef} envoyée par email`}
+              onClose={() => setIsEmailComposerOpen(false)}
+              onToast={onToast}
+            />
+          </div>
+        )}
 
         {/* Corps du Document Quittance (Prêt pour Impression et PDF) */}
         <div

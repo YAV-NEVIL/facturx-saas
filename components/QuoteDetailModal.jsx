@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   Printer,
@@ -20,6 +20,8 @@ import {
   Share2,
 } from "lucide-react";
 import { calculateInvoiceTotals, defaultCompanyInfo, formatAmount } from "@/lib/mock-data";
+import { generateQuotePdf, generateQuotePdfBase64 } from "@/lib/pdf-generator";
+import DocumentEmailComposer from "@/components/DocumentEmailComposer";
 
 export default function QuoteDetailModal({
   quote,
@@ -28,11 +30,36 @@ export default function QuoteDetailModal({
   onConvertToInvoice,
   onUpdateStatus,
   companyInfo = defaultCompanyInfo,
+  clients = [],
+  onToast,
 }) {
+  const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
+
+  useEffect(() => {
+    setIsEmailComposerOpen(false);
+  }, [quote?.id, isOpen]);
+
   if (!isOpen || !quote) return null;
 
   const activeCompany = companyInfo || defaultCompanyInfo;
   const { subtotal, vatAmount, total } = calculateInvoiceTotals(quote.items, quote.vatRate);
+  const matchedClient = Array.isArray(clients)
+    ? clients.find(
+        (c) =>
+          c.id === quote.clientId ||
+          (c.name && quote.clientName && c.name.toLowerCase() === quote.clientName.toLowerCase())
+      )
+    : null;
+  const recipientEmail = quote.clientEmail || matchedClient?.email || "";
+  const formattedTotal = formatAmount(total, activeCompany.defaultCurrency);
+  const defaultEmailSubject = `Devis commercial ${quote.id} — ${activeCompany.name}`;
+  const defaultEmailMessage = `Bonjour ${
+    quote.contactPerson || quote.clientName || ""
+  },\n\nVeuillez trouver ci-joint notre devis commercial N° ${quote.id} d'un montant de ${formattedTotal} TTC, valable jusqu'au ${
+    quote.validUntil || "30 jours"
+  }.\n\nNous restons à votre entière disposition pour toute question ou validation.\n\nCordialement,\n${
+    activeCompany.name
+  }`;
 
   const cleanPhone = (quote.clientPhone || "").replace(/[^0-9]/g, "");
   const whatsappMessage = `Bonjour ${quote.contactPerson || quote.clientName}, voici notre proposition chiffrée N° ${
@@ -140,6 +167,30 @@ export default function QuoteDetailModal({
 
             <button
               type="button"
+              onClick={() => generateQuotePdf(quote, activeCompany)}
+              className="px-3 py-2 bg-[#2D60FF] hover:bg-[#1E4FE8] text-white text-xs font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="Télécharger le devis au format PDF"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsEmailComposerOpen((prev) => !prev)}
+              className={`px-3 py-2 text-white text-xs font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer ${
+                isEmailComposerOpen
+                  ? "bg-emerald-700 ring-2 ring-emerald-300"
+                  : "bg-indigo-600 hover:bg-indigo-700"
+              }`}
+              title="Envoyer le devis par email avec le PDF en pièce jointe"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              <span>Envoyer par Email</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => window.print()}
               className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
               title="Imprimer / Enregistrer en PDF"
@@ -155,6 +206,35 @@ export default function QuoteDetailModal({
             </button>
           </div>
         </div>
+
+        {/* Panneau d'envoi réel d'email avec PDF du devis */}
+        {isEmailComposerOpen && (
+          <div className="px-6 py-5 bg-slate-50 border-b border-slate-200 animate-in fade-in duration-150">
+            <DocumentEmailComposer
+              title={`Envoyer le devis ${quote.id} par email avec PDF`}
+              subtitle="Transmission directe de la proposition commerciale au client avec pièce jointe PDF"
+              defaultTo={recipientEmail}
+              toName={quote.clientName}
+              defaultSubject={defaultEmailSubject}
+              defaultMessage={defaultEmailMessage}
+              attachmentLabel="Joindre le devis commercial PDF"
+              emailType="quote_pdf"
+              companyInfo={activeCompany}
+              extraPayload={{
+                quote: {
+                  id: quote.id,
+                  clientName: quote.clientName,
+                  validUntil: quote.validUntil,
+                  totalFormatted: formattedTotal,
+                },
+              }}
+              buildPdfAttachment={() => generateQuotePdfBase64(quote, activeCompany)}
+              successToastPrefix={`Devis ${quote.id} envoyé par email`}
+              onClose={() => setIsEmailComposerOpen(false)}
+              onToast={onToast}
+            />
+          </div>
+        )}
 
         {/* Document Officiel du Devis (Format Feuille A4 élégant) */}
         <div className="p-6 sm:p-8 overflow-y-auto space-y-6 bg-white text-slate-800">

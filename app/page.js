@@ -3877,6 +3877,7 @@ export default function App() {
                 setSelectedClientForProfile(clientObj);
               }}
               onNavigateToInvoices={() => setActiveTab("invoices")}
+              onToast={showToast}
             />
           )}
 
@@ -4114,6 +4115,8 @@ export default function App() {
         onConvertToInvoice={handleConvertQuoteToInvoice}
         onUpdateStatus={handleUpdateQuoteStatus}
         companyInfo={companyInfo}
+        clients={clients}
+        onToast={showToast}
       />
 
       {/* Confirmation Modal pour Rétablir par défaut */}

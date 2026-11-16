@@ -52,6 +52,7 @@ export default function PaymentsView({
   onOpenInvoice,
   onOpenClientProfile,
   onNavigateToInvoices,
+  onToast,
 }) {
   const __cur = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   // Filtres locaux
@@ -772,6 +773,20 @@ export default function PaymentsView({
         onClose={() => setSelectedPaymentForReceipt(null)}
         payment={selectedPaymentForReceipt}
         companyInfo={companyInfo}
+        defaultRecipientEmail={
+          selectedPaymentForReceipt
+            ? selectedPaymentForReceipt.clientEmail ||
+              invoices.find((inv) => inv.id === selectedPaymentForReceipt.invoiceId)?.clientEmail ||
+              clients.find(
+                (c) =>
+                  c.name &&
+                  selectedPaymentForReceipt.clientName &&
+                  c.name.toLowerCase() === selectedPaymentForReceipt.clientName.toLowerCase()
+              )?.email ||
+              ""
+            : ""
+        }
+        onToast={onToast}
         onOpenInvoice={onOpenInvoice}
         onOpenClientProfile={onOpenClientProfile}
       />

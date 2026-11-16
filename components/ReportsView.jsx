@@ -1742,6 +1742,7 @@ export default function ReportsView({
         data={previewConfig.data}
         currency={currency}
         onExportXLSX={handleExportCurrentView}
+        onToast={onToast}
       />
     </div>
   );

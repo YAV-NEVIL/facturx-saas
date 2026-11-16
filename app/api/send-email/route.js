@@ -31,6 +31,9 @@ export async function POST(request) {
       replyTo = "",
       companyInfo = null,
       invoice = null,
+      quote = null,
+      receipt = null,
+      report = null,
       attachment = null, // { filename, base64 }
       reminderLevel = "niveau2",
       goldForm = null,
@@ -192,61 +195,125 @@ export async function POST(request) {
       companyInfo?.waveNumber ||
       "";
 
+    const defaultSubjectsByType = {
+      invoice_pdf: invoice?.id ? `Facture normalisée ${invoice.id} — ${coName}` : null,
+      quote_pdf: quote?.id ? `Devis commercial ${quote.id} — ${coName}` : null,
+      receipt_pdf: receipt?.id ? `Quittance officielle ${receipt.id} — ${coName}` : null,
+      report_pdf: report?.title ? `[FacturX] ${report.title} — ${coName}` : null,
+    };
+
     const finalSubject =
-      subject ||
-      (type === "invoice_pdf" && invoice?.id
-        ? `Facture normalisée ${invoice.id} — ${coName}`
-        : `Communication de ${coName}`);
+      subject || defaultSubjectsByType[type] || `Communication de ${coName}`;
 
     const safeMessageHtml = escapeHtml(message).replace(/\n/g, "<br/>");
     const hasAttachment = Boolean(attachment?.filename && attachment?.base64);
 
-    let badgeLabel = "Facture Normalisée DGI • SFE";
-    let badgeBg = "#eff6ff";
-    let badgeColor = "#1d4ed8";
+    const DOCUMENT_BADGES = {
+      invoice_pdf: {
+        label: "Facture Normalisée DGI • SFE",
+        bg: "#eff6ff",
+        color: "#1d4ed8",
+      },
+      quote_pdf: {
+        label: "Devis / Proposition Commerciale",
+        bg: "#eef2ff",
+        color: "#4338ca",
+      },
+      receipt_pdf: {
+        label: "Quittance Officielle • Règlement Encaissé",
+        bg: "#ecfdf5",
+        color: "#047857",
+      },
+      report_pdf: {
+        label: "Rapport Financier • Certifié OHADA / DGI",
+        bg: "#eef2ff",
+        color: "#4338ca",
+      },
+    };
 
-    if (type === "reminder") {
-      if (reminderLevel === "niveau3") {
-        badgeLabel = "Mise en demeure • Recouvrement Urgent";
-        badgeBg = "#fff1f2";
-        badgeColor = "#be123c";
-      } else if (reminderLevel === "niveau2") {
-        badgeLabel = "Relance de Règlement • Facture Échue";
-        badgeBg = "#fffbeb";
-        badgeColor = "#b45309";
-      } else {
-        badgeLabel = "Rappel Courtois d'Échéance";
-        badgeBg = "#eff6ff";
-        badgeColor = "#1d4ed8";
-      }
+    const REMINDER_BADGES = {
+      niveau3: {
+        label: "Mise en demeure • Recouvrement Urgent",
+        bg: "#fff1f2",
+        color: "#be123c",
+      },
+      niveau2: {
+        label: "Relance de Règlement • Facture Échue",
+        bg: "#fffbeb",
+        color: "#b45309",
+      },
+      niveau1: {
+        label: "Rappel Courtois d'Échéance",
+        bg: "#eff6ff",
+        color: "#1d4ed8",
+      },
+    };
+
+    const resolvedBadge =
+      type === "reminder"
+        ? REMINDER_BADGES[reminderLevel] || REMINDER_BADGES.niveau2
+        : DOCUMENT_BADGES[type] || DOCUMENT_BADGES.invoice_pdf;
+
+    const badgeLabel = resolvedBadge.label;
+    const badgeBg = resolvedBadge.bg;
+    const badgeColor = resolvedBadge.color;
+
+    const buildMetaBox = (title, rows) => {
+      const visibleRows = rows.filter((r) => r && r.value);
+      if (!title && visibleRows.length === 0) return "";
+      return `<div style="margin: 18px 0; padding: 14px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 13px; color: #334155;">
+        ${title ? `<div style="font-weight: 800; color: #0f172a; margin-bottom: 6px;">${escapeHtml(title)}</div>` : ""}
+        ${visibleRows
+          .map(
+            (r) =>
+              `<div><strong>${escapeHtml(r.label)} :</strong> ${
+                r.rawHtml ? r.rawHtml : escapeHtml(r.value)
+              }</div>`
+          )
+          .join("")}
+      </div>`;
+    };
+
+    let docMetaHtml = "";
+    if (invoice) {
+      docMetaHtml = buildMetaBox(`Récapitulatif de la pièce : ${invoice.id || ""}`, [
+        { label: "Montant TTC", value: invoice.totalFormatted },
+        { label: "Date d'échéance", value: invoice.dueDate },
+        invoice.dgiCodeDef
+          ? {
+              label: "Code DEF / DGI",
+              value: invoice.dgiCodeDef,
+              rawHtml: `<span style="font-family: monospace; color: #047857; font-weight: 700;">${escapeHtml(
+                invoice.dgiCodeDef
+              )}</span>`,
+            }
+          : null,
+        { label: "Banque", value: coBank },
+        { label: "Mobile Money", value: coMobile },
+      ]);
+    } else if (quote) {
+      docMetaHtml = buildMetaBox(`Proposition commerciale : ${quote.id || ""}`, [
+        { label: "Montant TTC", value: quote.totalFormatted },
+        { label: "Valable jusqu'au", value: quote.validUntil },
+        { label: "Banque", value: coBank },
+        { label: "Mobile Money", value: coMobile },
+      ]);
+    } else if (receipt) {
+      docMetaHtml = buildMetaBox(`Quittance d'encaissement : ${receipt.id || ""}`, [
+        { label: "Montant encaissé", value: receipt.amountFormatted },
+        { label: "Facture soldée / liée", value: receipt.invoiceId },
+        { label: "Date de valeur", value: receipt.paymentDate },
+        { label: "Canal de règlement", value: receipt.method },
+        { label: "Référence transaction", value: receipt.transactionRef },
+      ]);
+    } else if (report) {
+      docMetaHtml = buildMetaBox(`État financier : ${report.title || ""}`, [
+        { label: "Référence d'audit", value: report.auditId },
+        { label: "Date d'édition", value: report.printDate },
+        { label: "Volume analysé", value: report.rowCountLabel },
+        { label: "Total consolidé", value: report.totalFormatted },
+      ]);
     }
-
-    const invoiceMetaHtml = invoice
-      ? `<div style="margin: 18px 0; padding: 14px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 13px; color: #334155;">
-          <div style="font-weight: 800; color: #0f172a; margin-bottom: 6px;">Récapitulatif de la pièce : ${escapeHtml(
-            invoice.id || ""
-          )}</div>
-          ${
-            invoice.totalFormatted
-              ? `<div><strong>Montant TTC :</strong> ${escapeHtml(invoice.totalFormatted)}</div>`
-              : ""
-          }
-          ${
-            invoice.dueDate
-              ? `<div><strong>Date d'échéance :</strong> ${escapeHtml(invoice.dueDate)}</div>`
-              : ""
-          }
-          ${
-            invoice.dgiCodeDef
-              ? `<div><strong>Code DEF / DGI :</strong> <span style="font-family: monospace; color: #047857; font-weight: 700;">${escapeHtml(
-                  invoice.dgiCodeDef
-                )}</span></div>`
-              : ""
-          }
-          ${coBank ? `<div><strong>Banque :</strong> ${escapeHtml(coBank)}</div>` : ""}
-          ${coMobile ? `<div><strong>Mobile Money :</strong> ${escapeHtml(coMobile)}</div>` : ""}
-        </div>`
-      : "";
 
     const htmlBody = `<div style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 16px; color: #0f172a; background: #ffffff;">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 14px;">
@@ -258,7 +325,7 @@ export async function POST(request) {
       <div style="font-size: 14px; line-height: 1.65; color: #1e293b;">
         ${safeMessageHtml}
       </div>
-      ${invoiceMetaHtml}
+      ${docMetaHtml}
       ${
         hasAttachment
           ? `<div style="margin-top: 14px; padding: 10px 14px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; font-size: 12px; color: #065f46; font-weight: 700;">
