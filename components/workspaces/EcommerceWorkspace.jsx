@@ -245,17 +245,22 @@ export default function EcommerceWorkspace({
       .sort((a, b) => b.revenue - a.revenue || b.quantity - a.quantity)
       .slice(0, 5);
 
-    const pipelineStages = ["nouvelle", "confirmee", "en_preparation", "expediee", "livree"].map(
-      (key) => {
-        const list = activeOrders.filter((o) => o.orderStatus === key);
-        return {
-          key,
-          ...ORDER_STATUS_META[key],
-          count: list.length,
-          amount: list.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0),
-        };
-      }
-    );
+    const pipelineStages = [
+      "nouvelle",
+      "confirmee",
+      "en_preparation",
+      "expediee",
+      "livree",
+      "annulee",
+    ].map((key) => {
+      const list = periodOrders.filter((o) => o.orderStatus === key);
+      return {
+        key,
+        ...ORDER_STATUS_META[key],
+        count: list.length,
+        amount: list.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0),
+      };
+    });
 
     const statusDonutData = [
       {
@@ -304,6 +309,7 @@ export default function EcommerceWorkspace({
       pendingLogisticsCount,
       shippingCount,
       deliveredCount,
+      cancelledOrders,
       cancelledCount,
       cancelledAmount,
       cancellationRate,
@@ -1255,17 +1261,29 @@ export default function EcommerceWorkspace({
               );
             })()}
 
-            {/* GRAPHIQUE 2 (1/3) : Répartition Commandes (Reçues • En attente • En expédition • Livrées) */}
+            {/* GRAPHIQUE 2 (1/3) : Répartition Commandes (Reçues • En attente • En expédition • Livrées • Annulées) */}
             {(() => {
+              const allDonutItems = [
+                ...metrics.statusDonutData,
+                {
+                  key: "annulee",
+                  label: "Annulées / Retours",
+                  count: metrics.cancelledCount,
+                  color: "#E11D48",
+                },
+              ];
               const totalStatusCount = Math.max(
                 1,
-                metrics.pendingLogisticsCount + metrics.shippingCount + metrics.deliveredCount
+                metrics.pendingLogisticsCount +
+                  metrics.shippingCount +
+                  metrics.deliveredCount +
+                  metrics.cancelledCount
               );
               const radius = 56;
               const circ = 2 * Math.PI * radius;
               let accOffset = 0;
 
-              const donutSegments = metrics.statusDonutData.map((seg) => {
+              const donutSegments = allDonutItems.map((seg) => {
                 const len = (seg.count / totalStatusCount) * circ;
                 const offset = accOffset;
                 accOffset += len;
@@ -1279,7 +1297,7 @@ export default function EcommerceWorkspace({
                       État des Commandes
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Reçues, en attente, en expédition et livrées ({selectedPeriod})
+                      Reçues, en attente, en expédition, livrées &amp; annulées ({selectedPeriod})
                     </p>
                   </div>
 
@@ -1295,7 +1313,7 @@ export default function EcommerceWorkspace({
                           stroke="#F1F5F9"
                           strokeWidth="16"
                         />
-                        {metrics.activeOrdersCount > 0 &&
+                        {metrics.totalOrders > 0 &&
                           donutSegments.map((seg) =>
                             seg.count > 0 ? (
                               <circle
@@ -1432,11 +1450,11 @@ export default function EcommerceWorkspace({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {metrics.pipelineStages.map((stage) => {
                 const share =
-                  metrics.activeOrdersCount > 0
-                    ? Math.round((stage.count / metrics.activeOrdersCount) * 100)
+                  metrics.totalOrders > 0
+                    ? Math.round((stage.count / metrics.totalOrders) * 100)
                     : 0;
                 return (
                   <button
@@ -1673,124 +1691,211 @@ export default function EcommerceWorkspace({
               </div>
             </div>
 
-            {/* Colonne Droite : Commandes Récentes & Facturation rapide (style DashboardRecentInvoices.jsx) */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4 flex flex-col">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">
-                    Commandes Récentes &amp; Facturation
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Passez directement de la commande à la facture client en 1 clic
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onChangeSection && onChangeSection("orders")}
-                  className="text-xs font-bold text-blue-600 hover:underline cursor-pointer shrink-0"
-                >
-                  Tout voir →
-                </button>
-              </div>
-
-              {periodOrders.length === 0 ? (
-                <div className="flex-1 py-10 text-center space-y-3 flex flex-col items-center justify-center">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center">
-                    <ShoppingBag className="w-6 h-6" />
+            {/* Colonne Droite : Commandes Récentes & Facturation + Suivi Annulations / Retours */}
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4 flex flex-col">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      Commandes Récentes &amp; Facturation
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Passez directement de la commande à la facture client en 1 clic
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 max-w-xs">
-                    Aucune commande enregistrée sur cette période. Créez un produit puis passez votre première commande.
-                  </p>
                   <button
                     type="button"
-                    onClick={() => setIsOrderModalOpen(true)}
-                    className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold cursor-pointer"
+                    onClick={() => onChangeSection && onChangeSection("orders")}
+                    className="text-xs font-bold text-blue-600 hover:underline cursor-pointer shrink-0"
                   >
-                    + Nouvelle Commande
+                    Tout voir →
                   </button>
                 </div>
-              ) : (
-                <div className="space-y-2.5 flex-1">
-                  {periodOrders.slice(0, 6).map((ord) => {
-                    const st = ORDER_STATUS_META[ord.orderStatus] || ORDER_STATUS_META.nouvelle;
-                    const isPaid = ord.paymentStatus === "paye";
-                    const linkedInvoice = ord.invoiceId
-                      ? invoices.find((inv) => inv.id === ord.invoiceId)
-                      : null;
-                    return (
-                      <div
-                        key={ord.id}
-                        className="p-3.5 rounded-2xl border border-slate-100 bg-[#F8FAFC] hover:bg-white hover:border-slate-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono text-xs font-extrabold text-slate-900">
-                              {ord.id}
-                            </span>
-                            <span
-                              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${st.badge}`}
-                            >
-                              {st.label}
-                            </span>
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                isPaid
-                                  ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
-                                  : "bg-[#FFEDD5] text-[#C2410C] border-[#FED7AA]"
-                              }`}
-                            >
-                              {isPaid ? "Payée" : "En attente"}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-600 mt-1 truncate">
-                            <strong>{ord.customerName}</strong> • {ord.deliveryZone} • {ord.paymentMethod}
-                          </p>
-                        </div>
 
-                        <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
-                          <span className="text-sm font-extrabold text-slate-900">
-                            {formatAmount(ord.totalAmount, currSym)}
-                          </span>
-                          {linkedInvoice ? (
-                            <button
-                              type="button"
-                              onClick={() => onOpenInvoice && onOpenInvoice(linkedInvoice)}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold cursor-pointer"
-                            >
-                              Facture
-                            </button>
-                          ) : (
-                            ord.orderStatus !== "annulee" && (
+                {periodOrders.length === 0 ? (
+                  <div className="flex-1 py-10 text-center space-y-3 flex flex-col items-center justify-center">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center">
+                      <ShoppingBag className="w-6 h-6" />
+                    </div>
+                    <p className="text-xs text-slate-500 max-w-xs">
+                      Aucune commande enregistrée sur cette période. Créez un produit puis passez votre première commande.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsOrderModalOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold cursor-pointer"
+                    >
+                      + Nouvelle Commande
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 flex-1">
+                    {periodOrders.slice(0, 6).map((ord) => {
+                      const st = ORDER_STATUS_META[ord.orderStatus] || ORDER_STATUS_META.nouvelle;
+                      const isPaid = ord.paymentStatus === "paye";
+                      const linkedInvoice = ord.invoiceId
+                        ? invoices.find((inv) => inv.id === ord.invoiceId)
+                        : null;
+                      return (
+                        <div
+                          key={ord.id}
+                          className="p-3.5 rounded-2xl border border-slate-100 bg-[#F8FAFC] hover:bg-white hover:border-slate-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-xs font-extrabold text-slate-900">
+                                {ord.id}
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${st.badge}`}
+                              >
+                                {st.label}
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  isPaid
+                                    ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                                    : "bg-[#FFEDD5] text-[#C2410C] border-[#FED7AA]"
+                                }`}
+                              >
+                                {isPaid ? "Payée" : "En attente"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1 truncate">
+                              <strong>{ord.customerName}</strong> • {ord.deliveryZone} • {ord.paymentMethod}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
+                            <span className="text-sm font-extrabold text-slate-900">
+                              {formatAmount(ord.totalAmount, currSym)}
+                            </span>
+                            {linkedInvoice ? (
                               <button
                                 type="button"
-                                onClick={() => handleInvoiceOrder(ord)}
-                                disabled={invoicingOrderId === ord.id}
-                                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                                onClick={() => onOpenInvoice && onOpenInvoice(linkedInvoice)}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold cursor-pointer"
                               >
-                                {invoicingOrderId === ord.id ? "..." : "Facturer"}
+                                Facture
                               </button>
-                            )
-                          )}
+                            ) : (
+                              ord.orderStatus !== "annulee" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleInvoiceOrder(ord)}
+                                  disabled={invoicingOrderId === ord.id}
+                                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                                >
+                                  {invoicingOrderId === ord.id ? "..." : "Facturer"}
+                                </button>
+                              )
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
 
-              {/* Rappel Cycle E-Commerce -> Gestion de Facturation */}
-              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="text-slate-500">
-                  Fin de cycle : <strong>{metrics.unbilledCount}</strong> commande(s) à facturer
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onChangeSection && onChangeSection("billing")}
-                  className="font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Ouvrir Gestion de facturation</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                {/* Rappel Cycle E-Commerce -> Gestion de Facturation */}
+                <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="text-slate-500">
+                    Fin de cycle : <strong>{metrics.unbilledCount}</strong> commande(s) à facturer
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onChangeSection && onChangeSection("billing")}
+                    className="font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Ouvrir Gestion de facturation</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Carte dédiée : Suivi des Annulations & Retours Livraison */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      Suivi des Annulations &amp; Retours livraison
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Commandes annulées, colis refusés et impact chiffre ({selectedDate || selectedPeriod})
+                    </p>
+                  </div>
+                  <span
+                    className={`text-[11px] font-bold px-2.5 py-1 rounded-full border shrink-0 ${
+                      metrics.cancelledCount > 0
+                        ? "bg-[#FFE4E6] text-[#BE123C] border-[#FECDD3]"
+                        : "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                    }`}
+                  >
+                    {metrics.cancellationRate}% annulation
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-[#FFE4E6]/45 border border-[#FECDD3]">
+                    <p className="text-[11px] font-bold text-[#BE123C] uppercase">
+                      Commandes annulées
+                    </p>
+                    <p className="text-lg font-extrabold text-[#BE123C] mt-0.5">
+                      {metrics.cancelledCount}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-100">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase">
+                      Montant non réalisé
+                    </p>
+                    <p className="text-lg font-extrabold text-slate-900 mt-0.5">
+                      {formatAmount(metrics.cancelledAmount, currSym)}
+                    </p>
+                  </div>
+                </div>
+
+                {metrics.cancelledOrders.length === 0 ? (
+                  <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center gap-2.5 text-xs text-emerald-800 font-semibold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Aucune commande annulée ni retour livraison sur cette période.</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {metrics.cancelledOrders.slice(0, 4).map((ord) => (
+                      <div
+                        key={ord.id}
+                        className="p-3 rounded-xl bg-[#FFE4E6]/35 border border-[#FECDD3] flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 truncate">
+                            <span className="font-mono text-[#BE123C] mr-1.5">{ord.id}</span>
+                            {ord.customerName}
+                          </p>
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {ord.deliveryZone} • {ord.paymentMethod}
+                          </p>
+                        </div>
+                        <span className="font-extrabold text-[#BE123C] shrink-0">
+                          {formatAmount(ord.totalAmount, currSym)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-100 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderFilter("annulee");
+                      onChangeSection && onChangeSection("orders");
+                    }}
+                    className="text-xs font-bold text-[#BE123C] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Gérer les annulations &amp; retours</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
