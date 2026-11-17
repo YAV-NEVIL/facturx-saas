@@ -19,6 +19,12 @@ import {
   Briefcase,
   Lock,
   Crown,
+  ShoppingBag,
+  Package,
+  Truck,
+  UtensilsCrossed,
+  BedDouble,
+  Store,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -31,6 +37,7 @@ export default function Sidebar({
   userRole = "admin",
   userProfile = null,
   subscriptionPlan = "free",
+  businessVertical = "b2b_services",
 }) {
   const rawPlan = String(subscriptionPlan || "free").toLowerCase().trim();
   const planBadge = (rawPlan === "stargate" ? "starter" : rawPlan).toUpperCase();
@@ -49,19 +56,69 @@ export default function Sidebar({
     return false;
   };
 
-  const navItems = [
-    { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-    { id: "invoices", label: "Factures", icon: FileText, badge: invoiceCount },
-    { id: "company", label: "Mon Entreprise", icon: Building2 },
-    { id: "clients", label: "Clients", icon: Users },
-    { id: "quotes", label: "Devis & Estimations", icon: Briefcase },
-    { id: "payments", label: "Paiements", icon: CreditCard },
-    { id: "employees", label: "Employés", icon: ShieldCheck },
-    { id: "analytics", label: "Analytique", icon: BarChart3 },
-    { id: "reports", label: "Rapports", icon: FileSpreadsheet },
-    { id: "pricing", label: "Abonnement & Tarifs", icon: Crown, badge: planBadge },
-    { id: "settings", label: "Paramètres", icon: Settings },
-  ];
+  const navItemsByVertical = {
+    b2b_services: [
+      { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+      { id: "invoices", label: "Factures", icon: FileText, badge: invoiceCount },
+      { id: "company", label: "Mon Entreprise", icon: Building2 },
+      { id: "clients", label: "Clients", icon: Users },
+      { id: "quotes", label: "Devis & Estimations", icon: Briefcase },
+      { id: "payments", label: "Paiements", icon: CreditCard },
+      { id: "employees", label: "Employés", icon: ShieldCheck },
+      { id: "analytics", label: "Analytique", icon: BarChart3 },
+      { id: "reports", label: "Rapports", icon: FileSpreadsheet },
+      { id: "pricing", label: "Abonnement & Tarifs", icon: Crown, badge: planBadge },
+      { id: "settings", label: "Paramètres", icon: Settings },
+    ],
+    ecommerce: [
+      { id: "dashboard", label: "Tableau E-Commerce", icon: ShoppingBag },
+      { id: "ecom_products", label: "Catalogue Produits", icon: Package },
+      { id: "ecom_orders", label: "Commandes & Livraisons", icon: Truck },
+      { id: "invoices", label: "Gestion de Facturation", icon: FileText, badge: invoiceCount },
+      { id: "payments", label: "Paiements & Reçus", icon: CreditCard },
+      { id: "clients", label: "Clients Boutique", icon: Users },
+      { id: "reports", label: "Rapports & TVA", icon: FileSpreadsheet },
+      { id: "company", label: "Mon Entreprise", icon: Building2 },
+      { id: "employees", label: "Employés", icon: ShieldCheck },
+      { id: "pricing", label: "Abonnement & Tarifs", icon: Crown, badge: planBadge },
+      { id: "settings", label: "Paramètres", icon: Settings },
+    ],
+    restaurant: [
+      { id: "dashboard", label: "Espace Restauration", icon: UtensilsCrossed },
+      { id: "invoices", label: "Gestion de Facturation", icon: FileText, badge: invoiceCount },
+      { id: "payments", label: "Encaissements", icon: CreditCard },
+      { id: "clients", label: "Clients", icon: Users },
+      { id: "reports", label: "Rapports & TVA", icon: FileSpreadsheet },
+      { id: "company", label: "Mon Entreprise", icon: Building2 },
+      { id: "employees", label: "Employés", icon: ShieldCheck },
+      { id: "pricing", label: "Abonnement & Tarifs", icon: Crown, badge: planBadge },
+      { id: "settings", label: "Paramètres", icon: Settings },
+    ],
+    hotel: [
+      { id: "dashboard", label: "Espace Hôtellerie", icon: BedDouble },
+      { id: "invoices", label: "Gestion de Facturation", icon: FileText, badge: invoiceCount },
+      { id: "payments", label: "Encaissements & Folios", icon: CreditCard },
+      { id: "clients", label: "Clients & Hôtes", icon: Users },
+      { id: "reports", label: "Rapports & TVA", icon: FileSpreadsheet },
+      { id: "company", label: "Mon Entreprise", icon: Building2 },
+      { id: "employees", label: "Employés", icon: ShieldCheck },
+      { id: "pricing", label: "Abonnement & Tarifs", icon: Crown, badge: planBadge },
+      { id: "settings", label: "Paramètres", icon: Settings },
+    ],
+    retail_pos: [
+      { id: "dashboard", label: "Caisse & Petit Commerce", icon: Store },
+      { id: "invoices", label: "Gestion de Facturation", icon: FileText, badge: invoiceCount },
+      { id: "payments", label: "Encaissements & Caisse", icon: CreditCard },
+      { id: "clients", label: "Clients", icon: Users },
+      { id: "reports", label: "Rapports & TVA", icon: FileSpreadsheet },
+      { id: "company", label: "Mon Entreprise", icon: Building2 },
+      { id: "employees", label: "Employés", icon: ShieldCheck },
+      { id: "pricing", label: "Abonnement & Tarifs", icon: Crown, badge: planBadge },
+      { id: "settings", label: "Paramètres", icon: Settings },
+    ],
+  };
+
+  const navItems = navItemsByVertical[businessVertical] || navItemsByVertical.b2b_services;
 
   return (
     <>

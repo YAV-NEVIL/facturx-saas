@@ -33,7 +33,8 @@ import {
   getCurrentSession,
   onAuthStateChange,
 } from "@/lib/supabaseService";
-import { Building2, Globe } from "lucide-react";
+import { Building2, Globe, ShoppingBag, UtensilsCrossed, BedDouble, Store } from "lucide-react";
+import { BUSINESS_VERTICALS } from "@/lib/business-verticals";
 
 export default function LoginScreen({
   onLoginSuccess,
@@ -58,6 +59,7 @@ export default function LoginScreen({
   const [country, setCountry] = useState("République Démocratique du Congo");
   const [countryCode, setCountryCode] = useState("CD");
   const [city, setCity] = useState("Kinshasa");
+  const [businessVertical, setBusinessVertical] = useState("b2b_services");
   const [loginRoleFilter, setLoginRoleFilter] = useState("all"); // "admin" | "employee" | "all"
   const [pendingOnboardingData, setPendingOnboardingData] = useState(null);
 
@@ -383,6 +385,7 @@ export default function LoginScreen({
       const onboardingData = {
         adminName: fullName.trim(),
         companyName: companyName.trim(),
+        businessVertical: businessVertical || "b2b_services",
         email: cleanSignupEmail,
         phone: phone.trim(),
         currency: currency,
@@ -401,6 +404,7 @@ export default function LoginScreen({
         phone.trim(),
         {
           company_name: onboardingData.companyName,
+          business_vertical: onboardingData.businessVertical,
           currency: onboardingData.currency,
           currency_symbol: onboardingData.currencySymbol,
           city: onboardingData.city,
@@ -832,6 +836,61 @@ export default function LoginScreen({
                   <div>
                     <h3 className="text-xs font-bold text-slate-900">Nouvelle Organisation sur FacturX</h3>
                     <p className="text-[11px] text-slate-500">Créez votre entreprise et devenez Administrateur Général.</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+                    Type d&apos;Activité / Secteur de l&apos;Entreprise *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {BUSINESS_VERTICALS.map((v) => {
+                      const isSelected = businessVertical === v.id;
+                      const IconComp =
+                        v.id === "ecommerce"
+                          ? ShoppingBag
+                          : v.id === "restaurant"
+                          ? UtensilsCrossed
+                          : v.id === "hotel"
+                          ? BedDouble
+                          : v.id === "retail_pos"
+                          ? Store
+                          : Building2;
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => setBusinessVertical(v.id)}
+                          className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            v.id === "b2b_services" ? "sm:col-span-2" : ""
+                          } ${
+                            isSelected
+                              ? "bg-blue-50/90 border-blue-600 ring-1 ring-blue-600/20 shadow-xs"
+                              : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                isSelected
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-white text-slate-600 border border-slate-200"
+                              }`}
+                            >
+                              <IconComp className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 leading-tight">
+                                {v.label}
+                              </p>
+                              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                                {v.subtitle}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

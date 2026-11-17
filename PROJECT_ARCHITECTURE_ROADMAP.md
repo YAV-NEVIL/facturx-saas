@@ -105,53 +105,46 @@ flowchart TB
 
 ## 4. Architecture Cible Multi-Activités (De Maintenant jusqu'à la Fin du Projet)
 
-### 4.1 Principe de Routage Intelligent par Type d'Entreprise
+### 4.1 Principe Fondamental : Routage par Activité + Gestion de Facturation Systématique à la Fin
 
-Dès l'inscription (`LoginScreen.jsx`) ou le paramétrage (`CompanyOnboardingGate.jsx`), l'utilisateur sélectionne son **Type d'Activité (`business_vertical`)**.  
-Ce choix détermine **l'interface métier complète** dans laquelle l'utilisateur atterrit après connexion, tout en conservant le même compte, la même sécurité RLS, le même abonnement et les mêmes services emails/PDF :
+FacturX reste avant tout **un logiciel de gestion et de facturation**.  
+Chaque verticale possède **sa propre interface opérationnelle**, mais **tous les parcours métier se terminent obligatoirement par la Gestion de Facturation & Encaissement** (facture normalisée DGI RDC / OHADA, QR Code DEF, reçu/quittance PDF, envoi email Brevo & journal TVA).
 
 ```mermaid
 flowchart TD
-    Auth["Connexion / Inscription (LoginScreen + Onboarding)"] --> Check{"Type d'entreprise\n(company.business_vertical)"}
+    Auth["Connexion / Inscription\n(Choix du Type d'Activité)"] --> Check{"Type d'entreprise\n(company.business_vertical)"}
 
-    Check -->|"Prestations de services\nIndustrie & Gros Magasins"| B2B["WORKSPACE B2B CLASSIQUE\n(✅ Actuel — Factures DGI, Devis,\nRecouvrement, Quittances, Rapports OHADA)"]
-    Check -->|"E-Commerce"| ECOM["WORKSPACE E-COMMERCE\n(Phase 7 — Catalogue, Commandes,\nLivraisons, Paiement Mobile Money)"]
-    Check -->|"Restauration\n(Resto, Fast-Food, Bar)"| RESTO["WORKSPACE RESTAURATION\n(Phase 8A — Plan de Salle, POS Serveur,\nCuisine KDS, Additions)"]
-    Check -->|"Hôtellerie\n(Hôtel, Résidence, Auberge)"| HOTEL["WORKSPACE HÔTELLERIE\n(Phase 8B — Chambres, Check-in/out,\nCalendrier Réservations, Folio Séjour)"]
-    Check -->|"Petit Commerce / Détail\n(Boutique, Supérette, Pharmacie)"| RETAIL["WORKSPACE PETIT COMMERCE POS\n(Phase 9 — Caisse Tactile Rapide,\nStock & Ruptures, Z de Caisse)"]
+    Check -->|"Prestations de services,\nIndustrie & Gros Magasins"| B2B["WORKSPACE B2B CLASSIQUE ✅\nDevis → Prestation →\nGestion de Facturation DGI & Recouvrement"]
+    Check -->|"E-Commerce"| ECOM["WORKSPACE E-COMMERCE (Phase 7)\nCatalogue → Commande → Livraison →\nGestion de Facturation & Reçu PDF"]
+    Check -->|"Restauration\n(Resto, Fast-Food, Bar)"| RESTO["WORKSPACE RESTAURATION (Phase 8A)\nTables → Commande Cuisine → Addition →\nGestion de Facturation & Ticket"]
+    Check -->|"Hôtellerie\n(Hôtel, Résidence, Auberge)"| HOTEL["WORKSPACE HÔTELLERIE (Phase 8B)\nRéservation → Check-in → Folio Séjour →\nGestion de Facturation Check-out"]
+    Check -->|"Petit Commerce / Détail\n(Boutique, Pharmacie, Supérette)"| RETAIL["WORKSPACE PETIT COMMERCE POS (Phase 9)\nStock → Caisse Rapide POS → Z de Caisse →\nGestion de Facturation & Quittance"]
 
-    subgraph Core["Socle Partagé Universel (Commun à tous les Workspaces)"]
-        C1["Auth Multi-Tenant + RBAC + Postes Personnalisés"]
-        C2["Abonnements SaaS (Free / Starter / Business / Gold)"]
-        C3["Passerelle Brevo Emails + Générateur PDF + PWA Hors-Ligne"]
-        C4["Mon Entreprise, Paramètres, Multi-Devises & KYB 48h"]
+    subgraph Core["Noyau Partagé Universel (Commun à tous les Workspaces)"]
+        C1["Moteur de Gestion de Facturation Normalisée (DGI / OHADA / PDF / Brevo)"]
+        C2["Auth Multi-Tenant + RBAC + Postes Personnalisés"]
+        C3["Abonnements SaaS + Multi-Devises + PWA Hors-Ligne + KYB 48h"]
     end
 
-    B2B --- Core
-    ECOM --- Core
-    RESTO --- Core
-    HOTEL --- Core
-    RETAIL --- Core
+    B2B --> C1
+    ECOM --> C1
+    RESTO --> C1
+    HOTEL --> C1
+    RETAIL --> C1
 ```
 
 ### 4.2 Détail Technique des Nouvelles Verticales (Phases 7 à 10)
 
-#### 🟡 Phase 7 — Architecture & Refonte du Portail Secteur + Workspace **E-Commerce**
+#### 🟡 Phase 7 — Sélecteur d'Activité + Workspace **E-Commerce** + Facturation Intégrée *(Implémentée)*
 1. **Sélecteur de Type d'Activité dès la création du compte** :
-   - Ajout du champ `business_vertical` (`b2b_services` | `ecommerce` | `restaurant` | `hotel` | `retail_pos`) dans la table Supabase `companies` (avec rétrocompatibilité : les entreprises existantes restent sur `b2b_services`).
-   - Écran de choix visuel par cartes claires dans `LoginScreen.jsx` (inscription) et `CompanyOnboardingGate.jsx` :
-     - *Services, Industrie & Gros Commerce* → Interface B2B actuelle.
-     - *E-Commerce* → Interface E-Commerce.
-     - *Restauration* → Interface Restauration.
-     - *Hôtellerie* → Interface Hôtellerie.
-     - *Petit Commerce / Détail* → Interface Caisse & Stock POS.
-   - Création d'un routeur de workspace (`components/workspaces/WorkspaceRouter.jsx`) dans `app/page.js` qui charge la navigation (`Sidebar`) et les vues propres à `companyInfo.businessVertical`.
-2. **Modules du Workspace E-Commerce** :
-   - **Dashboard E-Commerce** : Commandes du jour, panier moyen, chiffre d'affaires encaissé vs paiement à la livraison (COD), taux de livraison réussie.
-   - **Catalogue Produits & Stock** (`ecommerce_products`) : Nom, SKU, prix, stock disponible, variantes (taille/couleur), visuel produit, statut actif/rupture.
-   - **Gestion des Commandes** (`ecommerce_orders`, `ecommerce_order_items`) : Pipeline *Nouvelle → Confirmée → En préparation → En livraison → Livrée / Annulée*, adresse client, téléphone WhatsApp, mode de paiement (Mobile Money, Carte, Cash à la livraison).
-   - **Livraisons & Coursiers** : Attribution livreur, suivi des frais de livraison par zone, preuve de livraison.
-   - **Reçu / Bordereau de Commande PDF & Email Brevo** : Envoi automatique du récapitulatif de commande et du reçu client.
+   - Ajout de la colonne `business_vertical` (`b2b_services` | `ecommerce` | `restaurant` | `hotel` | `retail_pos`) dans Supabase `companies`.
+   - Sélecteur visuel par cartes dès l'inscription (`LoginScreen.jsx`), l'onboarding (`CompanyOnboardingGate.jsx`) et les paramètres (`SettingsView.jsx`).
+   - Routeur multi-activités dans `app/page.js` & `Sidebar.jsx` : oriente automatiquement chaque activité vers son workspace dédié tout en gardant **Gestion de Facturation** accessible en bout de chaîne.
+2. **Modules du Workspace E-Commerce (`components/workspaces/EcommerceWorkspace.jsx`)** :
+   - **Dashboard E-Commerce** : Commandes du jour, chiffre d'affaires, panier moyen, commandes livrées vs en attente de facturation.
+   - **Catalogue Produits & Stock** (`ecommerce_products`) : Nom, SKU, catégorie, prix, stock en temps réel, alerte stock faible.
+   - **Gestion des Commandes & Livraisons** (`ecommerce_orders`) : Pipeline *Nouvelle → Confirmée → En préparation → Expédiée → Livrée / Annulée*, zone, livreur, mode de paiement (Cash à la livraison, Mobile Money).
+   - **Gestion de Facturation à la fin du cycle** : Conversion en 1 clic de toute commande en **Facture Normalisée DGI FacturX** (`invoices` + Code DEF + QR Code + PDF + envoi Brevo au client + encaissement).
 
 #### 🟠 Phase 8A — Workspace **Restauration** (Restaurants, Fast-Foods, Bars, Traiteurs)
 1. **Tables Supabase dédiées** : `restaurant_tables`, `menu_items`, `kitchen_orders`, `kitchen_order_items`.
@@ -159,14 +152,14 @@ flowchart TD
    - **Plan de Salle & Tables** : Vue interactive des tables (*Libre*, *Occupée*, *Addition demandée*) + commandes *À emporter / Livraison*.
    - **Prise de Commande POS Serveur (Mobile-First)** : Sélection rapide par catégories de menu (*Plats, Boissons, Desserts, Menus*), quantités, notes cuisine (*sans piment*, *cuisson*).
    - **Écran Cuisine / Bar (KDS)** : Vue temps réel des bons en attente → en préparation → prêts à servir.
-   - **Addition & Encaissement** : Division de note entre convives, pourboire, encaissement Cash / Mobile Money, impression ou envoi du ticket/facture.
+   - **Addition, Encaissement & Gestion de Facturation à la fin** : Division de note entre convives, pourboire, encaissement Cash / Mobile Money et génération automatique de **Facture / Ticket Normalisé DGI & Quittance** alimentant directement la comptabilité et la TVA.
 
 #### 🟣 Phase 8B — Workspace **Hôtellerie** (Hôtels, Résidences, Auberges)
 1. **Tables Supabase dédiées** : `hotel_rooms`, `hotel_reservations`, `hotel_folio_charges`.
 2. **Modules du Workspace Hôtellerie** :
    - **Tableau des Chambres** : Statut temps réel (*Disponible, Occupée, À nettoyer, Maintenance*), type de chambre (Standard, Suite, VIP), tarif nuitée.
    - **Calendrier & Réservations** : Création réservation, Check-in, Check-out, gestion des acomptes et prolongation de séjour.
-   - **Folio Client (Note de Séjour)** : Addition automatique des nuitées + extras consommés (Restaurant, Blanchisserie, Navette, Minibar) avec génération de facture normalisée DGI/OHADA et quittance au départ.
+   - **Folio Client & Gestion de Facturation au Check-out** : Addition automatique des nuitées + extras consommés (Restaurant, Blanchisserie, Navette, Minibar) clôturée obligatoirement par une **Facture de Séjour Normalisée DGI/OHADA** + **Quittance PDF** au départ.
 
 #### 🟢 Phase 9 — Workspace **Petit Commerce / Commerce de Détail (POS)**
 1. **Tables Supabase dédiées** : `retail_products`, `retail_sales`, `retail_sale_items`, `cash_registers`.
@@ -174,7 +167,7 @@ flowchart TD
    - **Caisse Rapide Tactile (POS Mobile-First)** : Catalogue visuel/recherche instantanée (ou scan code-barres caméra mobile), ajout au panier en 1 tap, calcul automatique du total et de la monnaie à rendre.
    - **Encaissement Instantané & Crédit Client** : Paiement Cash, Mobile Money ou mise sur compte client (carnet de dettes suivi avec relances WhatsApp).
    - **Stock Simplifié & Marges** : Entrées de stock, alertes seuil critique / date d'expiration, suivi Prix d'achat vs Prix de vente (marge brute réelle).
-   - **Clôture de Caisse Journalière (Z de Caisse)** : Synthèse des encaissements du jour par caissier et par canal, exportable en PDF.
+   - **Clôture Z de Caisse & Gestion de Facturation** : Chaque vente génère un ticket / facture normalisée (ou facture B2B complète sur demande du client) consolidée dans la **Gestion de Facturation** et les journaux TVA.
 
 #### 🔵 Phase 10 — Finalisation Production, Sécurité & Mise à l'Échelle *(Limite Finale de l'Application)*
 Cette phase marque **l'aboutissement complet de FacturX v2.0** prêt pour une exploitation commerciale à grande échelle :

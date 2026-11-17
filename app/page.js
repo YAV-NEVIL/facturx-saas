@@ -31,6 +31,9 @@ import LoginScreen from "@/components/LoginScreen";
 import CompanyOnboardingGate from "@/components/CompanyOnboardingGate";
 import EmployeesView from "@/components/EmployeesView";
 import PricingView from "@/components/PricingView";
+import EcommerceWorkspace from "@/components/workspaces/EcommerceWorkspace";
+import VerticalWorkspaceShell from "@/components/workspaces/VerticalWorkspaceShell";
+import { BUSINESS_VERTICALS, isClassicB2BVertical } from "@/lib/business-verticals";
 import {
   canCreateInvoice,
   canSendReminder,
@@ -63,6 +66,13 @@ import {
   updateMemberOnlineStatus,
   signOutUser,
   getCurrentSession,
+  fetchEcommerceProducts,
+  createEcommerceProduct as apiCreateEcommerceProduct,
+  updateEcommerceProduct as apiUpdateEcommerceProduct,
+  deleteEcommerceProduct as apiDeleteEcommerceProduct,
+  fetchEcommerceOrders,
+  createEcommerceOrder as apiCreateEcommerceOrder,
+  updateEcommerceOrder as apiUpdateEcommerceOrder,
 } from "@/lib/supabaseService";
 import {
   enqueueOfflineAction,
@@ -141,8 +151,12 @@ const STORAGE_KEY_CLIENTS = "facturx_clients_v3";
 const STORAGE_KEY_QUOTES = "facturx_quotes_v3";
 const STORAGE_KEY_PAYMENTS = "facturx_payments_v3";
 const STORAGE_KEY_ACTIVE_TAB = "facturx_active_tab_v3";
+const STORAGE_KEY_ECOM_PRODUCTS = "facturx_ecom_products_v1";
+const STORAGE_KEY_ECOM_ORDERS = "facturx_ecom_orders_v1";
 const VALID_TABS = new Set([
   "dashboard",
+  "ecom_products",
+  "ecom_orders",
   "invoices",
   "company",
   "clients",
@@ -247,6 +261,8 @@ export default function App() {
   const [userProfile, setUserProfile] = useState(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [teamMembers, setTeamMembers] = useState([]);
+  const [ecommerceProducts, setEcommerceProducts] = useState([]);
+  const [ecommerceOrders, setEcommerceOrders] = useState([]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isOnboardingPreviewOpen, setIsOnboardingPreviewOpen] = useState(false);
   const [isKybRevisionOpen, setIsKybRevisionOpen] = useState(false);
@@ -384,7 +400,7 @@ export default function App() {
           }
         }
 
-        const [comp, clis, invs, qts, pays, tms] = await Promise.all([
+        const [comp, clis, invs, qts, pays, tms, ecomProds, ecomOrds] = await Promise.all([
           fetchCompanyProfile(activeCompId).catch((e) => {
             console.warn("Supabase fetchCompanyProfile:", e);
             return null;
@@ -409,6 +425,8 @@ export default function App() {
             console.warn("Supabase fetchTeamMembers:", e);
             return [];
           }),
+          fetchEcommerceProducts(activeCompId).catch(() => []),
+          fetchEcommerceOrders(activeCompId).catch(() => []),
         ]);
 
         if (!isMounted) return;
@@ -523,6 +541,22 @@ export default function App() {
             },
           ]);
         }
+        if (Array.isArray(ecomProds)) {
+          setEcommerceProducts(ecomProds);
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem(STORAGE_KEY_ECOM_PRODUCTS, JSON.stringify(ecomProds));
+            } catch (e) {}
+          }
+        }
+        if (Array.isArray(ecomOrds)) {
+          setEcommerceOrders(ecomOrds);
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem(STORAGE_KEY_ECOM_ORDERS, JSON.stringify(ecomOrds));
+            } catch (e) {}
+          }
+        }
         setIsSupabaseConnected(true);
       } catch (err) {
         console.error("Erreur globale sync Supabase:", err);
@@ -580,6 +614,22 @@ export default function App() {
       setIsOffline(!status.isOnline);
       setPendingSyncCount(status.pendingCount);
       if (status.isOnline && status.pendingCount === 0) {
+        if (Array.isArray(ecomProds)) {
+          setEcommerceProducts(ecomProds);
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem(STORAGE_KEY_ECOM_PRODUCTS, JSON.stringify(ecomProds));
+            } catch (e) {}
+          }
+        }
+        if (Array.isArray(ecomOrds)) {
+          setEcommerceOrders(ecomOrds);
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem(STORAGE_KEY_ECOM_ORDERS, JSON.stringify(ecomOrds));
+            } catch (e) {}
+          }
+        }
         setIsSupabaseConnected(true);
       }
     });
@@ -1087,6 +1137,104 @@ export default function App() {
       enqueueOfflineAction("DELETE_CLIENT", { id: target?.id || clientNameToDelete, name: clientNameToDelete }, userProfile?.companyId);
       showToast(`Client "${clientNameToDelete}" retiré en file d'attente hors-ligne.`, "info");
     }
+  };
+
+  // Handlers Workspace E-Commerce (Produits, Commandes & Facturation automatique à la fin)
+  const handleCreateEcommerceProduct = async (product) => {
+    const activeCompId = userProfile?.companyId || companyInfo?.id;
+    const created = await apiCreateEcommerceProduct(product, activeCompId);
+    setEcommerceProducts((prev) => [created, ...prev]);
+    return created;
+  };
+
+  const handleUpdateEcommerceProduct = async (id, patch) => {
+    const updated = await apiUpdateEcommerceProduct(id, patch);
+    setEcommerceProducts((prev) => prev.map((p) => (p.id === id ? updated : p)));
+    return updated;
+  };
+
+  const handleDeleteEcommerceProduct = async (id) => {
+    await apiDeleteEcommerceProduct(id);
+    setEcommerceProducts((prev) => prev.filter((p) => p.id !== id));
+    showToast("Produit supprimé du catalogue.", "info");
+  };
+
+  const handleCreateEcommerceOrder = async (order) => {
+    const activeCompId = userProfile?.companyId || companyInfo?.id;
+    const created = await apiCreateEcommerceOrder(order, activeCompId);
+    setEcommerceOrders((prev) => [created, ...prev]);
+    // Décrémenter le stock des produits commandés
+    for (const item of order.items || []) {
+      const prod = ecommerceProducts.find((p) => p.id === item.productId);
+      if (prod) {
+        const nextStock = Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1));
+        try {
+          await handleUpdateEcommerceProduct(prod.id, { stock: nextStock });
+        } catch {
+          // Non bloquant
+        }
+      }
+    }
+    return created;
+  };
+
+  const handleUpdateEcommerceOrderStatus = async (orderId, nextStatus) => {
+    const updated = await apiUpdateEcommerceOrder(orderId, { orderStatus: nextStatus });
+    setEcommerceOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+    showToast(`Commande ${orderId} mise à jour.`, "success");
+  };
+
+  const handleGenerateInvoiceFromOrder = async (order) => {
+    const today = new Date();
+    const issueStr = today.toLocaleDateString("fr-FR");
+    const dueStr = new Date(today.getTime() + 7 * 86400000).toLocaleDateString("fr-FR");
+    const invId = `FAC-${today.getFullYear()}-${String(invoices.length + 1).padStart(3, "0")}`;
+    const invoiceItems = [
+      ...(order.items || []).map((it) => ({
+        description: it.description,
+        quantity: Number(it.quantity || 1),
+        unitPrice: Number(it.unitPrice || 0),
+      })),
+    ];
+    if (Number(order.deliveryFee || 0) > 0) {
+      invoiceItems.push({
+        description: `Frais de livraison (${order.deliveryZone || "Standard"})`,
+        quantity: 1,
+        unitPrice: Number(order.deliveryFee),
+      });
+    }
+
+    const vatRate =
+      typeof companyInfo?.defaultVatRate === "number" ? companyInfo.defaultVatRate : 0.16;
+
+    const newInvoice = {
+      id: invId,
+      clientName: order.customerName,
+      clientEmail: order.customerEmail || "",
+      clientPhone: order.customerPhone || "",
+      contactPerson: order.customerName,
+      address: order.deliveryAddress || "",
+      location: order.deliveryZone || companyInfo?.city || "Kinshasa",
+      issueDate: issueStr,
+      dueDate: dueStr,
+      status: order.paymentStatus === "paye" ? "payee" : "envoyee",
+      vatRate,
+      items: invoiceItems,
+      notes: `Facture issue de la commande E-Commerce ${order.id} (${order.paymentMethod}).`,
+      company: companyInfo,
+    };
+
+    await handleCreateInvoice(newInvoice);
+    try {
+      const updatedOrder = await apiUpdateEcommerceOrder(order.id, { invoiceId: invId });
+      setEcommerceOrders((prev) => prev.map((o) => (o.id === order.id ? updatedOrder : o)));
+    } catch {
+      setEcommerceOrders((prev) =>
+        prev.map((o) => (o.id === order.id ? { ...o, invoiceId: invId } : o))
+      );
+    }
+    setOpenInvoiceEmailInitially(false);
+    setSelectedInvoice(newInvoice);
   };
 
   // Add new invoice
@@ -1739,6 +1887,8 @@ export default function App() {
         "facturx_settings_v3",
         "facturx_settings_tab_v3",
         "facturx_team_v3",
+        STORAGE_KEY_ECOM_PRODUCTS,
+        STORAGE_KEY_ECOM_ORDERS,
         STORAGE_KEY_ACTIVE_TAB,
       ].forEach((k) => localStorage.removeItem(k));
     }
@@ -1797,6 +1947,7 @@ export default function App() {
               ...prev,
               id: profile.companyId,
               name: profile.companyName || prev.name,
+              businessVertical: profile.businessVertical || prev.businessVertical || "b2b_services",
               defaultCurrency: profile.currency || prev.defaultCurrency,
               currencySymbol: profile.currencySymbol || prev.currencySymbol,
               onboardingCompleted:
@@ -1812,6 +1963,7 @@ export default function App() {
                 ...defaultCompanyInfo,
                 id: profile.companyId,
                 name: profile.companyName || "Mon Entreprise",
+                businessVertical: profile.businessVertical || "b2b_services",
                 initials:
                   (profile.companyName || "FX")
                     .split(" ")
@@ -1849,6 +2001,8 @@ export default function App() {
               };
               setCompanyInfo(cleanCompany);
               setCompanyForm(cleanCompany);
+              setEcommerceProducts([]);
+              setEcommerceOrders([]);
               if (typeof window !== "undefined") {
                 localStorage.setItem(STORAGE_KEY_COMPANY, JSON.stringify(cleanCompany));
                 localStorage.setItem(STORAGE_KEY_ACCOUNT_BASELINE, JSON.stringify(cleanCompany));
@@ -1865,7 +2019,9 @@ export default function App() {
                 fetchQuotes(profile.companyId).catch(() => []),
                 fetchPayments(profile.companyId).catch(() => []),
                 fetchTeamMembers(profile.companyId).catch(() => []),
-              ]).then(([comp, clis, invs, qts, pays, tms]) => {
+                fetchEcommerceProducts(profile.companyId).catch(() => []),
+                fetchEcommerceOrders(profile.companyId).catch(() => []),
+              ]).then(([comp, clis, invs, qts, pays, tms, eProds, eOrds]) => {
                 if (comp) {
                   setCompanyInfo((prev) => {
                     const merged = { ...prev, ...comp };
@@ -1881,6 +2037,7 @@ export default function App() {
                       ...prev,
                       companyId: comp.id || prev.companyId,
                       companyName: comp.name || prev.companyName,
+                      businessVertical: comp.businessVertical || prev.businessVertical || "b2b_services",
                       onboardingCompleted: Boolean(comp.onboardingCompleted),
                       kybStatus: comp.kybStatus || "not_submitted",
                       kybSubmittedAt: comp.kybSubmittedAt || null,
@@ -1896,6 +2053,8 @@ export default function App() {
                 if (Array.isArray(qts)) setQuotes(qts);
                 if (Array.isArray(pays)) setPayments(pays);
                 if (Array.isArray(tms) && tms.length > 0) setTeamMembers(tms);
+                if (Array.isArray(eProds)) setEcommerceProducts(eProds);
+                if (Array.isArray(eOrds)) setEcommerceOrders(eOrds);
               });
             }
             const ownerEntry = {
@@ -1920,6 +2079,7 @@ export default function App() {
               ...defaultCompanyInfo,
               id: null,
               name: profile.companyName || "",
+              businessVertical: profile.businessVertical || "b2b_services",
               city: profile.city || "Kinshasa",
               country: profile.country || "République Démocratique du Congo",
               countryCode: profile.countryCode || "CD",
@@ -1938,6 +2098,8 @@ export default function App() {
             setInvoices([]);
             setQuotes([]);
             setPayments([]);
+            setEcommerceProducts([]);
+            setEcommerceOrders([]);
           }
           showToast(`Bienvenue, ${profile.fullName} !`, "success");
         }}
@@ -2118,6 +2280,7 @@ export default function App() {
         userRole={userProfile?.role || "admin"}
         userProfile={userProfile}
         subscriptionPlan={activeSubscriptionPlan}
+        businessVertical={companyInfo?.businessVertical || "b2b_services"}
       />
 
       {/* 2. Main Content Area */}
@@ -2208,8 +2371,60 @@ export default function App() {
               </div>
             </div>
           )}
-          {/* TAB: DASHBOARD (SYNTHÈSE FINANCIÈRE & PRÉVISIONS) */}
-          {activeTab === "dashboard" && (
+          {/* WORKSPACE E-COMMERCE (Si l'entreprise est de type ecommerce) */}
+          {companyInfo?.businessVertical === "ecommerce" &&
+            (activeTab === "dashboard" ||
+              activeTab === "ecom_products" ||
+              activeTab === "ecom_orders") && (
+              <EcommerceWorkspace
+                activeSection={
+                  activeTab === "ecom_products"
+                    ? "products"
+                    : activeTab === "ecom_orders"
+                    ? "orders"
+                    : "overview"
+                }
+                onChangeSection={(sec) => {
+                  if (sec === "products") setActiveTab("ecom_products");
+                  else if (sec === "orders") setActiveTab("ecom_orders");
+                  else if (sec === "billing") setActiveTab("invoices");
+                  else setActiveTab("dashboard");
+                }}
+                products={ecommerceProducts}
+                orders={ecommerceOrders}
+                invoices={invoices}
+                companyInfo={companyInfo}
+                onCreateProduct={handleCreateEcommerceProduct}
+                onUpdateProduct={handleUpdateEcommerceProduct}
+                onDeleteProduct={handleDeleteEcommerceProduct}
+                onCreateOrder={handleCreateEcommerceOrder}
+                onUpdateOrderStatus={handleUpdateEcommerceOrderStatus}
+                onGenerateInvoiceFromOrder={handleGenerateInvoiceFromOrder}
+                onOpenInvoice={(inv) => {
+                  setOpenInvoiceEmailInitially(false);
+                  setSelectedInvoice(inv);
+                }}
+                onToast={showToast}
+              />
+            )}
+
+          {/* WORKSPACE RESTAURATION / HÔTELLERIE / PETIT COMMERCE POS */}
+          {!isClassicB2BVertical(companyInfo?.businessVertical) &&
+            companyInfo?.businessVertical !== "ecommerce" &&
+            activeTab === "dashboard" && (
+              <VerticalWorkspaceShell
+                verticalId={companyInfo?.businessVertical}
+                companyInfo={companyInfo}
+                invoices={invoices}
+                clients={clients}
+                payments={payments}
+                onOpenCreateInvoice={() => handleOpenCreateInvoiceWithLimit()}
+                onNavigateTab={(tab) => setActiveTab(tab)}
+              />
+            )}
+
+          {/* TAB: DASHBOARD B2B CLASSIQUE (Services, Industrie & Gros Commerce) */}
+          {isClassicB2BVertical(companyInfo?.businessVertical) && activeTab === "dashboard" && (
             <div className="space-y-5 sm:space-y-6 lg:space-y-8 animate-in fade-in duration-200">
               {/* BANNIÈRE DE BIENVENUE PERSONNALISÉE SELON LE PROFIL CONNECTÉ */}
               <div className="bg-gradient-to-r from-[#1A44B8] via-[#163DA9] to-[#2D60FF] rounded-2xl p-4 sm:p-6 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2793,6 +3008,25 @@ export default function App() {
                         placeholder="Nom officiel de votre entreprise"
                         className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-1">
+                        Type d&apos;Activité / Interface Métier
+                      </label>
+                      <select
+                        value={companyForm.businessVertical || "b2b_services"}
+                        onChange={(e) =>
+                          handleCompanyFieldChange("businessVertical", e.target.value)
+                        }
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-600 focus:outline-none"
+                      >
+                        {BUSINESS_VERTICALS.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">

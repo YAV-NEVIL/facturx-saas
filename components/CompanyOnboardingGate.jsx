@@ -28,6 +28,7 @@ import {
   submitCompanyOnboardingAndKyb,
   getKybDocumentSignedUrl,
 } from "../lib/supabaseService";
+import { BUSINESS_VERTICALS } from "../lib/business-verticals";
 
 const REQUIRED_DOC_SLOTS = [
   {
@@ -84,6 +85,7 @@ export default function CompanyOnboardingGate({
   const [form, setForm] = useState({
     name: companyInfo?.name || userProfile?.companyName || "",
     legalForm: companyInfo?.legalForm || "SARL",
+    businessVertical: companyInfo?.businessVertical || userProfile?.businessVertical || "b2b_services",
     activitySector: companyInfo?.activitySector || "Commerce Général & Services B2B",
     logoUrl: companyInfo?.logoUrl || "",
     address: companyInfo?.address || "",
@@ -428,6 +430,23 @@ export default function CompanyOnboardingGate({
                       <option value="Établissement">Établissement / Entreprise Individuelle</option>
                       <option value="SNC">SNC / SCS</option>
                       <option value="ONG / ASBL">ONG / ASBL</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Type d&apos;Activité / Interface Métier FacturX *
+                    </label>
+                    <select
+                      value={form.businessVertical}
+                      onChange={(e) => setForm({ ...form, businessVertical: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900 focus:outline-none focus:border-blue-600"
+                    >
+                      {BUSINESS_VERTICALS.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label} — {v.subtitle}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
