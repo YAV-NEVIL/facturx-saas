@@ -57,12 +57,14 @@ export default function EcommerceWorkspace({
   products = [],
   orders = [],
   invoices = [],
+  clients = [],
   companyInfo = {},
   onCreateProduct,
   onUpdateProduct,
   onDeleteProduct,
   onCreateOrder,
   onUpdateOrderStatus,
+  onToggleOrderPayment,
   onGenerateInvoiceFromOrder,
   onOpenInvoice,
   onToast,
@@ -132,6 +134,8 @@ export default function EcommerceWorkspace({
     );
   }, [products, productSearch]);
 
+  const effectiveOrderFilter = activeSection === "billing" ? "unbilled" : orderFilter;
+
   const filteredOrders = useMemo(() => {
     const q = orderSearch.trim().toLowerCase();
     return orders.filter((o) => {
@@ -139,16 +143,17 @@ export default function EcommerceWorkspace({
         !q ||
         (o.id || "").toLowerCase().includes(q) ||
         (o.customerName || "").toLowerCase().includes(q) ||
-        (o.customerPhone || "").toLowerCase().includes(q);
+        (o.customerPhone || "").toLowerCase().includes(q) ||
+        (o.deliveryZone || "").toLowerCase().includes(q);
       const matchStatus =
-        orderFilter === "all"
+        effectiveOrderFilter === "all"
           ? true
-          : orderFilter === "unbilled"
+          : effectiveOrderFilter === "unbilled"
           ? !o.invoiceId && o.orderStatus !== "annulee"
-          : o.orderStatus === orderFilter;
+          : o.orderStatus === effectiveOrderFilter;
       return matchQuery && matchStatus;
     });
-  }, [orders, orderSearch, orderFilter]);
+  }, [orders, orderSearch, effectiveOrderFilter]);
 
   const openNewProductModal = () => {
     setEditingProduct(null);
@@ -214,7 +219,23 @@ export default function EcommerceWorkspace({
   const handleAddProductToCart = () => {
     const prod = products.find((p) => p.id === selectedCartProductId);
     if (!prod) return;
+    const availStock = Number(prod.stock || 0);
+    if (availStock <= 0) {
+      if (onToast) onToast(`Rupture de stock pour "${prod.name}". Réapprovisionnez d'abord le catalogue.`, "error");
+      return;
+    }
     const qty = Math.max(1, Number(selectedCartQty || 1));
+    const existingItem = orderCart.find((i) => i.productId === prod.id);
+    const nextQtyTotal = (existingItem ? existingItem.quantity : 0) + qty;
+    if (nextQtyTotal > availStock) {
+      if (onToast) {
+        onToast(
+          `Stock insuffisant pour "${prod.name}" (disponible : ${availStock}, demandé : ${nextQtyTotal}).`,
+          "error"
+        );
+      }
+      return;
+    }
     setOrderCart((prev) => {
       const existing = prev.find((i) => i.productId === prod.id);
       if (existing) {
@@ -616,9 +637,19 @@ export default function EcommerceWorkspace({
                   Convertissez vos commandes en factures normalisées avec Code DEF, QR Code, PDF et envoi email Brevo au client.
                 </p>
               </div>
-              <span className="shrink-0 px-3 py-1 rounded-full bg-white border border-blue-200 font-bold text-blue-700">
-                {metrics.unbilledCount} commande(s) à facturer
-              </span>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <span className="px-3 py-1 rounded-full bg-white border border-blue-200 font-bold text-blue-700">
+                  {metrics.unbilledCount} commande(s) à facturer
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onChangeSection && onChangeSection("invoices")}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Registre Factures ({invoices.length})</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -629,28 +660,32 @@ export default function EcommerceWorkspace({
                 type="text"
                 value={orderSearch}
                 onChange={(e) => setOrderSearch(e.target.value)}
-                placeholder="Rechercher par N° commande, client, téléphone..."
+                placeholder="Rechercher par N° commande, client, téléphone, zone..."
                 className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm"
               />
             </div>
-            <select
-              value={activeSection === "billing" ? "unbilled" : orderFilter}
-              onChange={(e) => setOrderFilter(e.target.value)}
-              className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
-            >
-              <option value="all">Toutes les commandes</option>
-              <option value="unbilled">Non encore facturées</option>
-              {Object.entries(ORDER_STATUS_META).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
+            {activeSection !== "billing" && (
+              <select
+                value={orderFilter}
+                onChange={(e) => setOrderFilter(e.target.value)}
+                className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
+              >
+                <option value="all">Toutes les commandes</option>
+                <option value="unbilled">Non encore facturées</option>
+                {Object.entries(ORDER_STATUS_META).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {filteredOrders.length === 0 ? (
             <div className="py-12 text-center text-xs text-slate-500">
-              Aucune commande trouvée pour ce filtre.
+              {activeSection === "billing"
+                ? "Toutes vos commandes actives ont déjà été facturées. Consultez le Registre Factures pour voir les documents émis."
+                : "Aucune commande trouvée pour ce filtre."}
             </div>
           ) : (
             <div className="space-y-3">
@@ -659,6 +694,7 @@ export default function EcommerceWorkspace({
                 const linkedInvoice = ord.invoiceId
                   ? invoices.find((inv) => inv.id === ord.invoiceId)
                   : null;
+                const isPaid = ord.paymentStatus === "paye";
                 return (
                   <div
                     key={ord.id}
@@ -673,6 +709,15 @@ export default function EcommerceWorkspace({
                           <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${st.badge}`}>
                             {st.label}
                           </span>
+                          <span
+                            className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                              isPaid
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-amber-50 text-amber-800 border-amber-200"
+                            }`}
+                          >
+                            {isPaid ? "Payée" : "Paiement en attente"}
+                          </span>
                           {ord.invoiceId && (
                             <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                               Facture : {ord.invoiceId}
@@ -684,6 +729,14 @@ export default function EcommerceWorkspace({
                           {ord.customerPhone ? ` • ${ord.customerPhone}` : ""}
                           {ord.deliveryAddress ? ` • ${ord.deliveryAddress}` : ""}
                         </p>
+                        {Array.isArray(ord.items) && ord.items.length > 0 && (
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            Articles :{" "}
+                            {ord.items
+                              .map((it) => `${it.quantity}× ${it.description}`)
+                              .join(", ")}
+                          </p>
+                        )}
                       </div>
 
                       <div className="text-left sm:text-right">
@@ -698,19 +751,35 @@ export default function EcommerceWorkspace({
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200/70">
-                      <select
-                        value={ord.orderStatus}
-                        onChange={(e) =>
-                          onUpdateOrderStatus && onUpdateOrderStatus(ord.id, e.target.value)
-                        }
-                        className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700"
-                      >
-                        {Object.entries(ORDER_STATUS_META).map(([k, v]) => (
-                          <option key={k} value={k}>
-                            Statut : {v.label}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={ord.orderStatus}
+                          onChange={(e) =>
+                            onUpdateOrderStatus && onUpdateOrderStatus(ord.id, e.target.value)
+                          }
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700"
+                        >
+                          {Object.entries(ORDER_STATUS_META).map(([k, v]) => (
+                            <option key={k} value={k}>
+                              Statut : {v.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        {onToggleOrderPayment && ord.orderStatus !== "annulee" && (
+                          <button
+                            type="button"
+                            onClick={() => onToggleOrderPayment(ord.id)}
+                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                              isPaid
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                : "bg-white text-slate-700 border-slate-200 hover:bg-amber-50"
+                            }`}
+                          >
+                            {isPaid ? "✓ Encaissée" : "Marquer Payée"}
+                          </button>
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-2">
                         {linkedInvoice ? (
@@ -874,6 +943,37 @@ export default function EcommerceWorkspace({
             </div>
             <form onSubmit={handleCreateOrderSubmit} className="flex-1 flex flex-col min-h-0">
               <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-3.5 text-xs">
+                {clients.length > 0 && (
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Client existant (optionnel — remplit automatiquement)
+                    </label>
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        const chosen = clients.find((c) => c.id === e.target.value);
+                        if (chosen) {
+                          setOrderForm((prev) => ({
+                            ...prev,
+                            customerName: chosen.name || prev.customerName,
+                            customerEmail: chosen.email || prev.customerEmail,
+                            customerPhone: chosen.phone || prev.customerPhone,
+                            deliveryAddress: chosen.address || prev.deliveryAddress,
+                          }));
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-semibold text-slate-700"
+                    >
+                      <option value="">-- Nouveau client ou choisir dans le CRM --</option>
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.phone ? `(${c.phone})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Nom du client *</label>
@@ -959,6 +1059,42 @@ export default function EcommerceWorkspace({
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Zone / Commune</label>
+                    <input
+                      type="text"
+                      value={orderForm.deliveryZone}
+                      onChange={(e) =>
+                        setOrderForm({ ...orderForm, deliveryZone: e.target.value })
+                      }
+                      placeholder="Ex: Gombe, Limete, Ngaliema..."
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Livreur / Coursier</label>
+                    <input
+                      type="text"
+                      value={orderForm.driverName}
+                      onChange={(e) =>
+                        setOrderForm({ ...orderForm, driverName: e.target.value })
+                      }
+                      placeholder="Nom du livreur (optionnel)"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Instructions / Notes commande</label>
+                  <input
+                    type="text"
+                    value={orderForm.notes}
+                    onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
+                    placeholder="Ex: Appeler 15 min avant arrivée, couleur demandée..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
+                  />
+                </div>
 
                 {/* Sélection produits depuis le catalogue */}
                 <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
@@ -977,11 +1113,15 @@ export default function EcommerceWorkspace({
                         className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold"
                       >
                         <option value="">-- Choisir un produit --</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({formatAmount(p.price, currSym)} • Stock: {p.stock})
-                          </option>
-                        ))}
+                        {products.map((p) => {
+                          const stk = Number(p.stock || 0);
+                          return (
+                            <option key={p.id} value={p.id} disabled={stk <= 0}>
+                              {p.name} ({formatAmount(p.price, currSym)} •{" "}
+                              {stk <= 0 ? "Rupture de stock" : `Stock: ${stk}`})
+                            </option>
+                          );
+                        })}
                       </select>
                       <div className="flex gap-2">
                         <input

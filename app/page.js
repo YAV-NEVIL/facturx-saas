@@ -157,6 +157,7 @@ const VALID_TABS = new Set([
   "dashboard",
   "ecom_products",
   "ecom_orders",
+  "ecom_billing",
   "invoices",
   "company",
   "clients",
@@ -363,6 +364,16 @@ export default function App() {
           if (Array.isArray(parsedPayments) && (Boolean(localStorage.getItem(STORAGE_KEY_USER_PROFILE)) || parsedPayments.length > 0)) {
             setPayments(parsedPayments);
           }
+        }
+        const savedEcomProds = localStorage.getItem(STORAGE_KEY_ECOM_PRODUCTS);
+        if (savedEcomProds) {
+          const parsedEcomProds = JSON.parse(savedEcomProds);
+          if (Array.isArray(parsedEcomProds)) setEcommerceProducts(parsedEcomProds);
+        }
+        const savedEcomOrders = localStorage.getItem(STORAGE_KEY_ECOM_ORDERS);
+        if (savedEcomOrders) {
+          const parsedEcomOrders = JSON.parse(savedEcomOrders);
+          if (Array.isArray(parsedEcomOrders)) setEcommerceOrders(parsedEcomOrders);
         }
       } catch (err) {
         console.error("Erreur lecture localStorage:", err);
@@ -723,6 +734,26 @@ export default function App() {
       }
     }
   }, [payments]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && ecommerceProducts.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY_ECOM_PRODUCTS, JSON.stringify(ecommerceProducts));
+      } catch (err) {
+        console.error("Erreur enregistrement ecom products:", err);
+      }
+    }
+  }, [ecommerceProducts]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && ecommerceOrders.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY_ECOM_ORDERS, JSON.stringify(ecommerceOrders));
+      } catch (err) {
+        console.error("Erreur enregistrement ecom orders:", err);
+      }
+    }
+  }, [ecommerceOrders]);
 
   // Synchroniser le formulaire d'entreprise
   const handleCompanyFieldChange = (field, value) => {
@@ -1140,6 +1171,46 @@ export default function App() {
   };
 
   // Handlers Workspace E-Commerce (Produits, Commandes & Facturation automatique à la fin)
+  const ensureEcommerceClientInCrm = async (order) => {
+    const cleanName = (order?.customerName || "").trim();
+    if (!cleanName) return null;
+    const existing = clients.find(
+      (c) =>
+        (c.name || "").trim().toLowerCase() === cleanName.toLowerCase() ||
+        (order.customerEmail &&
+          c.email &&
+          c.email.trim().toLowerCase() === order.customerEmail.trim().toLowerCase())
+    );
+    if (existing) return existing;
+
+    const newClient = {
+      name: cleanName,
+      contactPerson: cleanName,
+      email: order.customerEmail || "",
+      phone: order.customerPhone || "",
+      address: order.deliveryAddress || "",
+      city: order.deliveryZone || companyInfo?.city || "Kinshasa",
+      country: companyInfo?.country || "RDC",
+      taxId: "",
+      rccm: "",
+      category: "E-Commerce",
+      companyId: userProfile?.companyId || companyInfo?.id || null,
+    };
+    setClients((prev) => [newClient, ...prev]);
+    try {
+      const saved = await apiCreateClient(newClient, userProfile?.companyId || companyInfo?.id);
+      if (saved && saved.id) {
+        setClients((prev) =>
+          prev.map((c) => (c.name === newClient.name && !c.id ? { ...c, id: saved.id } : c))
+        );
+        return { ...newClient, id: saved.id };
+      }
+    } catch {
+      // Non bloquant
+    }
+    return newClient;
+  };
+
   const handleCreateEcommerceProduct = async (product) => {
     const activeCompId = userProfile?.companyId || companyInfo?.id;
     const created = await apiCreateEcommerceProduct(product, activeCompId);
@@ -1155,7 +1226,15 @@ export default function App() {
 
   const handleDeleteEcommerceProduct = async (id) => {
     await apiDeleteEcommerceProduct(id);
-    setEcommerceProducts((prev) => prev.filter((p) => p.id !== id));
+    setEcommerceProducts((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(STORAGE_KEY_ECOM_PRODUCTS, JSON.stringify(next));
+        } catch (e) {}
+      }
+      return next;
+    });
     showToast("Produit supprimé du catalogue.", "info");
   };
 
@@ -1163,6 +1242,8 @@ export default function App() {
     const activeCompId = userProfile?.companyId || companyInfo?.id;
     const created = await apiCreateEcommerceOrder(order, activeCompId);
     setEcommerceOrders((prev) => [created, ...prev]);
+    // Synchroniser le client E-Commerce vers le CRM Boutique
+    ensureEcommerceClientInCrm(order).catch(() => {});
     // Décrémenter le stock des produits commandés
     for (const item of order.items || []) {
       const prod = ecommerceProducts.find((p) => p.id === item.productId);
@@ -1179,12 +1260,57 @@ export default function App() {
   };
 
   const handleUpdateEcommerceOrderStatus = async (orderId, nextStatus) => {
+    const prevOrder = ecommerceOrders.find((o) => o.id === orderId);
     const updated = await apiUpdateEcommerceOrder(orderId, { orderStatus: nextStatus });
     setEcommerceOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+
+    // Restaurer ou ré-allouer le stock si annulation / réactivation
+    if (prevOrder && prevOrder.orderStatus !== nextStatus) {
+      const wasCancelled = prevOrder.orderStatus === "annulee";
+      const isNowCancelled = nextStatus === "annulee";
+      if (!wasCancelled && isNowCancelled) {
+        for (const item of prevOrder.items || []) {
+          const prod = ecommerceProducts.find((p) => p.id === item.productId);
+          if (prod) {
+            const restored = Number(prod.stock || 0) + Number(item.quantity || 1);
+            handleUpdateEcommerceProduct(prod.id, { stock: restored }).catch(() => {});
+          }
+        }
+      } else if (wasCancelled && !isNowCancelled) {
+        for (const item of prevOrder.items || []) {
+          const prod = ecommerceProducts.find((p) => p.id === item.productId);
+          if (prod) {
+            const reduced = Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1));
+            handleUpdateEcommerceProduct(prod.id, { stock: reduced }).catch(() => {});
+          }
+        }
+      }
+    }
     showToast(`Commande ${orderId} mise à jour.`, "success");
   };
 
+  const handleToggleEcommerceOrderPayment = async (orderId) => {
+    const target = ecommerceOrders.find((o) => o.id === orderId);
+    if (!target) return;
+    const nextPayStatus = target.paymentStatus === "paye" ? "en_attente" : "paye";
+    try {
+      const updated = await apiUpdateEcommerceOrder(orderId, { paymentStatus: nextPayStatus });
+      setEcommerceOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+    } catch {
+      setEcommerceOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, paymentStatus: nextPayStatus } : o))
+      );
+    }
+    showToast(
+      nextPayStatus === "paye"
+        ? `Paiement encaissé pour ${orderId}.`
+        : `Paiement repassé en attente pour ${orderId}.`,
+      "success"
+    );
+  };
+
   const handleGenerateInvoiceFromOrder = async (order) => {
+    const linkedClient = await ensureEcommerceClientInCrm(order).catch(() => null);
     const today = new Date();
     const issueStr = today.toLocaleDateString("fr-FR");
     const dueStr = new Date(today.getTime() + 7 * 86400000).toLocaleDateString("fr-FR");
@@ -1209,6 +1335,7 @@ export default function App() {
 
     const newInvoice = {
       id: invId,
+      clientId: linkedClient?.id || null,
       clientName: order.customerName,
       clientEmail: order.customerEmail || "",
       clientPhone: order.customerPhone || "",
@@ -1224,7 +1351,9 @@ export default function App() {
       company: companyInfo,
     };
 
-    await handleCreateInvoice(newInvoice);
+    const createdOk = await handleCreateInvoice(newInvoice);
+    if (!createdOk) return;
+
     try {
       const updatedOrder = await apiUpdateEcommerceOrder(order.id, { invoiceId: invId });
       setEcommerceOrders((prev) => prev.map((o) => (o.id === order.id ? updatedOrder : o)));
@@ -1247,7 +1376,7 @@ export default function App() {
       );
       setIsCreateModalOpen(false);
       setActiveTab("pricing");
-      return;
+      return false;
     }
 
     const activeCompId = userProfile?.companyId || companyInfo?.id || newInvoice.companyId || null;
@@ -1273,7 +1402,7 @@ export default function App() {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       enqueueOfflineAction("CREATE_INVOICE", invoiceToSave, activeCompId);
       showToast(`Facture ${invoiceToSave.id} créée en mode hors-ligne (en attente de sync).`, "info");
-      return;
+      return true;
     }
 
     showToast(`Enregistrement de la facture ${invoiceToSave.id}...`, "info");
@@ -1298,6 +1427,7 @@ export default function App() {
       enqueueOfflineAction("CREATE_INVOICE", invoiceToSave, activeCompId);
       showToast(`Facture ${invoiceToSave.id} créée (sauvegardée en file d'attente hors-ligne).`, "info");
     }
+    return true;
   };
 
   // Mark invoice as paid
@@ -1345,6 +1475,14 @@ export default function App() {
         inv.id === invoiceId ? { ...inv, status: "payee" } : inv
       )
     );
+    // Synchroniser automatiquement la commande E-Commerce associée si elle existe
+    const linkedEcomOrder = ecommerceOrders.find((o) => o.invoiceId === invoiceId);
+    if (linkedEcomOrder && linkedEcomOrder.paymentStatus !== "paye") {
+      setEcommerceOrders((prev) =>
+        prev.map((o) => (o.id === linkedEcomOrder.id ? { ...o, paymentStatus: "paye" } : o))
+      );
+      apiUpdateEcommerceOrder(linkedEcomOrder.id, { paymentStatus: "paye" }).catch(() => {});
+    }
     if (selectedInvoice && selectedInvoice.id === invoiceId) {
       setSelectedInvoice((prev) => ({ ...prev, status: "payee" }));
     }
@@ -2375,30 +2513,36 @@ export default function App() {
           {companyInfo?.businessVertical === "ecommerce" &&
             (activeTab === "dashboard" ||
               activeTab === "ecom_products" ||
-              activeTab === "ecom_orders") && (
+              activeTab === "ecom_orders" ||
+              activeTab === "ecom_billing") && (
               <EcommerceWorkspace
                 activeSection={
                   activeTab === "ecom_products"
                     ? "products"
                     : activeTab === "ecom_orders"
                     ? "orders"
+                    : activeTab === "ecom_billing"
+                    ? "billing"
                     : "overview"
                 }
                 onChangeSection={(sec) => {
                   if (sec === "products") setActiveTab("ecom_products");
                   else if (sec === "orders") setActiveTab("ecom_orders");
-                  else if (sec === "billing") setActiveTab("invoices");
+                  else if (sec === "billing") setActiveTab("ecom_billing");
+                  else if (sec === "invoices") setActiveTab("invoices");
                   else setActiveTab("dashboard");
                 }}
                 products={ecommerceProducts}
                 orders={ecommerceOrders}
                 invoices={invoices}
+                clients={clients}
                 companyInfo={companyInfo}
                 onCreateProduct={handleCreateEcommerceProduct}
                 onUpdateProduct={handleUpdateEcommerceProduct}
                 onDeleteProduct={handleDeleteEcommerceProduct}
                 onCreateOrder={handleCreateEcommerceOrder}
                 onUpdateOrderStatus={handleUpdateEcommerceOrderStatus}
+                onToggleOrderPayment={handleToggleEcommerceOrderPayment}
                 onGenerateInvoiceFromOrder={handleGenerateInvoiceFromOrder}
                 onOpenInvoice={(inv) => {
                   setOpenInvoiceEmailInitially(false);
