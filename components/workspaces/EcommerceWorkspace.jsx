@@ -22,8 +22,12 @@ import {
   CreditCard,
   TrendingUp,
   Building2,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
 import { formatAmount, getCurrencySymbol } from "@/lib/mock-data";
+import { exportEcommerceOrdersToXLSX } from "@/lib/export-utils";
+import { generateReportPdf } from "@/lib/pdf-generator";
 import CalendarDropdown from "@/components/CalendarDropdown";
 
 const ORDER_STATUS_META = {
@@ -208,7 +212,11 @@ export default function EcommerceWorkspace({
     ).length;
     const shippingCount = activeOrders.filter((o) => o.orderStatus === "expediee").length;
     const deliveredCount = activeOrders.filter((o) => o.orderStatus === "livree").length;
-    const cancelledCount = periodOrders.filter((o) => o.orderStatus === "annulee").length;
+    const cancelledOrders = periodOrders.filter((o) => o.orderStatus === "annulee");
+    const cancelledCount = cancelledOrders.length;
+    const cancelledAmount = cancelledOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
+    const cancellationRate =
+      periodOrders.length > 0 ? Math.round((cancelledCount / periodOrders.length) * 100) : 0;
     const deliveryRate =
       activeOrders.length > 0 ? Math.round((deliveredCount / activeOrders.length) * 100) : 0;
     const unbilledOrders = activeOrders.filter((o) => !o.invoiceId);
@@ -217,6 +225,25 @@ export default function EcommerceWorkspace({
     const lowStockProducts = products.filter((p) => Number(p.stock || 0) <= 5);
     const totalStockUnits = products.reduce((acc, p) => acc + Number(p.stock || 0), 0);
     const avgBasket = activeOrders.length > 0 ? totalRevenue / activeOrders.length : 0;
+
+    // Top Produits Vendus sur la période
+    const productSalesMap = {};
+    for (const o of activeOrders) {
+      for (const it of o.items || []) {
+        const key = it.productId || it.description || "Article";
+        const name = it.description || "Article";
+        const qty = Number(it.quantity || 1);
+        const rev = qty * Number(it.unitPrice || 0);
+        if (!productSalesMap[key]) {
+          productSalesMap[key] = { key, name, quantity: 0, revenue: 0 };
+        }
+        productSalesMap[key].quantity += qty;
+        productSalesMap[key].revenue += rev;
+      }
+    }
+    const topProducts = Object.values(productSalesMap)
+      .sort((a, b) => b.revenue - a.revenue || b.quantity - a.quantity)
+      .slice(0, 5);
 
     const pipelineStages = ["nouvelle", "confirmee", "en_preparation", "expediee", "livree"].map(
       (key) => {
@@ -278,6 +305,8 @@ export default function EcommerceWorkspace({
       shippingCount,
       deliveredCount,
       cancelledCount,
+      cancelledAmount,
+      cancellationRate,
       deliveryRate,
       unbilledCount,
       unbilledAmount,
@@ -285,6 +314,7 @@ export default function EcommerceWorkspace({
       lowStockProducts,
       totalStockUnits,
       avgBasket,
+      topProducts,
       pipelineStages,
       statusDonutData,
       paymentChannels,
@@ -554,6 +584,50 @@ export default function EcommerceWorkspace({
     }
   };
 
+  const handleExportDailyExcel = () => {
+    try {
+      const safeLabel = (selectedDate || selectedPeriod || "Aujourdhui").replace(/[/\s]+/g, "_");
+      exportEcommerceOrdersToXLSX(
+        periodOrders,
+        metrics.topProducts,
+        selectedDate || selectedPeriod,
+        currSym,
+        `Bilan_Ecommerce_${safeLabel}.xlsx`
+      );
+      if (onToast) onToast(`Bilan Excel (${selectedDate || selectedPeriod}) téléchargé !`, "success");
+    } catch (err) {
+      if (onToast) onToast(err.message || "Erreur lors de l'export Excel.", "error");
+    }
+  };
+
+  const handleExportDailyPdf = () => {
+    try {
+      const rows = periodOrders.map((o) => {
+        const st = ORDER_STATUS_META[o.orderStatus]?.label || o.orderStatus || "Nouvelle";
+        const pay = o.paymentStatus === "paye" ? "Payee" : "Attente";
+        return {
+          id: o.id,
+          clientName: o.customerName,
+          contactPerson: `${o.customerPhone || ""} ${o.deliveryZone ? `(${o.deliveryZone})` : ""}`.trim(),
+          dueDate: o.paymentMethod || "Cash",
+          totalAmount: Number(o.totalAmount || 0),
+          statusLabel: `${st} / ${pay}`,
+        };
+      });
+      generateReportPdf({
+        title: `BILAN E-COMMERCE — ${selectedDate || selectedPeriod}`,
+        reportType: "all",
+        companyInfo,
+        userProfile: { name: userProfile?.fullName || "Commerçant" },
+        data: rows,
+        currency: currSym,
+      });
+      if (onToast) onToast(`Bilan PDF (${selectedDate || selectedPeriod}) généré !`, "success");
+    } catch (err) {
+      if (onToast) onToast(err.message || "Erreur lors de la génération PDF.", "error");
+    }
+  };
+
   const sectionTabs = [
     { id: "overview", label: "Tableau de bord e-commerce", icon: ShoppingBag },
     { id: "products", label: `Catalogue produits (${products.length})`, icon: Package },
@@ -759,15 +833,35 @@ export default function EcommerceWorkspace({
                 }
               )}
             </div>
-            {periodOrders.length === 0 && orders.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {periodOrders.length === 0 && orders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => applyQuickPeriod("Toutes les dates")}
+                  className="text-xs font-bold text-blue-600 hover:underline mr-1 cursor-pointer"
+                >
+                  {orders.length} cmd sur l&apos;historique →
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => applyQuickPeriod("Toutes les dates")}
-                className="text-xs font-bold text-blue-600 hover:underline shrink-0 text-left sm:text-right cursor-pointer"
+                onClick={handleExportDailyExcel}
+                className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Exporter le bilan de la période en Excel"
               >
-                {orders.length} commande(s) sur l&apos;historique complet →
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Bilan Excel</span>
               </button>
-            )}
+              <button
+                type="button"
+                onClick={handleExportDailyPdf}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Télécharger le bilan de la période en PDF"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-600" />
+                <span>Bilan PDF</span>
+              </button>
+            </div>
           </div>
 
           {/* 4 Cartes KPIs Opérationnelles (Commandes reçues • Argent encaissé • En attente / Expédition • Livrées) */}
@@ -1279,6 +1373,36 @@ export default function EcommerceWorkspace({
                         </button>
                       );
                     })}
+
+                    {/* Suivi des Annulations / Retours livraison */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOrderFilter("annulee");
+                        onChangeSection && onChangeSection("orders");
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-[#FFE4E6]/45 hover:bg-[#FFE4E6]/75 border border-[#FECDD3] flex items-center justify-between gap-2 text-left transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#E11D48] shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#BE123C] truncate">
+                            Annulées / Retours
+                          </p>
+                          <p className="text-[10px] text-rose-700/80 truncate">
+                            {formatAmount(metrics.cancelledAmount, currSym)} non réalisés
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-sm font-extrabold text-[#BE123C]">
+                          {metrics.cancelledCount}
+                        </span>
+                        <span className="text-[10px] font-semibold text-rose-700/80 ml-1">
+                          ({metrics.cancellationRate}%)
+                        </span>
+                      </div>
+                    </button>
                   </div>
                 </div>
               );
@@ -1409,6 +1533,75 @@ export default function EcommerceWorkspace({
                             <div
                               className="h-full bg-blue-600 rounded-full"
                               style={{ width: `${Math.max(pct, 4)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Top Produits Vendus (Best-sellers de la période) */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      Top Produits Vendus
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Articles les plus performants ({selectedDate || selectedPeriod})
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onChangeSection && onChangeSection("products")}
+                    className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Catalogue →
+                  </button>
+                </div>
+
+                {metrics.topProducts.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-3 text-center">
+                    Aucune vente de produit enregistrée sur cette période.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {metrics.topProducts.map((tp, idx) => {
+                      const topMax = metrics.topProducts[0]?.revenue || 1;
+                      const pct = Math.max(8, Math.round((tp.revenue / topMax) * 100));
+                      return (
+                        <div
+                          key={tp.key}
+                          className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-100 space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className={`w-5 h-5 rounded-full text-[10px] font-extrabold flex items-center justify-center shrink-0 ${
+                                  idx === 0
+                                    ? "bg-[#183BB0] text-white"
+                                    : "bg-blue-100 text-[#183BB0]"
+                                }`}
+                              >
+                                #{idx + 1}
+                              </span>
+                              <span className="font-bold text-slate-900 truncate">{tp.name}</span>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-extrabold text-slate-900">
+                                {formatAmount(tp.revenue, currSym)}
+                              </span>
+                              <span className="text-[11px] font-semibold text-slate-500 ml-1.5">
+                                • {tp.quantity} vendu(s)
+                              </span>
+                            </div>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-200/70 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#183BB0] rounded-full"
+                              style={{ width: `${pct}%` }}
                             />
                           </div>
                         </div>
