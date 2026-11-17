@@ -1331,7 +1331,11 @@ export default function App() {
     }
 
     const vatRate =
-      typeof companyInfo?.defaultVatRate === "number" ? companyInfo.defaultVatRate : 0.16;
+      companyInfo?.businessVertical === "ecommerce"
+        ? 0
+        : typeof companyInfo?.defaultVatRate === "number"
+        ? companyInfo.defaultVatRate
+        : 0.16;
 
     const newInvoice = {
       id: invId,
@@ -2251,14 +2255,15 @@ export default function App() {
   // Dès que l'utilisateur a paramétré son entreprise et déposé ses documents (onboardingCompleted === true),
   // son accès à FacturX est IMMÉDIAT et JAMAIS bloqué (même pendant les 24h-48h de vérification ou en cas de document à revoir).
   const isPlatformSuperAdmin = userProfile?.email?.toLowerCase() === "facturx01@gmail.com";
+  const isEcommerceVertical = companyInfo?.businessVertical === "ecommerce";
+  const shouldSkipLegalVerification = isPlatformSuperAdmin || isEcommerceVertical;
   const effectiveOnboardingCompleted =
     typeof companyInfo?.onboardingCompleted === "boolean"
       ? companyInfo.onboardingCompleted
       : Boolean(userProfile?.onboardingCompleted ?? false);
-  const effectiveKybStatus =
-    companyInfo?.kybStatus ||
-    userProfile?.kybStatus ||
-    (isPlatformSuperAdmin ? "approved" : "not_submitted");
+  const effectiveKybStatus = shouldSkipLegalVerification
+    ? "approved"
+    : companyInfo?.kybStatus || userProfile?.kybStatus || "not_submitted";
 
   const handleRefreshKybStatus = async () => {
     const cId = companyInfo?.id || userProfile?.companyId;
@@ -2328,7 +2333,9 @@ export default function App() {
             localStorage.setItem(STORAGE_KEY_USER_PROFILE, JSON.stringify(updatedProfile));
           }
           showToast(
-            "Bienvenue dans votre espace FacturX ! Vos documents sont en cours de vérification (informé sous 48h).",
+            updatedComp?.businessVertical === "ecommerce"
+              ? "Bienvenue dans votre boutique E-Commerce FacturX !"
+              : "Bienvenue dans votre espace FacturX ! Vos documents sont en cours de vérification (informé sous 48h).",
             "success"
           );
         }}
@@ -2338,7 +2345,7 @@ export default function App() {
   }
 
   // Notifications dynamiques (conformité KYB + invitations équipe envoyées / acceptées)
-  const kybHeaderNotifications = !isPlatformSuperAdmin
+  const kybHeaderNotifications = !shouldSkipLegalVerification
     ? effectiveKybStatus === "pending_review"
       ? [
           {
@@ -2444,7 +2451,7 @@ export default function App() {
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onSignOut={handleSignOut}
           notifications={combinedHeaderNotifications}
-          kybStatus={!isPlatformSuperAdmin ? effectiveKybStatus : null}
+          kybStatus={!shouldSkipLegalVerification ? effectiveKybStatus : null}
           onOpenKybDocuments={() => setIsKybRevisionOpen(true)}
         />
 
@@ -2537,6 +2544,8 @@ export default function App() {
                 invoices={invoices}
                 clients={clients}
                 companyInfo={companyInfo}
+                userProfile={userProfile}
+                onNavigateTab={(tab) => setActiveTab(tab)}
                 onCreateProduct={handleCreateEcommerceProduct}
                 onUpdateProduct={handleUpdateEcommerceProduct}
                 onDeleteProduct={handleDeleteEcommerceProduct}
@@ -3055,10 +3064,14 @@ export default function App() {
                     </div>
                     <div>
                       <h3 className="text-sm font-extrabold text-slate-900">
-                        Identité & Enregistrement Fiscal (RDC)
+                        {companyForm.businessVertical === "ecommerce"
+                          ? "Identité de la Boutique E-Commerce"
+                          : "Identité & Enregistrement Fiscal (RDC)"}
                       </h3>
                       <p className="text-[11px] text-slate-500">
-                        Raison sociale, logo officiel, RCCM, Id. Nat. et N° d&apos;Impôt obligatoires en République Démocratique du Congo
+                        {companyForm.businessVertical === "ecommerce"
+                          ? "Nom de la boutique, logo officiel et type d'activité (documents légaux facultatifs pour les e-commerçants)"
+                          : "Raison sociale, logo officiel, RCCM, Id. Nat. et N° d'Impôt obligatoires en République Démocratique du Congo"}
                       </p>
                     </div>
                   </div>

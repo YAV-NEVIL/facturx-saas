@@ -95,15 +95,16 @@ export default function ReportsView({
   // Menu déroulant Export
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
-  // Devise active de l'entreprise
+  // Devise active de l'entreprise & contexte métier
   const currency = companyInfo.currencySymbol || "FC";
+  const isEcommerce = companyInfo?.businessVertical === "ecommerce";
 
   // --- 1. CALCUL DES MÉTRIQUES ET DONNÉES FINANCIÈRES ---
   const enrichedInvoices = useMemo(() => {
     return invoices.map((inv) => {
       const { subtotal, vatAmount, total } = calculateInvoiceTotals(
         inv.items,
-        inv.vatRate ?? companyInfo.defaultVatRate ?? 0.16
+        inv.vatRate ?? companyInfo.defaultVatRate ?? (isEcommerce ? 0 : 0.16)
       );
 
       // Calcul des jours de dépassement d'échéance
@@ -140,7 +141,7 @@ export default function ReportsView({
         urgencyLevel,
       };
     });
-  }, [invoices, companyInfo]);
+  }, [invoices, companyInfo, isEcommerce]);
 
   // Factures échues / à relancer
   const overdueInvoices = useMemo(() => {
@@ -666,13 +667,15 @@ export default function ReportsView({
                     <Clock className="w-4 h-4 text-amber-600" />
                     <span>Paiements en attente (Prévisionnel)</span>
                   </button>
-                  <button
-                    onClick={() => exportFiscalReportToXLSX(invoices, companyInfo)}
-                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2.5"
-                  >
-                    <ShieldCheck className="w-4 h-4 text-blue-600" />
-                    <span>Déclaration Fiscale OHADA / DGI</span>
-                  </button>
+                  {!isEcommerce && (
+                    <button
+                      onClick={() => exportFiscalReportToXLSX(invoices, companyInfo)}
+                      className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2.5"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-blue-600" />
+                      <span>Déclaration Fiscale OHADA / DGI</span>
+                    </button>
+                  )}
                   <div className="my-1 border-t border-slate-100" />
                   <button
                     onClick={handleExportFullAuditWorkbook}
@@ -895,20 +898,22 @@ export default function ReportsView({
               </span>
             </button>
 
-            <button
-              onClick={() => setActiveReportTab("fiscal")}
-              className={`px-4 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-                activeReportTab === "fiscal"
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4 text-indigo-600" />
-              <span>Déclaration Fiscale OHADA / DGI</span>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                TVA {Math.round((companyInfo.defaultVatRate ?? 0.16) * 100)}%
-              </span>
-            </button>
+            {!isEcommerce && (
+              <button
+                onClick={() => setActiveReportTab("fiscal")}
+                className={`px-4 py-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                  activeReportTab === "fiscal"
+                    ? "border-indigo-600 text-indigo-600"
+                    : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                <span>Déclaration Fiscale OHADA / DGI</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                  TVA {Math.round((companyInfo.defaultVatRate ?? 0.16) * 100)}%
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1083,9 +1088,11 @@ export default function ReportsView({
                           <p className="text-base font-extrabold text-rose-700 tracking-tight">
                             {formatAmount(inv.total, currency)}
                           </p>
-                          <span className="text-[11px] text-slate-400 block mt-0.5">
-                            dont TVA {formatAmount(inv.vatAmount, currency)}
-                          </span>
+                          {!isEcommerce && inv.vatAmount > 0 && (
+                            <span className="text-[11px] text-slate-400 block mt-0.5">
+                              dont TVA {formatAmount(inv.vatAmount, currency)}
+                            </span>
+                          )}
                         </td>
 
                         {/* Statut relance */}

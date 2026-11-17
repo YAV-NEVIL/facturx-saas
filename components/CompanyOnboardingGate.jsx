@@ -102,7 +102,11 @@ export default function CompanyOnboardingGate({
       companyInfo?.defaultCurrency || userProfile?.currency || "Franc Congolais (CDF / FC)",
     currencySymbol: companyInfo?.currencySymbol || userProfile?.currencySymbol || "FC",
     defaultVatRate:
-      typeof companyInfo?.defaultVatRate === "number" ? companyInfo.defaultVatRate : 0.16,
+      typeof companyInfo?.defaultVatRate === "number"
+        ? companyInfo.defaultVatRate
+        : (companyInfo?.businessVertical || userProfile?.businessVertical) === "ecommerce"
+        ? 0
+        : 0.16,
     bankName: companyInfo?.bankName || "Rawbank",
     iban: companyInfo?.iban || "",
     airtelMoneyNumber: companyInfo?.airtelMoneyNumber || "",
@@ -185,22 +189,54 @@ export default function CompanyOnboardingGate({
     return true;
   };
 
+  const isEcommerce = form.businessVertical === "ecommerce";
+
   const validateStep2 = () => {
-    if (!form.rccm.trim()) {
-      setErrorMsg("Veuillez renseigner votre numéro RCCM (ou numéro d'immatriculation officiel).");
-      return false;
-    }
-    if (!form.nif.trim() && !form.idNat.trim()) {
-      setErrorMsg("Veuillez renseigner au moins votre Numéro Impôt (NIF / DGI) ou Identification Nationale.");
-      return false;
+    if (!isEcommerce) {
+      if (!form.rccm.trim()) {
+        setErrorMsg("Veuillez renseigner votre numéro RCCM (ou numéro d'immatriculation officiel).");
+        return false;
+      }
+      if (!form.nif.trim() && !form.idNat.trim()) {
+        setErrorMsg("Veuillez renseigner au moins votre Numéro Impôt (NIF / DGI) ou Identification Nationale.");
+        return false;
+      }
     }
     setErrorMsg("");
     return true;
   };
 
+  const handleSubmitWithoutKyb = async () => {
+    if (!validateStep2()) return;
+    setIsSubmitting(true);
+    setErrorMsg("");
+    try {
+      const updatedCompany = await submitCompanyOnboardingAndKyb(
+        companyInfo?.id || userProfile?.companyId || null,
+        { ...form, defaultVatRate: 0 },
+        [],
+        userProfile
+      );
+      if (onOnboardingSubmitted) {
+        onOnboardingSubmitted(updatedCompany);
+      }
+    } catch (err) {
+      console.error("Erreur activation boutique E-Commerce:", err);
+      setErrorMsg(err.message || "Une erreur est survenue lors de l'activation de votre boutique.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleNextStep = () => {
     if (step === 1 && !validateStep1()) return;
-    if (step === 2 && !validateStep2()) return;
+    if (step === 2) {
+      if (isEcommerce) {
+        handleSubmitWithoutKyb();
+        return;
+      }
+      if (!validateStep2()) return;
+    }
     setStep((s) => Math.min(3, s + 1));
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -336,19 +372,29 @@ export default function CompanyOnboardingGate({
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-              Paramétrage de votre Entreprise & Documents d&apos;État
+              {isEcommerce
+                ? "Paramétrage de votre Boutique E-Commerce"
+                : "Paramétrage de votre Entreprise & Documents d'État"}
             </h1>
             <p className="text-xs sm:text-sm text-blue-100 mt-1.5">
-              Bienvenue {userProfile?.fullName || "Administrateur"}. Renseignez les coordonnées de votre entreprise et joignez vos documents officiels : vous accédez immédiatement à FacturX pendant que nos équipes vérifient vos pièces sous 24h à 48h.
+              {isEcommerce
+                ? `Bienvenue ${userProfile?.fullName || "Commerçant"}. Configurez votre boutique et vos moyens d'encaissement en 2 étapes rapides (aucun document légal d'État requis).`
+                : `Bienvenue ${userProfile?.fullName || "Administrateur"}. Renseignez les coordonnées de votre entreprise et joignez vos documents officiels : vous accédez immédiatement à FacturX pendant que nos équipes vérifient vos pièces sous 24h à 48h.`}
             </p>
 
             {/* Stepper Mobile-First */}
-            <div className="grid grid-cols-3 gap-2 mt-5">
-              {[
-                { num: 1, label: "Identité & Siège" },
-                { num: 2, label: "Fiscalité & Banque" },
-                { num: 3, label: "Actes Légaux d'État" },
-              ].map((s) => {
+            <div className={`grid ${isEcommerce ? "grid-cols-2" : "grid-cols-3"} gap-2 mt-5`}>
+              {(isEcommerce
+                ? [
+                    { num: 1, label: "Identité Boutique" },
+                    { num: 2, label: "Paiements & Lancement" },
+                  ]
+                : [
+                    { num: 1, label: "Identité & Siège" },
+                    { num: 2, label: "Fiscalité & Banque" },
+                    { num: 3, label: "Actes Légaux d'État" },
+                  ]
+              ).map((s, _, arr) => {
                 const active = step === s.num;
                 const done = step > s.num;
                 return (
@@ -367,7 +413,7 @@ export default function CompanyOnboardingGate({
                     }`}
                   >
                     <div className="text-[10px] font-extrabold uppercase tracking-wider">
-                      Étape {s.num}/3 {done ? "✓" : ""}
+                      Étape {s.num}/{arr.length} {done ? "✓" : ""}
                     </div>
                     <div className="text-xs font-bold truncate mt-0.5">{s.label}</div>
                   </button>
@@ -619,60 +665,64 @@ export default function CompanyOnboardingGate({
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Taux de TVA par Défaut *
-                    </label>
-                    <select
-                      value={String(form.defaultVatRate)}
-                      onChange={(e) => setForm({ ...form, defaultVatRate: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-blue-600"
-                    >
-                      <option value="0.16">16% — Taux normal RDC (DGI)</option>
-                      <option value="0.18">18% — Taux normal OHADA / UEMOA</option>
-                      <option value="0">0% — Exonéré / Franchise de TVA</option>
-                    </select>
-                  </div>
+                  {!isEcommerce && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Taux de TVA par Défaut *
+                        </label>
+                        <select
+                          value={String(form.defaultVatRate)}
+                          onChange={(e) => setForm({ ...form, defaultVatRate: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-blue-600"
+                        >
+                          <option value="0.16">16% — Taux normal RDC (DGI)</option>
+                          <option value="0.18">18% — Taux normal OHADA / UEMOA</option>
+                          <option value="0">0% — Exonéré / Franchise de TVA</option>
+                        </select>
+                      </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Numéro RCCM Officiel *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={form.rccm}
-                      onChange={(e) => setForm({ ...form, rccm: e.target.value })}
-                      placeholder="Ex: CD/KIN/RCCM/25-B-00123"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:border-blue-600"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Numéro RCCM Officiel *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={form.rccm}
+                          onChange={(e) => setForm({ ...form, rccm: e.target.value })}
+                          placeholder="Ex: CD/KIN/RCCM/25-B-00123"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Numéro Impôt (DGI / NIF / NINEA) *
-                    </label>
-                    <input
-                      type="text"
-                      value={form.nif}
-                      onChange={(e) => setForm({ ...form, nif: e.target.value })}
-                      placeholder="Ex: A2509876X"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:border-blue-600"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Numéro Impôt (DGI / NIF / NINEA) *
+                        </label>
+                        <input
+                          type="text"
+                          value={form.nif}
+                          onChange={(e) => setForm({ ...form, nif: e.target.value })}
+                          placeholder="Ex: A2509876X"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Identification Nationale (Id. Nat.)
-                    </label>
-                    <input
-                      type="text"
-                      value={form.idNat}
-                      onChange={(e) => setForm({ ...form, idNat: e.target.value })}
-                      placeholder="Ex: 01-F4300-N12345K"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:border-blue-600"
-                    />
-                  </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Identification Nationale (Id. Nat.)
+                        </label>
+                        <input
+                          type="text"
+                          value={form.idNat}
+                          onChange={(e) => setForm({ ...form, idNat: e.target.value })}
+                          placeholder="Ex: 01-F4300-N12345K"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -743,9 +793,16 @@ export default function CompanyOnboardingGate({
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                    disabled={isSubmitting}
+                    className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
                   >
-                    <span>Continuer vers Documents Légaux d&apos;État</span>
+                    <span>
+                      {isEcommerce
+                        ? isSubmitting
+                          ? "Activation en cours..."
+                          : "Activer ma Boutique E-Commerce"
+                        : "Continuer vers Documents Légaux d'État"}
+                    </span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>

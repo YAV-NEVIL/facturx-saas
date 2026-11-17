@@ -21,6 +21,8 @@ import {
   X,
   CreditCard,
   TrendingUp,
+  Building2,
+  Calendar,
 } from "lucide-react";
 import { formatAmount, getCurrencySymbol } from "@/lib/mock-data";
 
@@ -28,37 +30,51 @@ const ORDER_STATUS_META = {
   nouvelle: {
     label: "Nouvelle",
     badge: "bg-blue-50 text-blue-700 border-blue-200",
+    dot: "bg-blue-600",
+    bar: "bg-blue-600",
   },
   confirmee: {
     label: "Confirmée",
     badge: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    dot: "bg-indigo-600",
+    bar: "bg-indigo-600",
   },
   en_preparation: {
     label: "En préparation",
-    badge: "bg-amber-50 text-amber-800 border-amber-200",
+    badge: "bg-[#FFEDD5] text-[#C2410C] border-[#FED7AA]",
+    dot: "bg-[#EA580C]",
+    bar: "bg-[#EA580C]",
   },
   expediee: {
     label: "En livraison",
     badge: "bg-purple-50 text-purple-700 border-purple-200",
+    dot: "bg-purple-600",
+    bar: "bg-purple-600",
   },
   livree: {
     label: "Livrée",
-    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    badge: "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]",
+    dot: "bg-[#16A34A]",
+    bar: "bg-[#16A34A]",
   },
   annulee: {
     label: "Annulée",
-    badge: "bg-rose-50 text-rose-700 border-rose-200",
+    badge: "bg-[#FFE4E6] text-[#BE123C] border-[#FECDD3]",
+    dot: "bg-[#E11D48]",
+    bar: "bg-[#E11D48]",
   },
 };
 
 export default function EcommerceWorkspace({
   activeSection = "overview", // "overview" | "products" | "orders" | "billing"
   onChangeSection,
+  onNavigateTab,
   products = [],
   orders = [],
   invoices = [],
   clients = [],
   companyInfo = {},
+  userProfile = null,
   onCreateProduct,
   onUpdateProduct,
   onDeleteProduct,
@@ -72,6 +88,7 @@ export default function EcommerceWorkspace({
   const currency = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const currSym = getCurrencySymbol(currency);
 
+  const [overviewPeriod, setOverviewPeriod] = useState("all"); // "all" | "today" | "7d" | "30d"
   const [productSearch, setProductSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
   const [orderFilter, setOrderFilter] = useState("all");
@@ -106,22 +123,73 @@ export default function EcommerceWorkspace({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [invoicingOrderId, setInvoicingOrderId] = useState(null);
 
+  const periodOrders = useMemo(() => {
+    if (overviewPeriod === "all") return orders;
+    const now = Date.now();
+    const cutoffDays = overviewPeriod === "today" ? 1 : overviewPeriod === "7d" ? 7 : 30;
+    const cutoffMs = now - cutoffDays * 86400000;
+    return orders.filter((o) => {
+      if (!o.createdAt) return true;
+      const t = new Date(o.createdAt).getTime();
+      return Number.isNaN(t) ? true : t >= cutoffMs;
+    });
+  }, [orders, overviewPeriod]);
+
   const metrics = useMemo(() => {
-    const activeOrders = orders.filter((o) => o.orderStatus !== "annulee");
+    const activeOrders = periodOrders.filter((o) => o.orderStatus !== "annulee");
     const totalRevenue = activeOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
+    const paidOrders = activeOrders.filter((o) => o.paymentStatus === "paye");
+    const paidRevenue = paidOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
+    const pendingRevenue = Math.max(0, totalRevenue - paidRevenue);
     const deliveredCount = activeOrders.filter((o) => o.orderStatus === "livree").length;
-    const unbilledCount = activeOrders.filter((o) => !o.invoiceId).length;
-    const lowStockCount = products.filter((p) => Number(p.stock || 0) <= 5).length;
+    const deliveryRate =
+      activeOrders.length > 0 ? Math.round((deliveredCount / activeOrders.length) * 100) : 0;
+    const unbilledOrders = activeOrders.filter((o) => !o.invoiceId);
+    const unbilledCount = unbilledOrders.length;
+    const unbilledAmount = unbilledOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
+    const lowStockProducts = products.filter((p) => Number(p.stock || 0) <= 5);
+    const totalStockUnits = products.reduce((acc, p) => acc + Number(p.stock || 0), 0);
     const avgBasket = activeOrders.length > 0 ? totalRevenue / activeOrders.length : 0;
+
+    const pipelineStages = ["nouvelle", "confirmee", "en_preparation", "expediee", "livree"].map(
+      (key) => {
+        const list = activeOrders.filter((o) => o.orderStatus === key);
+        return {
+          key,
+          ...ORDER_STATUS_META[key],
+          count: list.length,
+          amount: list.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0),
+        };
+      }
+    );
+
+    const channelMap = {};
+    for (const o of activeOrders) {
+      const m = o.paymentMethod || "Cash à la livraison";
+      if (!channelMap[m]) channelMap[m] = { method: m, count: 0, amount: 0 };
+      channelMap[m].count += 1;
+      channelMap[m].amount += Number(o.totalAmount || 0);
+    }
+    const paymentChannels = Object.values(channelMap).sort((a, b) => b.amount - a.amount);
+
     return {
-      totalOrders: orders.length,
+      totalOrders: periodOrders.length,
+      activeOrdersCount: activeOrders.length,
       totalRevenue,
+      paidRevenue,
+      pendingRevenue,
       deliveredCount,
+      deliveryRate,
       unbilledCount,
-      lowStockCount,
+      unbilledAmount,
+      lowStockCount: lowStockProducts.length,
+      lowStockProducts,
+      totalStockUnits,
       avgBasket,
+      pipelineStages,
+      paymentChannels,
     };
-  }, [orders, products]);
+  }, [periodOrders, products]);
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
@@ -320,46 +388,157 @@ export default function EcommerceWorkspace({
   };
 
   const sectionTabs = [
-    { id: "overview", label: "Tableau E-Commerce", icon: ShoppingBag },
-    { id: "products", label: `Catalogue (${products.length})`, icon: Package },
+    { id: "overview", label: "Tableau de bord e-commerce", icon: ShoppingBag },
+    { id: "products", label: `Catalogue produits (${products.length})`, icon: Package },
     { id: "orders", label: `Commandes & Livraisons (${orders.length})`, icon: Truck },
-    { id: "billing", label: `Gestion de Facturation (${metrics.unbilledCount})`, icon: Receipt },
+    { id: "billing", label: `Gestion de facturation (${metrics.unbilledCount})`, icon: Receipt },
   ];
 
+  const heroBySection = {
+    overview: {
+      badge: "TOUR DE CONTRÔLE",
+      title: "Tableau de bord e-commerce",
+      subtitle: `Synthèse de vos ventes, suivi des livraisons et facturation en ${currSym} pour ${
+        companyInfo?.name || "votre boutique"
+      }`,
+    },
+    products: {
+      badge: "CATALOGUE BOUTIQUE",
+      title: "Catalogue produits",
+      subtitle: `Gérez vos articles, tarifs en ${currSym} et niveaux de stock disponibles pour ${
+        companyInfo?.name || "votre boutique"
+      }`,
+    },
+    orders: {
+      badge: "COMMANDES & EXPÉDITIONS",
+      title: "Commandes & Livraisons",
+      subtitle: `Suivez vos paniers, livreurs, zones d'expédition et encaissements en ${currSym}`,
+    },
+    billing: {
+      badge: "FIN DE CYCLE",
+      title: "Gestion de facturation",
+      subtitle: `Convertissez vos commandes en factures officielles, téléchargez le PDF et envoyez au client`,
+    },
+  };
+
+  const currentHero = heroBySection[activeSection] || heroBySection.overview;
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
-      {/* En-tête E-Commerce */}
+    <div className="space-y-5 sm:space-y-6 lg:space-y-8 animate-in fade-in duration-200">
+      {/* BANNIÈRE DE BIENVENUE (Uniquement sur Tableau de bord e-commerce — Design System B2B 1:1) */}
+      {activeSection === "overview" && (
+        <div className="bg-gradient-to-r from-[#1A44B8] via-[#163DA9] to-[#2D60FF] rounded-2xl p-4 sm:p-6 text-white shadow-md relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 min-w-0">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-base sm:text-lg font-extrabold shadow-inner shrink-0">
+              {userProfile?.initials || companyInfo?.initials || "FX"}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg sm:text-2xl font-extrabold tracking-tight">
+                  Bonjour, {userProfile?.fullName || "Commerçant"}
+                </h2>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  En ligne
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-blue-100/90 mt-1 break-words">
+                Espace <strong>E-Commerce</strong> ({userProfile?.badge || userProfile?.role || "Gérant"}) chez{" "}
+                <span className="underline decoration-blue-300 font-bold">
+                  {companyInfo?.name || userProfile?.companyName || "Ma Boutique"}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {onNavigateTab && (userProfile?.role === "admin" || !userProfile?.role) && (
+            <div className="flex items-center gap-2 self-start md:self-auto">
+              <button
+                type="button"
+                onClick={() => onNavigateTab("company")}
+                className="px-3.5 py-2 bg-white/15 hover:bg-white/25 active:scale-95 text-white border border-white/20 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Building2 className="w-3.5 h-3.5 text-blue-200" />
+                <span>Mon Entreprise</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* HERO SECTION SPÉCIFIQUE À LA PAGE ACTIVE (Nom exact de chaque page) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 mb-2">
-            <ShoppingBag className="w-3.5 h-3.5" />
-            <span>Workspace E-Commerce & Vente en Ligne</span>
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Pilotage Boutique, Commandes &amp; Facturation
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-blue-100 text-[#183BB0] border border-blue-200">
+              {currentHero.badge}
+            </span>
+            <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Données synchronisées en direct
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-1.5">
+            {currentHero.title}
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Catalogue produits, suivi des livraisons et conversion en facture normalisée DGI à la fin.
+          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+            {currentHero.subtitle}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={openNewProductModal}
-            className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-indigo-600" />
-            <span>Nouveau Produit</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsOrderModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nouvelle Commande</span>
-          </button>
+          {activeSection === "overview" && (
+            <div className="relative">
+              <Calendar className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                value={overviewPeriod}
+                onChange={(e) => setOverviewPeriod(e.target.value)}
+                className="pl-8 pr-3 py-2 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 shadow-xs cursor-pointer"
+              >
+                <option value="all">Toutes les dates</option>
+                <option value="today">Aujourd&apos;hui</option>
+                <option value="7d">7 derniers jours</option>
+                <option value="30d">30 derniers jours</option>
+              </select>
+            </div>
+          )}
+
+          {(activeSection === "overview" || activeSection === "products") && (
+            <button
+              type="button"
+              onClick={openNewProductModal}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                activeSection === "products"
+                  ? "bg-[#183BB0] hover:bg-[#122F8C] text-white shadow-md shadow-blue-900/20"
+                  : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-xs"
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+              <span>{activeSection === "products" ? "Ajouter un produit" : "Nouveau Produit"}</span>
+            </button>
+          )}
+
+          {(activeSection === "overview" || activeSection === "orders") && (
+            <button
+              type="button"
+              onClick={() => setIsOrderModalOpen(true)}
+              className="px-4 py-2 bg-[#183BB0] hover:bg-[#122F8C] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md shadow-blue-900/20 transition-all hover:scale-[1.02] cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nouvelle Commande</span>
+            </button>
+          )}
+
+          {activeSection === "billing" && (
+            <button
+              type="button"
+              onClick={() => onChangeSection && onChangeSection("invoices")}
+              className="px-4 py-2 bg-[#183BB0] hover:bg-[#122F8C] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md shadow-blue-900/20 transition-all cursor-pointer"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Registre Factures ({invoices.length})</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -386,149 +565,441 @@ export default function EcommerceWorkspace({
         })}
       </div>
 
-      {/* KPIs E-Commerce */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Chiffre d&apos;Affaires Commandes
-          </p>
-          <p className="text-2xl font-extrabold text-slate-900 mt-1">
-            {formatAmount(metrics.totalRevenue, currSym)}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">
-            Panier moyen : {formatAmount(metrics.avgBasket, currSym)}
-          </p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Commandes &amp; Livraisons
-          </p>
-          <p className="text-2xl font-extrabold text-indigo-700 mt-1">{metrics.totalOrders}</p>
-          <p className="text-xs text-emerald-600 font-semibold mt-1">
-            {metrics.deliveredCount} livrée(s) avec succès
-          </p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Produits &amp; Stock
-          </p>
-          <p className="text-2xl font-extrabold text-slate-900 mt-1">{products.length}</p>
-          <p className="text-xs text-amber-600 font-semibold mt-1">
-            {metrics.lowStockCount} alerte(s) stock faible (≤ 5)
-          </p>
-        </div>
-
-        <div
-          onClick={() => onChangeSection && onChangeSection("billing")}
-          className="bg-white rounded-2xl border border-blue-200 shadow-sm p-5 cursor-pointer hover:border-blue-400 transition-colors"
-        >
-          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
-            À Facturer (Fin de cycle)
-          </p>
-          <p className="text-2xl font-extrabold text-blue-700 mt-1">{metrics.unbilledCount}</p>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-            <span>Convertir en facture DGI</span>
-            <ArrowRight className="w-3 h-3" />
-          </p>
-        </div>
-      </div>
-
-      {/* VUE OVERVIEW : Chaîne complète se terminant par Gestion de Facturation */}
+      {/* VUE 1 : TABLEAU DE BORD E-COMMERCE OPTIMISÉ (DESIGN SYSTEM B2B 1:1) */}
       {activeSection === "overview" && (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h2 className="text-sm font-extrabold text-slate-900 mb-3">
-              Cycle E-Commerce FacturX (de la mise en catalogue jusqu&apos;à la Facturation DGI)
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                { step: "1. Catalogue", desc: `${products.length} produit(s) géré(s)`, tab: "products" },
-                { step: "2. Commande", desc: "Panier, client & adresse", tab: "orders" },
-                { step: "3. Livraison", desc: "Coursier, zone & suivi", tab: "orders" },
-                {
-                  step: "4. Gestion de Facturation",
-                  desc: "Facture normalisée DGI & Reçu PDF",
-                  tab: "billing",
-                },
-              ].map((item) => (
-                <button
-                  key={item.step}
-                  type="button"
-                  onClick={() => onChangeSection && onChangeSection(item.tab)}
-                  className="p-4 rounded-2xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 text-left transition-all cursor-pointer"
+          {/* 4 Cartes KPIs style StatsCards.jsx */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {/* KPI 1 : Chiffre d'affaires */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                  Panier : {formatAmount(metrics.avgBasket, currSym)}
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
+                Chiffre d&apos;Affaires
+              </p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
+                {formatAmount(metrics.totalRevenue, currSym)}
+              </p>
+              <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
+                <span className="text-emerald-600 font-semibold">
+                  Encaissé : {formatAmount(metrics.paidRevenue, currSym)}
+                </span>
+              </p>
+            </div>
+
+            {/* KPI 2 : Commandes & Livraisons */}
+            <div
+              onClick={() => onChangeSection && onChangeSection("orders")}
+              className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]">
+                  {metrics.deliveryRate}% livrées
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
+                Commandes &amp; Livraisons
+              </p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
+                {metrics.totalOrders}
+              </p>
+              <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
+                <span>{metrics.deliveredCount} livrée(s)</span>
+                <span className="text-blue-600 font-bold">Voir →</span>
+              </p>
+            </div>
+
+            {/* KPI 3 : Catalogue & Stock */}
+            <div
+              onClick={() => onChangeSection && onChangeSection("products")}
+              className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <Package className="w-5 h-5" />
+                </div>
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                    metrics.lowStockCount > 0
+                      ? "bg-[#FFE4E6] text-[#BE123C] border-[#FECDD3]"
+                      : "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                  }`}
                 >
-                  <p className="text-xs font-extrabold text-blue-700">{item.step}</p>
-                  <p className="text-xs text-slate-600 mt-1">{item.desc}</p>
-                </button>
-              ))}
+                  {metrics.lowStockCount > 0
+                    ? `${metrics.lowStockCount} alerte(s)`
+                    : "Stock sain"}
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
+                Catalogue produits
+              </p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
+                {products.length}
+              </p>
+              <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
+                <span>{metrics.totalStockUnits} unité(s) en stock</span>
+                <span className="text-blue-600 font-bold">Gérer →</span>
+              </p>
+            </div>
+
+            {/* KPI 4 : À Facturer (Fin de cycle) */}
+            <div
+              onClick={() => onChangeSection && onChangeSection("billing")}
+              className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#183BB0] flex items-center justify-center shrink-0">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                    metrics.unbilledCount > 0
+                      ? "bg-[#FFEDD5] text-[#C2410C] border-[#FED7AA]"
+                      : "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                  }`}
+                >
+                  {metrics.unbilledCount > 0 ? "À facturer" : "Tout facturé"}
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
+                Gestion de facturation
+              </p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
+                {metrics.unbilledCount}
+              </p>
+              <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
+                <span>{formatAmount(metrics.unbilledAmount, currSym)}</span>
+                <span className="text-blue-600 font-bold flex items-center gap-1">
+                  Facturer <ArrowRight className="w-3 h-3" />
+                </span>
+              </p>
             </div>
           </div>
 
-          {/* Dernières commandes */}
+          {/* Pipeline Opérationnel des Commandes (Cliquable par étape) */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-900">Commandes Récentes</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  Suivi des Commandes par Étape
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Cliquez sur une étape pour filtrer directement les commandes correspondantes
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => onChangeSection && onChangeSection("orders")}
-                className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                onClick={() => {
+                  setOrderFilter("all");
+                  onChangeSection && onChangeSection("orders");
+                }}
+                className="text-xs font-bold text-blue-600 hover:underline self-start sm:self-auto cursor-pointer"
               >
-                Tout voir →
+                Ouvrir le suivi complet →
               </button>
             </div>
-            {orders.length === 0 ? (
-              <div className="py-10 text-center text-xs text-slate-500">
-                Aucune commande enregistrée. Créez d&apos;abord un produit puis passez votre première commande.
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {orders.slice(0, 5).map((ord) => {
-                  const st = ORDER_STATUS_META[ord.orderStatus] || ORDER_STATUS_META.nouvelle;
-                  return (
-                    <div
-                      key={ord.id}
-                      className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs font-extrabold text-slate-900">
-                            {ord.id}
-                          </span>
-                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${st.badge}`}>
-                            {st.label}
-                          </span>
-                          {ord.invoiceId && (
-                            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                              Facturée : {ord.invoiceId}
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {metrics.pipelineStages.map((stage) => {
+                const share =
+                  metrics.activeOrdersCount > 0
+                    ? Math.round((stage.count / metrics.activeOrdersCount) * 100)
+                    : 0;
+                return (
+                  <button
+                    key={stage.key}
+                    type="button"
+                    onClick={() => {
+                      setOrderFilter(stage.key);
+                      onChangeSection && onChangeSection("orders");
+                    }}
+                    className="p-3.5 rounded-2xl bg-[#F8FAFC] hover:bg-blue-50/60 border border-slate-100 hover:border-blue-200 text-left transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                        <span className={`w-2 h-2 rounded-full ${stage.dot}`} />
+                        {stage.label}
+                      </span>
+                      <span className="text-xs font-extrabold text-slate-900">{stage.count}</span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-600 mt-2">
+                      {formatAmount(stage.amount, currSym)}
+                    </p>
+                    <div className="w-full h-1.5 bg-slate-200/80 rounded-full overflow-hidden mt-2">
+                      <div
+                        className={`h-full rounded-full ${stage.bar}`}
+                        style={{ width: `${Math.max(share, stage.count > 0 ? 10 : 0)}%` }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Grille Principale 2 Colonnes : Trésorerie & Alertes Stock | Commandes Récentes */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Colonne Gauche : Encaissements par canal & Alertes Stock */}
+            <div className="space-y-6">
+              {/* Encaissements & Canaux Mobile Money / Cash */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      Encaissements &amp; Modes de Paiement
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Répartition réelle des règlements boutique
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                    {metrics.totalRevenue > 0
+                      ? Math.round((metrics.paidRevenue / metrics.totalRevenue) * 100)
+                      : 0}
+                    % encaissé
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-100">
+                    <p className="text-[11px] font-bold text-emerald-700 uppercase">Encaissé</p>
+                    <p className="text-base font-extrabold text-emerald-900 mt-0.5">
+                      {formatAmount(metrics.paidRevenue, currSym)}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-100">
+                    <p className="text-[11px] font-bold text-amber-800 uppercase">À recevoir</p>
+                    <p className="text-base font-extrabold text-amber-950 mt-0.5">
+                      {formatAmount(metrics.pendingRevenue, currSym)}
+                    </p>
+                  </div>
+                </div>
+
+                {metrics.paymentChannels.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-3 text-center">
+                    Aucun paiement enregistré sur cette période.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5 pt-1">
+                    {metrics.paymentChannels.map((ch) => {
+                      const pct =
+                        metrics.totalRevenue > 0
+                          ? Math.round((ch.amount / metrics.totalRevenue) * 100)
+                          : 0;
+                      return (
+                        <div key={ch.method} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-700">
+                              {ch.method} ({ch.count})
                             </span>
+                            <span className="font-bold text-slate-900">
+                              {formatAmount(ch.amount, currSym)} ({pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-blue-600 rounded-full"
+                              style={{ width: `${Math.max(pct, 4)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Alertes Stock Faible */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-bold text-slate-900">
+                    Alertes Stock &amp; Réapprovisionnement
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => onChangeSection && onChangeSection("products")}
+                    className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Catalogue →
+                  </button>
+                </div>
+
+                {products.length === 0 ? (
+                  <div className="py-4 text-center space-y-2">
+                    <p className="text-xs text-slate-500">
+                      Aucun produit dans votre catalogue pour le moment.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={openNewProductModal}
+                      className="px-3.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold cursor-pointer"
+                    >
+                      + Ajouter mon premier produit
+                    </button>
+                  </div>
+                ) : metrics.lowStockProducts.length === 0 ? (
+                  <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center gap-2.5 text-xs text-emerald-800 font-semibold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Tous vos {products.length} produits ont un stock suffisant (&gt; 5 unités).</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {metrics.lowStockProducts.slice(0, 4).map((prod) => (
+                      <div
+                        key={prod.id}
+                        className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-100 flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{prod.name}</p>
+                          <p className="text-[11px] text-rose-600 font-semibold">
+                            {Number(prod.stock || 0) <= 0
+                              ? "Rupture de stock"
+                              : `Plus que ${prod.stock} en stock`}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openEditProductModal(prod)}
+                          className="shrink-0 px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-600 border border-slate-200 text-xs font-bold cursor-pointer"
+                        >
+                          Réapprovisionner
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Colonne Droite : Commandes Récentes & Facturation rapide (style DashboardRecentInvoices.jsx) */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4 flex flex-col">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Commandes Récentes &amp; Facturation
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Passez directement de la commande à la facture client en 1 clic
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onChangeSection && onChangeSection("orders")}
+                  className="text-xs font-bold text-blue-600 hover:underline cursor-pointer shrink-0"
+                >
+                  Tout voir →
+                </button>
+              </div>
+
+              {periodOrders.length === 0 ? (
+                <div className="flex-1 py-10 text-center space-y-3 flex flex-col items-center justify-center">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center">
+                    <ShoppingBag className="w-6 h-6" />
+                  </div>
+                  <p className="text-xs text-slate-500 max-w-xs">
+                    Aucune commande enregistrée sur cette période. Créez un produit puis passez votre première commande.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsOrderModalOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold cursor-pointer"
+                  >
+                    + Nouvelle Commande
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2.5 flex-1">
+                  {periodOrders.slice(0, 6).map((ord) => {
+                    const st = ORDER_STATUS_META[ord.orderStatus] || ORDER_STATUS_META.nouvelle;
+                    const isPaid = ord.paymentStatus === "paye";
+                    const linkedInvoice = ord.invoiceId
+                      ? invoices.find((inv) => inv.id === ord.invoiceId)
+                      : null;
+                    return (
+                      <div
+                        key={ord.id}
+                        className="p-3.5 rounded-2xl border border-slate-100 bg-[#F8FAFC] hover:bg-white hover:border-slate-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-xs font-extrabold text-slate-900">
+                              {ord.id}
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${st.badge}`}
+                            >
+                              {st.label}
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                isPaid
+                                  ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                                  : "bg-[#FFEDD5] text-[#C2410C] border-[#FED7AA]"
+                              }`}
+                            >
+                              {isPaid ? "Payée" : "En attente"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1 truncate">
+                            <strong>{ord.customerName}</strong> • {ord.deliveryZone} • {ord.paymentMethod}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
+                          <span className="text-sm font-extrabold text-slate-900">
+                            {formatAmount(ord.totalAmount, currSym)}
+                          </span>
+                          {linkedInvoice ? (
+                            <button
+                              type="button"
+                              onClick={() => onOpenInvoice && onOpenInvoice(linkedInvoice)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold cursor-pointer"
+                            >
+                              Facture
+                            </button>
+                          ) : (
+                            ord.orderStatus !== "annulee" && (
+                              <button
+                                type="button"
+                                onClick={() => handleInvoiceOrder(ord)}
+                                disabled={invoicingOrderId === ord.id}
+                                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                              >
+                                {invoicingOrderId === ord.id ? "..." : "Facturer"}
+                              </button>
+                            )
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 mt-1">
-                          <strong>{ord.customerName}</strong> • {ord.deliveryZone} • {ord.paymentMethod}
-                        </p>
                       </div>
-                      <div className="flex items-center justify-between sm:justify-end gap-3">
-                        <span className="text-sm font-extrabold text-slate-900">
-                          {formatAmount(ord.totalAmount, currSym)}
-                        </span>
-                        {!ord.invoiceId && ord.orderStatus !== "annulee" && (
-                          <button
-                            type="button"
-                            onClick={() => handleInvoiceOrder(ord)}
-                            disabled={invoicingOrderId === ord.id}
-                            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
-                          >
-                            {invoicingOrderId === ord.id ? "..." : "Facturer"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Rappel Cycle E-Commerce -> Gestion de Facturation */}
+              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-slate-500">
+                  Fin de cycle : <strong>{metrics.unbilledCount}</strong> commande(s) à facturer
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onChangeSection && onChangeSection("billing")}
+                  className="font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Ouvrir Gestion de facturation</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}
@@ -628,28 +1099,18 @@ export default function EcommerceWorkspace({
       {(activeSection === "orders" || activeSection === "billing") && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
           {activeSection === "billing" && (
-            <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-xs text-blue-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <p className="font-extrabold">
-                  Gestion de Facturation E-Commerce (DGI RDC / OHADA)
+                <p className="font-extrabold text-slate-900">
+                  Commandes en attente de facturation
                 </p>
-                <p className="text-blue-800 mt-0.5">
-                  Convertissez vos commandes en factures normalisées avec Code DEF, QR Code, PDF et envoi email Brevo au client.
+                <p className="text-slate-500 mt-0.5">
+                  Convertissez vos commandes en factures PDF et envoyez-les directement à vos clients par email.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <span className="px-3 py-1 rounded-full bg-white border border-blue-200 font-bold text-blue-700">
-                  {metrics.unbilledCount} commande(s) à facturer
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onChangeSection && onChangeSection("invoices")}
-                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Registre Factures ({invoices.length})</span>
-                </button>
-              </div>
+              <span className="shrink-0 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 font-bold text-blue-700">
+                {metrics.unbilledCount} commande(s) à facturer
+              </span>
             </div>
           )}
 

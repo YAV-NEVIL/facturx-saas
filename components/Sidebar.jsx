@@ -77,7 +77,7 @@ export default function Sidebar({
       { id: "invoices", label: "Gestion de Facturation", icon: FileText, badge: invoiceCount },
       { id: "payments", label: "Paiements & Reçus", icon: CreditCard },
       { id: "clients", label: "Clients Boutique", icon: Users },
-      { id: "reports", label: "Rapports & TVA", icon: FileSpreadsheet },
+      { id: "reports", label: "Rapports", icon: FileSpreadsheet },
       { id: "company", label: "Mon Entreprise", icon: Building2 },
       { id: "employees", label: "Employés", icon: ShieldCheck },
       { id: "pricing", label: "Abonnement & Tarifs", icon: Crown, badge: planBadge },
