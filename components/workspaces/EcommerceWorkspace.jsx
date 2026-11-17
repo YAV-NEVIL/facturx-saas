@@ -22,9 +22,9 @@ import {
   CreditCard,
   TrendingUp,
   Building2,
-  Calendar,
 } from "lucide-react";
 import { formatAmount, getCurrencySymbol } from "@/lib/mock-data";
+import CalendarDropdown from "@/components/CalendarDropdown";
 
 const ORDER_STATUS_META = {
   nouvelle: {
@@ -88,7 +88,27 @@ export default function EcommerceWorkspace({
   const currency = companyInfo?.defaultCurrency || companyInfo?.currencySymbol || "FC";
   const currSym = getCurrencySymbol(currency);
 
-  const [overviewPeriod, setOverviewPeriod] = useState("all"); // "all" | "today" | "7d" | "30d"
+  const fmtOrderDateStr = (d) => {
+    const dt = d instanceof Date ? d : new Date(d);
+    if (Number.isNaN(dt.getTime())) return null;
+    const dd = String(dt.getDate()).padStart(2, "0");
+    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+    return `${dd}/${mm}/${dt.getFullYear()}`;
+  };
+
+  const todayLiveObj = new Date();
+  const todayLiveStr = fmtOrderDateStr(todayLiveObj);
+  const yesterdayLiveStr = fmtOrderDateStr(
+    new Date(todayLiveObj.getFullYear(), todayLiveObj.getMonth(), todayLiveObj.getDate() - 1)
+  );
+  const tomorrowLiveStr = fmtOrderDateStr(
+    new Date(todayLiveObj.getFullYear(), todayLiveObj.getMonth(), todayLiveObj.getDate() + 1)
+  );
+
+  const [selectedPeriod, setSelectedPeriod] = useState("Aujourd'hui");
+  const [selectedDate, setSelectedDate] = useState(todayLiveStr);
+  const [hoveredChartIdx, setHoveredChartIdx] = useState(null);
+  const [hoveredStatusKey, setHoveredStatusKey] = useState(null);
   const [productSearch, setProductSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
   const [orderFilter, setOrderFilter] = useState("all");
@@ -123,17 +143,57 @@ export default function EcommerceWorkspace({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [invoicingOrderId, setInvoicingOrderId] = useState(null);
 
+  const orderCalendarDates = useMemo(() => {
+    const set = new Set();
+    for (const o of orders) {
+      const ds = fmtOrderDateStr(o.createdAt || new Date());
+      if (ds) set.add(ds);
+    }
+    return Array.from(set);
+  }, [orders]);
+
+  const applyQuickPeriod = (label) => {
+    setSelectedPeriod(label);
+    if (label === "Aujourd'hui") setSelectedDate(todayLiveStr);
+    else if (label === "Hier") setSelectedDate(yesterdayLiveStr);
+    else if (label === "Demain") setSelectedDate(tomorrowLiveStr);
+    else setSelectedDate(null);
+  };
+
   const periodOrders = useMemo(() => {
-    if (overviewPeriod === "all") return orders;
-    const now = Date.now();
-    const cutoffDays = overviewPeriod === "today" ? 1 : overviewPeriod === "7d" ? 7 : 30;
-    const cutoffMs = now - cutoffDays * 86400000;
+    if (selectedPeriod === "Toutes les dates" && !selectedDate) return orders;
+
+    const now = new Date();
+    const isExactDayFilter = Boolean(selectedDate && /^\d{2}\/\d{2}\/\d{4}$/.test(selectedDate));
+
     return orders.filter((o) => {
-      if (!o.createdAt) return true;
-      const t = new Date(o.createdAt).getTime();
-      return Number.isNaN(t) ? true : t >= cutoffMs;
+      const rawDate = o.createdAt ? new Date(o.createdAt) : now;
+      if (Number.isNaN(rawDate.getTime())) return true;
+      const ordStr = fmtOrderDateStr(rawDate);
+
+      if (isExactDayFilter) {
+        return ordStr === selectedDate;
+      }
+      if (selectedPeriod === "Aujourd'hui") return ordStr === todayLiveStr;
+      if (selectedPeriod === "Hier") return ordStr === yesterdayLiveStr;
+      if (selectedPeriod === "Demain") return ordStr === tomorrowLiveStr;
+      if (selectedPeriod === "Cette semaine") {
+        const diffDays = (now.getTime() - rawDate.getTime()) / 86400000;
+        return diffDays >= -1 && diffDays <= 7;
+      }
+      if (selectedPeriod === "Ce mois-ci") {
+        return (
+          rawDate.getMonth() === now.getMonth() && rawDate.getFullYear() === now.getFullYear()
+        );
+      }
+      if (selectedPeriod === "Mois précédent") {
+        const prevM = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+        const prevY = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+        return rawDate.getMonth() === prevM && rawDate.getFullYear() === prevY;
+      }
+      return true;
     });
-  }, [orders, overviewPeriod]);
+  }, [orders, selectedPeriod, selectedDate, todayLiveStr, yesterdayLiveStr, tomorrowLiveStr]);
 
   const metrics = useMemo(() => {
     const activeOrders = periodOrders.filter((o) => o.orderStatus !== "annulee");
@@ -141,7 +201,14 @@ export default function EcommerceWorkspace({
     const paidOrders = activeOrders.filter((o) => o.paymentStatus === "paye");
     const paidRevenue = paidOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
     const pendingRevenue = Math.max(0, totalRevenue - paidRevenue);
+    const collectionRate = totalRevenue > 0 ? Math.round((paidRevenue / totalRevenue) * 100) : 0;
+
+    const pendingLogisticsCount = activeOrders.filter((o) =>
+      ["nouvelle", "confirmee", "en_preparation"].includes(o.orderStatus)
+    ).length;
+    const shippingCount = activeOrders.filter((o) => o.orderStatus === "expediee").length;
     const deliveredCount = activeOrders.filter((o) => o.orderStatus === "livree").length;
+    const cancelledCount = periodOrders.filter((o) => o.orderStatus === "annulee").length;
     const deliveryRate =
       activeOrders.length > 0 ? Math.round((deliveredCount / activeOrders.length) * 100) : 0;
     const unbilledOrders = activeOrders.filter((o) => !o.invoiceId);
@@ -163,6 +230,33 @@ export default function EcommerceWorkspace({
       }
     );
 
+    const statusDonutData = [
+      {
+        key: "pending_logistics",
+        label: "En attente",
+        sub: "Nouvelles / Préparation",
+        count: pendingLogisticsCount,
+        color: "#EA580C",
+        badgeClass: "bg-[#FFEDD5] text-[#C2410C] border-[#FED7AA]",
+      },
+      {
+        key: "expediee",
+        label: "En expédition",
+        sub: "En cours de livraison",
+        count: shippingCount,
+        color: "#2563EB",
+        badgeClass: "bg-blue-50 text-blue-700 border-blue-200",
+      },
+      {
+        key: "livree",
+        label: "Livrées",
+        sub: "Remises au client",
+        count: deliveredCount,
+        color: "#16A34A",
+        badgeClass: "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]",
+      },
+    ];
+
     const channelMap = {};
     for (const o of activeOrders) {
       const m = o.paymentMethod || "Cash à la livraison";
@@ -177,8 +271,13 @@ export default function EcommerceWorkspace({
       activeOrdersCount: activeOrders.length,
       totalRevenue,
       paidRevenue,
+      paidOrdersCount: paidOrders.length,
       pendingRevenue,
+      collectionRate,
+      pendingLogisticsCount,
+      shippingCount,
       deliveredCount,
+      cancelledCount,
       deliveryRate,
       unbilledCount,
       unbilledAmount,
@@ -187,9 +286,75 @@ export default function EcommerceWorkspace({
       totalStockUnits,
       avgBasket,
       pipelineStages,
+      statusDonutData,
       paymentChannels,
     };
   }, [periodOrders, products]);
+
+  // Série graphique dynamique : Argent encaissé vs Nombre de commandes reçues (horaire pour 1 jour, journalier pour multi-jours)
+  const chartSeries = useMemo(() => {
+    const isSingleDay =
+      Boolean(selectedDate && /^\d{2}\/\d{2}\/\d{4}$/.test(selectedDate)) ||
+      selectedPeriod === "Aujourd'hui" ||
+      selectedPeriod === "Hier" ||
+      selectedPeriod === "Demain";
+
+    if (isSingleDay) {
+      const slots = [
+        { label: "00h-06h", minH: 0, maxH: 6 },
+        { label: "06h-10h", minH: 6, maxH: 10 },
+        { label: "10h-14h", minH: 10, maxH: 14 },
+        { label: "14h-18h", minH: 14, maxH: 18 },
+        { label: "18h-22h", minH: 18, maxH: 22 },
+        { label: "22h-00h", minH: 22, maxH: 24 },
+      ];
+      return slots.map((s) => {
+        const slotOrders = periodOrders.filter((o) => {
+          if (o.orderStatus === "annulee") return false;
+          const dt = o.createdAt ? new Date(o.createdAt) : new Date();
+          const hr = Number.isNaN(dt.getTime()) ? 12 : dt.getHours();
+          return hr >= s.minH && hr < s.maxH;
+        });
+        const orderCount = slotOrders.length;
+        const orderedAmount = slotOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
+        const collectedAmount = slotOrders
+          .filter((o) => o.paymentStatus === "paye")
+          .reduce((acc, o) => acc + Number(o.totalAmount || 0), 0);
+        return {
+          label: s.label,
+          orderCount,
+          orderedAmount,
+          collectedAmount,
+        };
+      });
+    }
+
+    // Multi-jours : 7 derniers jours (ou derniers jours actifs)
+    const buckets = [];
+    const baseNow = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(baseNow.getFullYear(), baseNow.getMonth(), baseNow.getDate() - i);
+      const dStr = fmtOrderDateStr(d);
+      const dayLabel = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(
+        2,
+        "0"
+      )}`;
+      const dayOrders = periodOrders.filter((o) => {
+        if (o.orderStatus === "annulee") return false;
+        const oStr = fmtOrderDateStr(o.createdAt || baseNow);
+        return oStr === dStr;
+      });
+      buckets.push({
+        label: dayLabel,
+        orderCount: dayOrders.length,
+        orderedAmount: dayOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0),
+        collectedAmount: dayOrders
+          .filter((o) => o.paymentStatus === "paye")
+          .reduce((acc, o) => acc + Number(o.totalAmount || 0), 0),
+      });
+    }
+    return buckets;
+  }, [periodOrders, selectedPeriod, selectedDate]);
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
@@ -218,6 +383,8 @@ export default function EcommerceWorkspace({
           ? true
           : effectiveOrderFilter === "unbilled"
           ? !o.invoiceId && o.orderStatus !== "annulee"
+          : effectiveOrderFilter === "pending_logistics"
+          ? ["nouvelle", "confirmee", "en_preparation"].includes(o.orderStatus)
           : o.orderStatus === effectiveOrderFilter;
       return matchQuery && matchStatus;
     });
@@ -488,19 +655,17 @@ export default function EcommerceWorkspace({
 
         <div className="flex flex-wrap items-center gap-2.5">
           {activeSection === "overview" && (
-            <div className="relative">
-              <Calendar className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <select
-                value={overviewPeriod}
-                onChange={(e) => setOverviewPeriod(e.target.value)}
-                className="pl-8 pr-3 py-2 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 shadow-xs cursor-pointer"
-              >
-                <option value="all">Toutes les dates</option>
-                <option value="today">Aujourd&apos;hui</option>
-                <option value="7d">7 derniers jours</option>
-                <option value="30d">30 derniers jours</option>
-              </select>
-            </div>
+            <CalendarDropdown
+              selectedPeriod={selectedPeriod}
+              onSelectPeriod={setSelectedPeriod}
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              invoiceDates={orderCalendarDates}
+              useLiveDates={true}
+              dotLabel="Commandes enregistrées"
+              buttonClassName="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 shadow-xs cursor-pointer transition-colors"
+              align="right"
+            />
           )}
 
           {(activeSection === "overview" || activeSection === "products") && (
@@ -568,97 +733,138 @@ export default function EcommerceWorkspace({
       {/* VUE 1 : TABLEAU DE BORD E-COMMERCE OPTIMISÉ (DESIGN SYSTEM B2B 1:1) */}
       {activeSection === "overview" && (
         <div className="space-y-6">
-          {/* 4 Cartes KPIs style StatsCards.jsx */}
+          {/* Barre de raccourcis rapides de période (Aujourd'hui / Hier / Demain / Semaine / Toutes les dates) */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">
+                Période :
+              </span>
+              {["Aujourd'hui", "Hier", "Demain", "Cette semaine", "Ce mois-ci", "Toutes les dates"].map(
+                (label) => {
+                  const isAct = selectedPeriod === label;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => applyQuickPeriod(label)}
+                      className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isAct
+                          ? "bg-[#183BB0] text-white shadow-xs"
+                          : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                }
+              )}
+            </div>
+            {periodOrders.length === 0 && orders.length > 0 && (
+              <button
+                type="button"
+                onClick={() => applyQuickPeriod("Toutes les dates")}
+                className="text-xs font-bold text-blue-600 hover:underline shrink-0 text-left sm:text-right cursor-pointer"
+              >
+                {orders.length} commande(s) sur l&apos;historique complet →
+              </button>
+            )}
+          </div>
+
+          {/* 4 Cartes KPIs Opérationnelles (Commandes reçues • Argent encaissé • En attente / Expédition • Livrées) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {/* KPI 1 : Chiffre d'affaires */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+            {/* KPI 1 : Commandes reçues sur la période */}
+            <div
+              onClick={() => {
+                setOrderFilter("all");
+                onChangeSection && onChangeSection("orders");
+              }}
+              className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
+            >
               <div className="flex items-center justify-between gap-2">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                   <ShoppingBag className="w-5 h-5" />
                 </div>
                 <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                  Panier : {formatAmount(metrics.avgBasket, currSym)}
+                  {selectedPeriod}
                 </span>
               </div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
-                Chiffre d&apos;Affaires
-              </p>
-              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
-                {formatAmount(metrics.totalRevenue, currSym)}
-              </p>
-              <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
-                <span className="text-emerald-600 font-semibold">
-                  Encaissé : {formatAmount(metrics.paidRevenue, currSym)}
-                </span>
-              </p>
-            </div>
-
-            {/* KPI 2 : Commandes & Livraisons */}
-            <div
-              onClick={() => onChangeSection && onChangeSection("orders")}
-              className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Truck className="w-5 h-5" />
-                </div>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]">
-                  {metrics.deliveryRate}% livrées
-                </span>
-              </div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
-                Commandes &amp; Livraisons
+                Commandes reçues
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
                 {metrics.totalOrders}
               </p>
               <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
-                <span>{metrics.deliveredCount} livrée(s)</span>
+                <span>Volume : {formatAmount(metrics.totalRevenue, currSym)}</span>
                 <span className="text-blue-600 font-bold">Voir →</span>
               </p>
             </div>
 
-            {/* KPI 3 : Catalogue & Stock */}
+            {/* KPI 2 : Argent encaissé vs commandes reçues */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]">
+                  {metrics.collectionRate}% encaissé
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
+                Argent encaissé
+              </p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
+                {formatAmount(metrics.paidRevenue, currSym)}
+              </p>
+              <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
+                <span>
+                  Sur {metrics.paidOrdersCount}/{metrics.activeOrdersCount} cmd payées
+                </span>
+                <span className="text-amber-700 font-semibold">
+                  Reste : {formatAmount(metrics.pendingRevenue, currSym)}
+                </span>
+              </p>
+            </div>
+
+            {/* KPI 3 : En attente & En expédition */}
             <div
-              onClick={() => onChangeSection && onChangeSection("products")}
+              onClick={() => {
+                setOrderFilter("expediee");
+                onChangeSection && onChangeSection("orders");
+              }}
               className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                  <Package className="w-5 h-5" />
+                  <Clock className="w-5 h-5" />
                 </div>
-                <span
-                  className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
-                    metrics.lowStockCount > 0
-                      ? "bg-[#FFE4E6] text-[#BE123C] border-[#FECDD3]"
-                      : "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
-                  }`}
-                >
-                  {metrics.lowStockCount > 0
-                    ? `${metrics.lowStockCount} alerte(s)`
-                    : "Stock sain"}
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#FFEDD5] text-[#C2410C] border border-[#FED7AA]">
+                  {metrics.shippingCount} en expédition
                 </span>
               </div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
-                Catalogue produits
+                En attente / Expédition
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
-                {products.length}
+                {metrics.pendingLogisticsCount}{" "}
+                <span className="text-base font-bold text-slate-400">
+                  / {metrics.shippingCount}
+                </span>
               </p>
               <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
-                <span>{metrics.totalStockUnits} unité(s) en stock</span>
-                <span className="text-blue-600 font-bold">Gérer →</span>
+                <span>{metrics.pendingLogisticsCount} en attente</span>
+                <span className="text-blue-600 font-bold">Suivre →</span>
               </p>
             </div>
 
-            {/* KPI 4 : À Facturer (Fin de cycle) */}
+            {/* KPI 4 : Livrées & À facturer */}
             <div
               onClick={() => onChangeSection && onChangeSection("billing")}
               className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#183BB0] flex items-center justify-center shrink-0">
-                  <Receipt className="w-5 h-5" />
+                  <CheckCircle2 className="w-5 h-5" />
                 </div>
                 <span
                   className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
@@ -667,22 +873,416 @@ export default function EcommerceWorkspace({
                       : "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
                   }`}
                 >
-                  {metrics.unbilledCount > 0 ? "À facturer" : "Tout facturé"}
+                  {metrics.unbilledCount} à facturer
                 </span>
               </div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
-                Gestion de facturation
+                Commandes livrées
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
-                {metrics.unbilledCount}
+                {metrics.deliveredCount}
               </p>
               <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
-                <span>{formatAmount(metrics.unbilledAmount, currSym)}</span>
+                <span>{metrics.deliveryRate}% de livraison</span>
                 <span className="text-blue-600 font-bold flex items-center gap-1">
                   Facturer <ArrowRight className="w-3 h-3" />
                 </span>
               </p>
             </div>
+          </div>
+
+          {/* GRAPHIQUES INTERACTIFS : (1) Argent Encaissé vs Commandes Reçues + (2) Statuts Logistiques */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* GRAPHIQUE 1 (2/3) : Argent encaissé par rapport aux commandes reçues */}
+            {(() => {
+              const svgW = 640;
+              const svgH = 230;
+              const padL = 44;
+              const padR = 24;
+              const padT = 22;
+              const padB = 34;
+              const plotW = svgW - padL - padR;
+              const plotH = svgH - padT - padB;
+
+              const maxCash = Math.max(
+                1000,
+                ...chartSeries.map((d) => Math.max(d.orderedAmount, d.collectedAmount))
+              );
+              const maxCnt = Math.max(1, ...chartSeries.map((d) => d.orderCount));
+              const stepX = chartSeries.length > 1 ? plotW / (chartSeries.length - 1) : plotW / 2;
+
+              const getX = (idx) =>
+                chartSeries.length > 1 ? padL + idx * stepX : padL + plotW / 2;
+              const getYCash = (val) => padT + plotH - (val / maxCash) * plotH;
+              const getYCntHeight = (cnt) => (cnt / maxCnt) * (plotH * 0.72);
+
+              const buildSmoothPath = (pts) => {
+                if (pts.length === 0) return "";
+                if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+                let d = `M ${pts[0].x} ${pts[0].y}`;
+                for (let i = 0; i < pts.length - 1; i++) {
+                  const p0 = pts[i];
+                  const p1 = pts[i + 1];
+                  const cx = (p0.x + p1.x) / 2;
+                  d += ` C ${cx} ${p0.y}, ${cx} ${p1.y}, ${p1.x} ${p1.y}`;
+                }
+                return d;
+              };
+
+              const collectedPts = chartSeries.map((d, i) => ({
+                x: getX(i),
+                y: getYCash(d.collectedAmount),
+              }));
+              const orderedPts = chartSeries.map((d, i) => ({
+                x: getX(i),
+                y: getYCash(d.orderedAmount),
+              }));
+
+              const collectedLinePath = buildSmoothPath(collectedPts);
+              const orderedLinePath = buildSmoothPath(orderedPts);
+              const collectedAreaPath =
+                collectedPts.length > 0
+                  ? `${collectedLinePath} L ${collectedPts[collectedPts.length - 1].x} ${
+                      padT + plotH
+                    } L ${collectedPts[0].x} ${padT + plotH} Z`
+                  : "";
+
+              const activePoint =
+                hoveredChartIdx !== null && chartSeries[hoveredChartIdx]
+                  ? chartSeries[hoveredChartIdx]
+                  : null;
+
+              return (
+                <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-base font-bold text-slate-900">
+                          Argent Encaissé vs Commandes Reçues
+                        </h2>
+                        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-[#183BB0] border border-blue-100">
+                          {selectedDate || selectedPeriod}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Comparaison en direct entre le nombre de commandes reçues, le volume commandé et l&apos;argent encaissé
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] font-bold shrink-0">
+                      <span className="inline-flex items-center gap-1.5 text-slate-600">
+                        <span className="w-2.5 h-2.5 rounded-xs bg-blue-200 border border-blue-400" />
+                        Nb commandes
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A]" />
+                        Encaissé
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-[#183BB0]">
+                        <span className="w-3 h-0.5 bg-[#183BB0]" />
+                        Commandé
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Barre de détail dynamique au survol */}
+                  <div className="px-3.5 py-2 rounded-xl bg-[#F8FAFC] border border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    {activePoint ? (
+                      <>
+                        <span className="font-extrabold text-slate-900">
+                          Créneau / Jour : {activePoint.label}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="font-bold text-blue-700">
+                            {activePoint.orderCount} commande(s) reçue(s)
+                          </span>
+                          <span className="font-bold text-emerald-700">
+                            Encaissé : {formatAmount(activePoint.collectedAmount, currSym)}
+                          </span>
+                          <span className="text-slate-500 font-semibold">
+                            Commandé : {formatAmount(activePoint.orderedAmount, currSym)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-slate-600 font-semibold">
+                          Synthèse ({selectedPeriod}) :{" "}
+                          <strong className="text-slate-900">{metrics.totalOrders}</strong>{" "}
+                          commande(s) reçue(s)
+                        </span>
+                        <span className="font-bold text-emerald-700">
+                          {formatAmount(metrics.paidRevenue, currSym)} encaissés /{" "}
+                          {formatAmount(metrics.totalRevenue, currSym)} ({metrics.collectionRate}%)
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* SVG Graphique */}
+                  <div className="w-full overflow-x-auto">
+                    <svg
+                      viewBox={`0 0 ${svgW} ${svgH}`}
+                      className="w-full h-52 sm:h-60 min-w-[320px] select-none"
+                    >
+                      <defs>
+                        <linearGradient id="ecomCashGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#16A34A" stopOpacity="0.24" />
+                          <stop offset="100%" stopColor="#16A34A" stopOpacity="0.01" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Lignes de grille horizontales */}
+                      {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+                        const y = padT + plotH - ratio * plotH;
+                        const labelVal = Math.round(maxCash * ratio);
+                        return (
+                          <g key={idx}>
+                            <line
+                              x1={padL}
+                              y1={y}
+                              x2={svgW - padR}
+                              y2={y}
+                              stroke="#E2E8F0"
+                              strokeDasharray="3 3"
+                              strokeWidth="1"
+                            />
+                            <text
+                              x={padL - 6}
+                              y={y + 3}
+                              textAnchor="end"
+                              fontSize="9"
+                              fill="#94A3B8"
+                              fontWeight="600"
+                            >
+                              {labelVal >= 1000 ? `${Math.round(labelVal / 1000)}k` : labelVal}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Barres : Nombre de commandes reçues */}
+                      {chartSeries.map((d, i) => {
+                        const cx = getX(i);
+                        const barW = Math.min(34, plotW / chartSeries.length / 2);
+                        const barH = d.orderCount > 0 ? Math.max(8, getYCntHeight(d.orderCount)) : 0;
+                        const isHov = hoveredChartIdx === i;
+                        return (
+                          <g
+                            key={d.label}
+                            className="cursor-pointer"
+                            onMouseEnter={() => setHoveredChartIdx(i)}
+                            onMouseLeave={() => setHoveredChartIdx(null)}
+                            onClick={() => setHoveredChartIdx(i)}
+                          >
+                            <rect
+                              x={cx - barW / 2}
+                              y={padT + plotH - barH}
+                              width={barW}
+                              height={barH}
+                              rx="6"
+                              fill={isHov ? "#2563EB" : "#BFDBFE"}
+                              opacity={isHov ? "0.9" : "0.75"}
+                            />
+                            {d.orderCount > 0 && (
+                              <text
+                                x={cx}
+                                y={padT + plotH - barH - 5}
+                                textAnchor="middle"
+                                fontSize="9.5"
+                                fontWeight="800"
+                                fill={isHov ? "#183BB0" : "#3B82F6"}
+                              >
+                                {d.orderCount} cmd
+                              </text>
+                            )}
+                            {/* Label axe X */}
+                            <text
+                              x={cx}
+                              y={svgH - 10}
+                              textAnchor="middle"
+                              fontSize="10"
+                              fontWeight={isHov ? "800" : "600"}
+                              fill={isHov ? "#183BB0" : "#64748B"}
+                            >
+                              {d.label}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Aire + Courbe Montant Commandé (pointillée) */}
+                      <path
+                        d={orderedLinePath}
+                        fill="none"
+                        stroke="#183BB0"
+                        strokeWidth="2"
+                        strokeDasharray="5 4"
+                        opacity="0.7"
+                      />
+
+                      {/* Aire + Courbe Argent Encaissé */}
+                      {collectedAreaPath && (
+                        <path d={collectedAreaPath} fill="url(#ecomCashGrad)" />
+                      )}
+                      <path
+                        d={collectedLinePath}
+                        fill="none"
+                        stroke="#16A34A"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                      />
+
+                      {/* Points sur les courbes */}
+                      {collectedPts.map((pt, i) => {
+                        const isHov = hoveredChartIdx === i;
+                        return (
+                          <g key={`pt-${i}`}>
+                            <circle
+                              cx={pt.x}
+                              cy={pt.y}
+                              r={isHov ? 6 : 4}
+                              fill="#FFFFFF"
+                              stroke="#16A34A"
+                              strokeWidth="2.5"
+                            />
+                            <circle
+                              cx={orderedPts[i].x}
+                              cy={orderedPts[i].y}
+                              r={isHov ? 5 : 3}
+                              fill="#183BB0"
+                            />
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* GRAPHIQUE 2 (1/3) : Répartition Commandes (Reçues • En attente • En expédition • Livrées) */}
+            {(() => {
+              const totalStatusCount = Math.max(
+                1,
+                metrics.pendingLogisticsCount + metrics.shippingCount + metrics.deliveredCount
+              );
+              const radius = 56;
+              const circ = 2 * Math.PI * radius;
+              let accOffset = 0;
+
+              const donutSegments = metrics.statusDonutData.map((seg) => {
+                const len = (seg.count / totalStatusCount) * circ;
+                const offset = accOffset;
+                accOffset += len;
+                return { ...seg, len, offset };
+              });
+
+              return (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex flex-col justify-between space-y-4">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      État des Commandes
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Reçues, en attente, en expédition et livrées ({selectedPeriod})
+                    </p>
+                  </div>
+
+                  {/* Donut SVG + Total Reçues au centre */}
+                  <div className="flex items-center justify-center py-1">
+                    <div className="relative w-40 h-40">
+                      <svg viewBox="0 0 144 144" className="w-full h-full -rotate-90">
+                        <circle
+                          cx="72"
+                          cy="72"
+                          r={radius}
+                          fill="none"
+                          stroke="#F1F5F9"
+                          strokeWidth="16"
+                        />
+                        {metrics.activeOrdersCount > 0 &&
+                          donutSegments.map((seg) =>
+                            seg.count > 0 ? (
+                              <circle
+                                key={seg.key}
+                                cx="72"
+                                cy="72"
+                                r={radius}
+                                fill="none"
+                                stroke={seg.color}
+                                strokeWidth={hoveredStatusKey === seg.key ? "19" : "16"}
+                                strokeDasharray={`${seg.len} ${circ - seg.len}`}
+                                strokeDashoffset={-seg.offset}
+                                strokeLinecap="butt"
+                                className="transition-all duration-200 cursor-pointer"
+                                onMouseEnter={() => setHoveredStatusKey(seg.key)}
+                                onMouseLeave={() => setHoveredStatusKey(null)}
+                                onClick={() => {
+                                  setOrderFilter(seg.key);
+                                  onChangeSection && onChangeSection("orders");
+                                }}
+                              />
+                            ) : null
+                          )}
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                        <span className="text-2xl font-extrabold text-slate-900 leading-none">
+                          {metrics.totalOrders}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">
+                          Reçues
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Légende cliquable avec compteurs exacts */}
+                  <div className="space-y-2">
+                    {metrics.statusDonutData.map((seg) => {
+                      const pct =
+                        metrics.activeOrdersCount > 0
+                          ? Math.round((seg.count / metrics.activeOrdersCount) * 100)
+                          : 0;
+                      return (
+                        <button
+                          key={seg.key}
+                          type="button"
+                          onMouseEnter={() => setHoveredStatusKey(seg.key)}
+                          onMouseLeave={() => setHoveredStatusKey(null)}
+                          onClick={() => {
+                            setOrderFilter(seg.key);
+                            onChangeSection && onChangeSection("orders");
+                          }}
+                          className="w-full p-2.5 rounded-xl bg-[#F8FAFC] hover:bg-blue-50/60 border border-slate-100 flex items-center justify-between gap-2 text-left transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: seg.color }}
+                            />
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate">
+                                {seg.label}
+                              </p>
+                              <p className="text-[10px] text-slate-400 truncate">{seg.sub}</p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-sm font-extrabold text-slate-900">
+                              {seg.count}
+                            </span>
+                            <span className="text-[10px] font-semibold text-slate-400 ml-1">
+                              ({pct}%)
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Pipeline Opérationnel des Commandes (Cliquable par étape) */}
@@ -1132,6 +1732,7 @@ export default function EcommerceWorkspace({
                 className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
               >
                 <option value="all">Toutes les commandes</option>
+                <option value="pending_logistics">En attente (Nouvelles / Préparation)</option>
                 <option value="unbilled">Non encore facturées</option>
                 {Object.entries(ORDER_STATUS_META).map(([k, v]) => (
                   <option key={k} value={k}>

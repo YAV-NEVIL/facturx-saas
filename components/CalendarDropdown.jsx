@@ -37,13 +37,36 @@ export default function CalendarDropdown({
   invoiceDates = ["21/10/2026", "19/10/2026", "14/10/2026", "12/10/2026", "08/10/2026", "05/10/2026", "01/10/2026", "28/09/2026"],
   buttonClassName = "",
   align = "right", // "left" | "right"
+  useLiveDates = false,
+  dotLabel = "Factures enregistrées",
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
+  const nowRef = useLiveDates ? new Date() : new Date(2026, 9, 21);
+  const todayDay = nowRef.getDate();
+  const todayMonth = nowRef.getMonth();
+  const todayYear = nowRef.getFullYear();
+
+  const fmtDateObj = (dObj) => {
+    const dd = String(dObj.getDate()).padStart(2, "0");
+    const mm = String(dObj.getMonth() + 1).padStart(2, "0");
+    return `${dd}/${mm}/${dObj.getFullYear()}`;
+  };
+  const fmtReadableObj = (dObj) =>
+    `${dObj.getDate()} ${MONTH_NAMES[dObj.getMonth()]} ${dObj.getFullYear()}`;
+
+  const todayStr = fmtDateObj(nowRef);
+  const yesterdayObj = new Date(todayYear, todayMonth, todayDay - 1);
+  const yesterdayStr = fmtDateObj(yesterdayObj);
+  const dayBeforeObj = new Date(todayYear, todayMonth, todayDay - 2);
+  const dayBeforeStr = fmtDateObj(dayBeforeObj);
+  const tomorrowObj = new Date(todayYear, todayMonth, todayDay + 1);
+  const tomorrowStr = fmtDateObj(tomorrowObj);
+
   // Vue actuelle du calendrier (mois et année affichés)
-  const [viewYear, setViewYear] = useState(2026);
-  const [viewMonth, setViewMonth] = useState(9); // 9 = Octobre (0-indexed)
+  const [viewYear, setViewYear] = useState(todayYear);
+  const [viewMonth, setViewMonth] = useState(todayMonth);
 
   // Fermer au clic extérieur
   useEffect(() => {
@@ -115,37 +138,48 @@ export default function CalendarDropdown({
   };
 
   // Sélection d'un preset rapide
-  const handlePresetClick = (presetLabel, periodQuery) => {
+  const handlePresetClick = (presetLabel) => {
     if (onSelectPeriod) onSelectPeriod(presetLabel);
     if (presetLabel === "Aujourd'hui") {
-      setViewYear(2026);
-      setViewMonth(9);
-      if (onSelectDate) onSelectDate("21/10/2026");
+      setViewYear(todayYear);
+      setViewMonth(todayMonth);
+      if (onSelectDate) onSelectDate(todayStr);
     } else if (presetLabel === "Hier") {
-      setViewYear(2026);
-      setViewMonth(9);
-      if (onSelectDate) onSelectDate("20/10/2026");
+      setViewYear(yesterdayObj.getFullYear());
+      setViewMonth(yesterdayObj.getMonth());
+      if (onSelectDate) onSelectDate(yesterdayStr);
     } else if (presetLabel === "Avant-hier") {
-      setViewYear(2026);
-      setViewMonth(9);
-      if (onSelectDate) onSelectDate("19/10/2026");
+      setViewYear(dayBeforeObj.getFullYear());
+      setViewMonth(dayBeforeObj.getMonth());
+      if (onSelectDate) onSelectDate(dayBeforeStr);
+    } else if (presetLabel === "Demain") {
+      setViewYear(tomorrowObj.getFullYear());
+      setViewMonth(tomorrowObj.getMonth());
+      if (onSelectDate) onSelectDate(tomorrowStr);
     } else if (presetLabel === "Mois précédent") {
-      setViewYear(2026);
-      setViewMonth(8); // Septembre
-      if (onSelectDate) onSelectDate("Septembre 2026");
+      const prevM = todayMonth === 0 ? 11 : todayMonth - 1;
+      const prevY = todayMonth === 0 ? todayYear - 1 : todayYear;
+      setViewYear(prevY);
+      setViewMonth(prevM);
+      if (onSelectDate) onSelectDate(`${MONTH_NAMES[prevM]} ${prevY}`);
     } else {
       if (onSelectDate) onSelectDate(null); // Réinitialiser le filtre jour pour voir la période globale
     }
     setIsOpen(false);
   };
 
+  const prevMonthIdx = todayMonth === 0 ? 11 : todayMonth - 1;
+  const prevMonthYear = todayMonth === 0 ? todayYear - 1 : todayYear;
+
   const presets = [
-    { label: "Aujourd'hui", desc: "21 Octobre 2026" },
-    { label: "Hier", desc: "20 Octobre 2026" },
-    { label: "Avant-hier", desc: "19 Octobre 2026" },
-    { label: "Cette semaine", desc: "Du 19 au 25 Oct 2026" },
-    { label: "Ce mois-ci", desc: "Octobre 2026" },
-    { label: "Mois précédent", desc: "Septembre 2026" },
+    { label: "Aujourd'hui", desc: fmtReadableObj(nowRef) },
+    { label: "Hier", desc: fmtReadableObj(yesterdayObj) },
+    ...(useLiveDates
+      ? [{ label: "Demain", desc: fmtReadableObj(tomorrowObj) }]
+      : [{ label: "Avant-hier", desc: fmtReadableObj(dayBeforeObj) }]),
+    { label: "Cette semaine", desc: useLiveDates ? "7 derniers jours" : "Du 19 au 25 Oct 2026" },
+    { label: "Ce mois-ci", desc: `${MONTH_NAMES[todayMonth]} ${todayYear}` },
+    { label: "Mois précédent", desc: `${MONTH_NAMES[prevMonthIdx]} ${prevMonthYear}` },
     { label: "Toutes les dates", desc: "Historique complet" },
   ];
 
@@ -221,9 +255,10 @@ export default function CalendarDropdown({
                   {presets.map((preset) => {
                     const isActive =
                       selectedPeriod === preset.label ||
-                      (preset.label === "Aujourd'hui" && selectedDate === "21/10/2026") ||
-                      (preset.label === "Hier" && selectedDate === "20/10/2026") ||
-                      (preset.label === "Avant-hier" && selectedDate === "19/10/2026");
+                      (preset.label === "Aujourd'hui" && selectedDate === todayStr) ||
+                      (preset.label === "Hier" && selectedDate === yesterdayStr) ||
+                      (preset.label === "Avant-hier" && selectedDate === dayBeforeStr) ||
+                      (preset.label === "Demain" && selectedDate === tomorrowStr);
 
                     return (
                       <button
@@ -315,7 +350,7 @@ export default function CalendarDropdown({
                   const dateStr = formatDateString(dayNum, viewMonth, viewYear);
                   const isSelected = selectedDate === dateStr;
                   const isToday =
-                    dayNum === 21 && viewMonth === 9 && viewYear === 2026;
+                    dayNum === todayDay && viewMonth === todayMonth && viewYear === todayYear;
                   const hasInvoices = invoiceDates.includes(dateStr);
 
                   return (
@@ -371,11 +406,11 @@ export default function CalendarDropdown({
               <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span>Factures enregistrées</span>
+                  <span>{dotLabel}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                  <span>Aujourd&apos;hui (21 Oct)</span>
+                  <span>Aujourd&apos;hui ({todayDay} {MONTH_NAMES[todayMonth].slice(0, 4)})</span>
                 </div>
               </div>
             </div>
