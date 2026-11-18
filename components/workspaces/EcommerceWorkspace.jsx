@@ -35,12 +35,15 @@ import {
   Share2,
   Barcode,
   Tag,
+  Printer,
+  UserCheck,
 } from "lucide-react";
 import { formatAmount, getCurrencySymbol } from "@/lib/mock-data";
 import { exportEcommerceOrdersToXLSX, exportEcommerceCatalogToXLSX } from "@/lib/export-utils";
 import { generateReportPdf } from "@/lib/pdf-generator";
 import CalendarDropdown from "@/components/CalendarDropdown";
 import { BarcodeLabelModal, BulkCatalogImportModal } from "./EcommerceCatalogModals";
+import { EditOrderDeliveryModal, DeliverySlipModal } from "./EcommerceOrderModals";
 
 function getEffectiveProductPrice(prod) {
   const base = Number(prod?.price || 0);
@@ -102,6 +105,8 @@ export default function EcommerceWorkspace({
   onUpdateProduct,
   onDeleteProduct,
   onCreateOrder,
+  onUpdateOrder,
+  onDeleteOrder,
   onUpdateOrderStatus,
   onToggleOrderPayment,
   onGenerateInvoiceFromOrder,
@@ -140,6 +145,12 @@ export default function EcommerceWorkspace({
   const [deletingProductId, setDeletingProductId] = useState(null);
   const [orderSearch, setOrderSearch] = useState("");
   const [orderFilter, setOrderFilter] = useState("all");
+  const [orderDriverFilter, setOrderDriverFilter] = useState("all");
+  const [orderPaymentFilter, setOrderPaymentFilter] = useState("all"); // "all" | "paye" | "en_attente"
+  const [orderSort, setOrderSort] = useState("recent"); // "recent" | "amount_desc" | "amount_asc"
+  const [editingDeliveryOrder, setEditingDeliveryOrder] = useState(null);
+  const [slipOrder, setSlipOrder] = useState(null);
+  const [deletingOrderId, setDeletingOrderId] = useState(null);
 
   // Modales Produit, Import, Étiquettes & Commande
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -515,17 +526,62 @@ export default function EcommerceWorkspace({
     return sorted;
   }, [products, productSearch, productCategoryFilter, productStockFilter, productSort]);
 
+  const NEXT_ORDER_STEP = {
+    nouvelle: { nextStatus: "confirmee", buttonLabel: "Confirmer" },
+    confirmee: { nextStatus: "en_preparation", buttonLabel: "Préparer" },
+    en_preparation: { nextStatus: "expediee", buttonLabel: "Expédier" },
+    expediee: { nextStatus: "livree", buttonLabel: "Marquer Livrée" },
+  };
+
+  const orderStats = useMemo(() => {
+    const driversSet = new Set();
+    let toPrepareCount = 0;
+    let shippingCount = 0;
+    let deliveredCount = 0;
+    let unbilledCount = 0;
+    let unassignedDriverCount = 0;
+    let totalVolume = 0;
+
+    for (const o of orders) {
+      if (o.driverName && o.driverName.trim()) driversSet.add(o.driverName.trim());
+      if (o.orderStatus === "annulee") continue;
+      totalVolume += Number(o.totalAmount || 0);
+      if (["nouvelle", "confirmee", "en_preparation"].includes(o.orderStatus)) {
+        toPrepareCount += 1;
+      } else if (o.orderStatus === "expediee") {
+        shippingCount += 1;
+      } else if (o.orderStatus === "livree") {
+        deliveredCount += 1;
+      }
+      if (!o.invoiceId) unbilledCount += 1;
+      if (!o.driverName || !o.driverName.trim()) unassignedDriverCount += 1;
+    }
+
+    return {
+      totalCount: orders.length,
+      toPrepareCount,
+      shippingCount,
+      deliveredCount,
+      unbilledCount,
+      unassignedDriverCount,
+      totalVolume,
+      knownDrivers: Array.from(driversSet).sort(),
+    };
+  }, [orders]);
+
   const effectiveOrderFilter = activeSection === "billing" ? "unbilled" : orderFilter;
 
   const filteredOrders = useMemo(() => {
     const q = orderSearch.trim().toLowerCase();
-    return orders.filter((o) => {
+    const list = orders.filter((o) => {
       const matchQuery =
         !q ||
         (o.id || "").toLowerCase().includes(q) ||
         (o.customerName || "").toLowerCase().includes(q) ||
         (o.customerPhone || "").toLowerCase().includes(q) ||
-        (o.deliveryZone || "").toLowerCase().includes(q);
+        (o.deliveryAddress || "").toLowerCase().includes(q) ||
+        (o.deliveryZone || "").toLowerCase().includes(q) ||
+        (o.driverName || "").toLowerCase().includes(q);
       const matchStatus =
         effectiveOrderFilter === "all"
           ? true
@@ -534,9 +590,84 @@ export default function EcommerceWorkspace({
           : effectiveOrderFilter === "pending_logistics"
           ? ["nouvelle", "confirmee", "en_preparation"].includes(o.orderStatus)
           : o.orderStatus === effectiveOrderFilter;
-      return matchQuery && matchStatus;
+      const drv = (o.driverName || "").trim();
+      const matchDriver =
+        orderDriverFilter === "all"
+          ? true
+          : orderDriverFilter === "unassigned"
+          ? drv.length === 0
+          : drv === orderDriverFilter;
+      const pay = o.paymentStatus === "paye" ? "paye" : "en_attente";
+      const matchPayment =
+        orderPaymentFilter === "all" ? true : pay === orderPaymentFilter;
+      return matchQuery && matchStatus && matchDriver && matchPayment;
     });
-  }, [orders, orderSearch, effectiveOrderFilter]);
+
+    const sorted = [...list];
+    if (orderSort === "amount_desc") {
+      sorted.sort((a, b) => Number(b.totalAmount || 0) - Number(a.totalAmount || 0));
+    } else if (orderSort === "amount_asc") {
+      sorted.sort((a, b) => Number(a.totalAmount || 0) - Number(b.totalAmount || 0));
+    }
+    return sorted;
+  }, [
+    orders,
+    orderSearch,
+    effectiveOrderFilter,
+    orderDriverFilter,
+    orderPaymentFilter,
+    orderSort,
+  ]);
+
+  const handleShareOrderStatusWhatsApp = (ord) => {
+    const shopName = companyInfo?.name || "Notre Boutique";
+    const statusLabel = ORDER_STATUS_META[ord.orderStatus]?.label || ord.orderStatus;
+    const isPaid = ord.paymentStatus === "paye";
+    const driverTxt = ord.driverName
+      ? `\n🛵 *Livreur :* ${ord.driverName}`
+      : "";
+    const statusHint =
+      ord.orderStatus === "expediee"
+        ? "Votre colis est actuellement en route vers vous !"
+        : ord.orderStatus === "livree"
+        ? "Votre commande a été livrée avec succès. Merci pour votre confiance !"
+        : ord.orderStatus === "en_preparation"
+        ? "Votre commande est en cours d'emballage."
+        : ord.orderStatus === "confirmee"
+        ? "Votre commande est bien confirmée."
+        : "Nous avons bien reçu votre commande.";
+
+    const msg =
+      `📦 *${shopName} — Suivi Commande ${ord.id}*\n` +
+      `Bonjour *${ord.customerName}*,\n${statusHint}\n\n` +
+      `📌 *Statut :* ${statusLabel}\n` +
+      `📍 *Adresse / Zone :* ${ord.deliveryAddress || ord.deliveryZone}\n` +
+      `💰 *Total :* ${formatAmount(ord.totalAmount, currSym)} (${
+        isPaid ? "Déjà payée ✅" : `À régler : ${ord.paymentMethod}`
+      })` +
+      driverTxt;
+
+    const cleanDigits = String(ord.customerPhone || "").replace(/\D/g, "");
+    const baseWa = cleanDigits.length >= 8 ? `https://wa.me/${cleanDigits}` : "https://wa.me/";
+    if (typeof window !== "undefined") {
+      window.open(`${baseWa}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const handleExportOrdersExcel = () => {
+    try {
+      exportEcommerceOrdersToXLSX(
+        filteredOrders,
+        [],
+        orderFilter === "all" ? "Commandes_Livraisons" : orderFilter,
+        currSym,
+        "Commandes_Livraisons_Ecommerce_FacturX.xlsx"
+      );
+      if (onToast) onToast("Liste des commandes exportée en Excel (.xlsx) !", "success");
+    } catch (err) {
+      if (onToast) onToast(err.message || "Erreur lors de l'export des commandes.", "error");
+    }
+  };
 
   const openNewProductModal = () => {
     setEditingProduct(null);
@@ -2939,186 +3070,503 @@ export default function EcommerceWorkspace({
 
       {/* VUE COMMANDES & LIVRAISONS OU GESTION DE FACTURATION */}
       {(activeSection === "orders" || activeSection === "billing") && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-          {activeSection === "billing" && (
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <p className="font-extrabold text-slate-900">
-                  Commandes en attente de facturation
+        <div className="space-y-6">
+          {/* 4 KPIs Logistiques dédiés sur Commandes & Livraisons */}
+          {activeSection === "orders" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <div
+                onClick={() => setOrderFilter("all")}
+                className={`bg-white rounded-2xl border shadow-sm p-5 hover:shadow-md transition-all cursor-pointer ${
+                  orderFilter === "all" ? "border-blue-300 ring-2 ring-blue-50" : "border-slate-100"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <ShoppingBag className="w-5 h-5" />
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                    {orderStats.unassignedDriverCount} sans livreur
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
+                  Total Commandes
                 </p>
-                <p className="text-slate-500 mt-0.5">
-                  Convertissez vos commandes en factures PDF et envoyez-les directement à vos clients par email.
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
+                  {orderStats.totalCount}
+                </p>
+                <p className="text-xs text-slate-500 mt-2">
+                  Volume actif : {formatAmount(orderStats.totalVolume, currSym)}
                 </p>
               </div>
-              <span className="shrink-0 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 font-bold text-blue-700">
-                {metrics.unbilledCount} commande(s) à facturer
-              </span>
+
+              <div
+                onClick={() =>
+                  setOrderFilter((f) => (f === "pending_logistics" ? "all" : "pending_logistics"))
+                }
+                className={`bg-white rounded-2xl border shadow-sm p-5 hover:shadow-md transition-all cursor-pointer ${
+                  orderFilter === "pending_logistics"
+                    ? "border-amber-400 ring-2 ring-amber-100"
+                    : "border-slate-100"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#FFEDD5] text-[#C2410C] border border-[#FED7AA]">
+                    À préparer
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
+                  En attente / Préparation
+                </p>
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
+                  {orderStats.toPrepareCount}
+                </p>
+                <p className="text-xs text-amber-700 font-semibold mt-2">
+                  Cliquez pour préparer →
+                </p>
+              </div>
+
+              <div
+                onClick={() => setOrderFilter((f) => (f === "expediee" ? "all" : "expediee"))}
+                className={`bg-white rounded-2xl border shadow-sm p-5 hover:shadow-md transition-all cursor-pointer ${
+                  orderFilter === "expediee"
+                    ? "border-blue-400 ring-2 ring-blue-100"
+                    : "border-slate-100"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                    <Truck className="w-5 h-5" />
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                    {orderStats.knownDrivers.length} livreur(s)
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
+                  En cours de livraison
+                </p>
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
+                  {orderStats.shippingCount}
+                </p>
+                <p className="text-xs text-blue-600 font-semibold mt-2">
+                  Suivre les colis en route →
+                </p>
+              </div>
+
+              <div
+                onClick={() => setOrderFilter((f) => (f === "livree" ? "all" : "livree"))}
+                className={`bg-white rounded-2xl border shadow-sm p-5 hover:shadow-md transition-all cursor-pointer ${
+                  orderFilter === "livree"
+                    ? "border-emerald-400 ring-2 ring-emerald-100"
+                    : "border-slate-100"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]">
+                    {orderStats.unbilledCount} à facturer
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">
+                  Commandes livrées
+                </p>
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-1">
+                  {orderStats.deliveredCount}
+                </p>
+                <p className="text-xs text-emerald-700 font-semibold mt-2">
+                  Prêtes pour facturation →
+                </p>
+              </div>
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-                placeholder="Rechercher par N° commande, client, téléphone, zone..."
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm"
-              />
-            </div>
-            {activeSection !== "billing" && (
-              <select
-                value={orderFilter}
-                onChange={(e) => setOrderFilter(e.target.value)}
-                className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
-              >
-                <option value="all">Toutes les commandes</option>
-                <option value="pending_logistics">En attente (Nouvelles / Préparation)</option>
-                <option value="unbilled">Non encore facturées</option>
-                {Object.entries(ORDER_STATUS_META).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
+          {/* Conteneur Principal Commandes / Facturation */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-5 space-y-4">
+            {activeSection === "billing" && (
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p className="font-extrabold text-slate-900">
+                    Commandes en attente de facturation
+                  </p>
+                  <p className="text-slate-500 mt-0.5">
+                    Convertissez vos commandes en factures PDF et envoyez-les directement à vos clients par email.
+                  </p>
+                </div>
+                <span className="shrink-0 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 font-bold text-blue-700">
+                  {orderStats.unbilledCount} commande(s) à facturer
+                </span>
+              </div>
             )}
-          </div>
 
-          {filteredOrders.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-500">
-              {activeSection === "billing"
-                ? "Toutes vos commandes actives ont déjà été facturées. Consultez le Registre Factures pour voir les documents émis."
-                : "Aucune commande trouvée pour ce filtre."}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredOrders.map((ord) => {
-                const st = ORDER_STATUS_META[ord.orderStatus] || ORDER_STATUS_META.nouvelle;
-                const linkedInvoice = ord.invoiceId
-                  ? invoices.find((inv) => inv.id === ord.invoiceId)
-                  : null;
-                const isPaid = ord.paymentStatus === "paye";
-                return (
-                  <div
-                    key={ord.id}
-                    className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/40 space-y-3"
+            {/* Onglets pilules de statut rapides sur Commandes & Livraisons */}
+            {activeSection === "orders" && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                {[
+                  { id: "all", label: `Toutes (${orders.length})` },
+                  { id: "pending_logistics", label: `À préparer (${orderStats.toPrepareCount})` },
+                  { id: "nouvelle", label: "Nouvelles" },
+                  { id: "confirmee", label: "Confirmées" },
+                  { id: "en_preparation", label: "En préparation" },
+                  { id: "expediee", label: `En livraison (${orderStats.shippingCount})` },
+                  { id: "livree", label: `Livrées (${orderStats.deliveredCount})` },
+                  { id: "unbilled", label: `À facturer (${orderStats.unbilledCount})` },
+                  { id: "annulee", label: "Annulées" },
+                ].map((pill) => (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => setOrderFilter(pill.id)}
+                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                      orderFilter === pill.id
+                        ? "bg-[#183BB0] text-white border-[#183BB0] shadow-xs"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                    }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-sm font-extrabold text-slate-900">
-                            {ord.id}
-                          </span>
-                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${st.badge}`}>
-                            {st.label}
-                          </span>
-                          <span
-                            className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                              isPaid
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : "bg-amber-50 text-amber-800 border-amber-200"
-                            }`}
-                          >
-                            {isPaid ? "Payée" : "Paiement en attente"}
-                          </span>
-                          {ord.invoiceId && (
-                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                              Facture : {ord.invoiceId}
+                    {pill.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Barre Recherche & Filtres (Livreur, Paiement, Tri, Export Excel) */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  placeholder="Rechercher par N° commande, client, téléphone, zone, livreur..."
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={orderDriverFilter}
+                  onChange={(e) => setOrderDriverFilter(e.target.value)}
+                  className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
+                >
+                  <option value="all">Tous les livreurs</option>
+                  <option value="unassigned">
+                    Sans livreur ({orderStats.unassignedDriverCount})
+                  </option>
+                  {orderStats.knownDrivers.map((drv) => (
+                    <option key={drv} value={drv}>
+                      Livreur : {drv}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={orderPaymentFilter}
+                  onChange={(e) => setOrderPaymentFilter(e.target.value)}
+                  className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
+                >
+                  <option value="all">Tous paiements</option>
+                  <option value="paye">Payées</option>
+                  <option value="en_attente">Paiement en attente</option>
+                </select>
+
+                <select
+                  value={orderSort}
+                  onChange={(e) => setOrderSort(e.target.value)}
+                  className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
+                >
+                  <option value="recent">Plus récentes</option>
+                  <option value="amount_desc">Montant décroissant</option>
+                  <option value="amount_asc">Montant croissant</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={handleExportOrdersExcel}
+                  className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  title="Exporter les commandes filtrées en Excel"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Exporter Excel</span>
+                </button>
+              </div>
+            </div>
+
+            {filteredOrders.length === 0 ? (
+              <div className="py-12 text-center space-y-2.5">
+                <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mx-auto">
+                  <Truck className="w-6 h-6" />
+                </div>
+                <p className="text-xs text-slate-500">
+                  {activeSection === "billing"
+                    ? "Toutes vos commandes actives ont déjà été facturées. Consultez le Registre Factures pour voir les documents émis."
+                    : "Aucune commande trouvée pour ces filtres."}
+                </p>
+                {orders.length > 0 && activeSection !== "billing" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderSearch("");
+                      setOrderFilter("all");
+                      setOrderDriverFilter("all");
+                      setOrderPaymentFilter("all");
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer"
+                  >
+                    Réinitialiser les filtres
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredOrders.map((ord) => {
+                  const st = ORDER_STATUS_META[ord.orderStatus] || ORDER_STATUS_META.nouvelle;
+                  const linkedInvoice = ord.invoiceId
+                    ? invoices.find((inv) => inv.id === ord.invoiceId)
+                    : null;
+                  const isPaid = ord.paymentStatus === "paye";
+                  const nextStep = NEXT_ORDER_STEP[ord.orderStatus] || null;
+                  const createdLabel = ord.createdAt
+                    ? new Date(ord.createdAt).toLocaleString("fr-FR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "";
+
+                  return (
+                    <div
+                      key={ord.id}
+                      className="p-4 rounded-2xl border border-slate-200/80 bg-[#F8FAFC] hover:bg-white transition-all space-y-3"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-sm font-extrabold text-slate-900">
+                              {ord.id}
                             </span>
+                            {createdLabel && (
+                              <span className="text-[11px] font-medium text-slate-400">
+                                {createdLabel}
+                              </span>
+                            )}
+                            <span
+                              className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${st.badge}`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                              {st.label}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                                isPaid
+                                  ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                                  : "bg-[#FFEDD5] text-[#C2410C] border-[#FED7AA]"
+                              }`}
+                            >
+                              {isPaid ? "Payée" : "Paiement en attente"}
+                            </span>
+                            {ord.invoiceId && (
+                              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Facture : {ord.invoiceId}
+                              </span>
+                            )}
+                            {!ord.driverName && ord.orderStatus !== "annulee" && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingDeliveryOrder(ord)}
+                                className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 cursor-pointer"
+                              >
+                                + Assigner livreur
+                              </button>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-slate-700">
+                            <strong>{ord.customerName}</strong>
+                            {ord.customerPhone ? (
+                              <a
+                                href={`tel:${ord.customerPhone}`}
+                                className="text-blue-600 hover:underline font-semibold ml-1.5"
+                              >
+                                • {ord.customerPhone}
+                              </a>
+                            ) : null}
+                            {ord.deliveryAddress ? ` • ${ord.deliveryAddress}` : ""}
+                          </p>
+
+                          {Array.isArray(ord.items) && ord.items.length > 0 && (
+                            <p className="text-[11px] text-slate-500">
+                              <strong className="text-slate-700">Articles :</strong>{" "}
+                              {ord.items
+                                .map((it) => `${it.quantity}× ${it.description}`)
+                                .join(", ")}
+                            </p>
+                          )}
+
+                          {ord.notes && (
+                            <p className="text-[11px] text-amber-800 bg-amber-50/70 px-2.5 py-1 rounded-lg border border-amber-100 inline-block">
+                              Note : {ord.notes}
+                            </p>
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 mt-1">
-                          <strong>{ord.customerName}</strong>
-                          {ord.customerPhone ? ` • ${ord.customerPhone}` : ""}
-                          {ord.deliveryAddress ? ` • ${ord.deliveryAddress}` : ""}
-                        </p>
-                        {Array.isArray(ord.items) && ord.items.length > 0 && (
-                          <p className="text-[11px] text-slate-500 mt-1">
-                            Articles :{" "}
-                            {ord.items
-                              .map((it) => `${it.quantity}× ${it.description}`)
-                              .join(", ")}
+
+                        <div className="text-left sm:text-right shrink-0 space-y-0.5">
+                          <p className="text-base font-extrabold text-slate-900">
+                            {formatAmount(ord.totalAmount, currSym)}
                           </p>
-                        )}
+                          <p className="text-[11px] text-slate-500">
+                            {ord.paymentMethod} • Zone : <strong>{ord.deliveryZone}</strong>
+                          </p>
+                          {Number(ord.deliveryFee || 0) > 0 && (
+                            <p className="text-[10px] text-slate-400">
+                              dont livraison : {formatAmount(ord.deliveryFee, currSym)}
+                            </p>
+                          )}
+                          {ord.driverName && (
+                            <p className="text-[11px] font-bold text-[#183BB0] inline-flex items-center gap-1">
+                              <UserCheck className="w-3 h-3" />
+                              <span>Livreur : {ord.driverName}</span>
+                            </p>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="text-left sm:text-right">
-                        <p className="text-base font-extrabold text-slate-900">
-                          {formatAmount(ord.totalAmount, currSym)}
-                        </p>
-                        <p className="text-[11px] text-slate-500">
-                          {ord.paymentMethod} • Zone : {ord.deliveryZone}
-                          {ord.driverName ? ` • Livreur : ${ord.driverName}` : ""}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200/70">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <select
-                          value={ord.orderStatus}
-                          onChange={(e) =>
-                            onUpdateOrderStatus && onUpdateOrderStatus(ord.id, e.target.value)
-                          }
-                          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700"
-                        >
-                          {Object.entries(ORDER_STATUS_META).map(([k, v]) => (
-                            <option key={k} value={k}>
-                              Statut : {v.label}
-                            </option>
-                          ))}
-                        </select>
-
-                        {onToggleOrderPayment && ord.orderStatus !== "annulee" && (
-                          <button
-                            type="button"
-                            onClick={() => onToggleOrderPayment(ord.id)}
-                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
-                              isPaid
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                                : "bg-white text-slate-700 border-slate-200 hover:bg-amber-50"
-                            }`}
-                          >
-                            {isPaid ? "✓ Encaissée" : "Marquer Payée"}
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {linkedInvoice ? (
-                          <button
-                            type="button"
-                            onClick={() => onOpenInvoice && onOpenInvoice(linkedInvoice)}
-                            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            <span>Ouvrir Facture / PDF / Email</span>
-                          </button>
-                        ) : (
-                          ord.orderStatus !== "annulee" && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200/70">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {nextStep && (
                             <button
                               type="button"
-                              onClick={() => handleInvoiceOrder(ord)}
-                              disabled={invoicingOrderId === ord.id}
-                              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              onClick={() =>
+                                onUpdateOrderStatus &&
+                                onUpdateOrderStatus(ord.id, nextStep.nextStatus)
+                              }
+                              className="px-3 py-1.5 rounded-xl bg-[#183BB0] hover:bg-[#122F8C] text-white text-xs font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
                             >
-                              <Receipt className="w-3.5 h-3.5" />
-                              <span>
-                                {invoicingOrderId === ord.id
-                                  ? "Génération..."
-                                  : "Générer Facture Normalisée"}
-                              </span>
+                              <span>{nextStep.buttonLabel}</span>
+                              <ArrowRight className="w-3 h-3" />
                             </button>
-                          )
-                        )}
+                          )}
+
+                          <select
+                            value={ord.orderStatus}
+                            onChange={(e) =>
+                              onUpdateOrderStatus && onUpdateOrderStatus(ord.id, e.target.value)
+                            }
+                            className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700"
+                          >
+                            {Object.entries(ORDER_STATUS_META).map(([k, v]) => (
+                              <option key={k} value={k}>
+                                {v.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          {onToggleOrderPayment && ord.orderStatus !== "annulee" && (
+                            <button
+                              type="button"
+                              onClick={() => onToggleOrderPayment(ord.id)}
+                              className={`px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                                isPaid
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                  : "bg-white text-slate-700 border-slate-200 hover:bg-amber-50"
+                              }`}
+                            >
+                              {isPaid ? "✓ Encaissée" : "Marquer Payée"}
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setEditingDeliveryOrder(ord)}
+                            className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 text-xs font-bold text-slate-700 flex items-center gap-1 cursor-pointer"
+                            title="Assigner livreur / Modifier livraison"
+                          >
+                            <Truck className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="hidden sm:inline">Livraison</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSlipOrder(ord)}
+                            className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 flex items-center gap-1 cursor-pointer"
+                            title="Bon de Livraison imprimable"
+                          >
+                            <Printer className="w-3.5 h-3.5 text-slate-600" />
+                            <span className="hidden sm:inline">Bon</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleShareOrderStatusWhatsApp(ord)}
+                            className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 cursor-pointer"
+                            title="Envoyer suivi WhatsApp au client"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {onDeleteOrder && (
+                            deletingOrderId === ord.id ? (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await onDeleteOrder(ord.id);
+                                  setDeletingOrderId(null);
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-rose-600 text-white text-[11px] font-bold cursor-pointer"
+                              >
+                                Confirmer suppr.
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setDeletingOrderId(ord.id)}
+                                className="p-1.5 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 text-slate-400 hover:text-rose-600 cursor-pointer"
+                                title="Supprimer cette commande"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {linkedInvoice ? (
+                            <button
+                              type="button"
+                              onClick={() => onOpenInvoice && onOpenInvoice(linkedInvoice)}
+                              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>Ouvrir Facture / PDF / Email</span>
+                            </button>
+                          ) : (
+                            ord.orderStatus !== "annulee" && (
+                              <button
+                                type="button"
+                                onClick={() => handleInvoiceOrder(ord)}
+                                disabled={invoicingOrderId === ord.id}
+                                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              >
+                                <Receipt className="w-3.5 h-3.5" />
+                                <span>
+                                  {invoicingOrderId === ord.id
+                                    ? "Génération..."
+                                    : "Générer Facture"}
+                                </span>
+                              </button>
+                            )
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -3779,6 +4227,24 @@ export default function EcommerceWorkspace({
         currSym={currSym}
         onImportProducts={onCreateProductsBulk}
         onToast={onToast}
+      />
+
+      {/* MODALE ASSIGNATION LIVREUR & ÉDITION LIVRAISON */}
+      <EditOrderDeliveryModal
+        order={editingDeliveryOrder}
+        onClose={() => setEditingDeliveryOrder(null)}
+        onSave={onUpdateOrder}
+        knownDrivers={orderStats.knownDrivers}
+        currSym={currSym}
+      />
+
+      {/* MODALE BON DE LIVRAISON IMPRIMABLE */}
+      <DeliverySlipModal
+        order={slipOrder}
+        onClose={() => setSlipOrder(null)}
+        companyInfo={companyInfo}
+        currSym={currSym}
+        onShareWhatsApp={handleShareOrderStatusWhatsApp}
       />
     </div>
   );

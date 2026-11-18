@@ -74,6 +74,7 @@ import {
   fetchEcommerceOrders,
   createEcommerceOrder as apiCreateEcommerceOrder,
   updateEcommerceOrder as apiUpdateEcommerceOrder,
+  deleteEcommerceOrder as apiDeleteEcommerceOrder,
 } from "@/lib/supabaseService";
 import {
   enqueueOfflineAction,
@@ -1295,6 +1296,64 @@ export default function App() {
       }
     }
     showToast(`Commande ${orderId} mise à jour.`, "success");
+  };
+
+  const handleUpdateEcommerceOrder = async (orderId, patch) => {
+    const prevOrder = ecommerceOrders.find((o) => o.id === orderId);
+    const updated = await apiUpdateEcommerceOrder(orderId, patch);
+    setEcommerceOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+
+    if (
+      prevOrder &&
+      patch.orderStatus !== undefined &&
+      prevOrder.orderStatus !== patch.orderStatus
+    ) {
+      const wasCancelled = prevOrder.orderStatus === "annulee";
+      const isNowCancelled = patch.orderStatus === "annulee";
+      if (!wasCancelled && isNowCancelled) {
+        for (const item of prevOrder.items || []) {
+          const prod = ecommerceProducts.find((p) => p.id === item.productId);
+          if (prod) {
+            const restored = Number(prod.stock || 0) + Number(item.quantity || 1);
+            handleUpdateEcommerceProduct(prod.id, { stock: restored }).catch(() => {});
+          }
+        }
+      } else if (wasCancelled && !isNowCancelled) {
+        for (const item of prevOrder.items || []) {
+          const prod = ecommerceProducts.find((p) => p.id === item.productId);
+          if (prod) {
+            const reduced = Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1));
+            handleUpdateEcommerceProduct(prod.id, { stock: reduced }).catch(() => {});
+          }
+        }
+      }
+    }
+    showToast(`Commande ${orderId} mise à jour !`, "success");
+    return updated;
+  };
+
+  const handleDeleteEcommerceOrder = async (orderId) => {
+    const target = ecommerceOrders.find((o) => o.id === orderId);
+    await apiDeleteEcommerceOrder(orderId);
+    if (target && target.orderStatus !== "annulee") {
+      for (const item of target.items || []) {
+        const prod = ecommerceProducts.find((p) => p.id === item.productId);
+        if (prod) {
+          const restored = Number(prod.stock || 0) + Number(item.quantity || 1);
+          handleUpdateEcommerceProduct(prod.id, { stock: restored }).catch(() => {});
+        }
+      }
+    }
+    setEcommerceOrders((prev) => {
+      const next = prev.filter((o) => o.id !== orderId);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(STORAGE_KEY_ECOM_ORDERS, JSON.stringify(next));
+        } catch (e) {}
+      }
+      return next;
+    });
+    showToast(`Commande ${orderId} supprimée.`, "info");
   };
 
   const handleToggleEcommerceOrderPayment = async (orderId) => {
@@ -2559,6 +2618,8 @@ export default function App() {
                 onUpdateProduct={handleUpdateEcommerceProduct}
                 onDeleteProduct={handleDeleteEcommerceProduct}
                 onCreateOrder={handleCreateEcommerceOrder}
+                onUpdateOrder={handleUpdateEcommerceOrder}
+                onDeleteOrder={handleDeleteEcommerceOrder}
                 onUpdateOrderStatus={handleUpdateEcommerceOrderStatus}
                 onToggleOrderPayment={handleToggleEcommerceOrderPayment}
                 onGenerateInvoiceFromOrder={handleGenerateInvoiceFromOrder}
