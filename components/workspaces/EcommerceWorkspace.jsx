@@ -32,11 +32,21 @@ import {
   Image as ImageIcon,
   Upload,
   Minus,
+  Share2,
+  Barcode,
+  Tag,
 } from "lucide-react";
 import { formatAmount, getCurrencySymbol } from "@/lib/mock-data";
 import { exportEcommerceOrdersToXLSX, exportEcommerceCatalogToXLSX } from "@/lib/export-utils";
 import { generateReportPdf } from "@/lib/pdf-generator";
 import CalendarDropdown from "@/components/CalendarDropdown";
+import { BarcodeLabelModal, BulkCatalogImportModal } from "./EcommerceCatalogModals";
+
+function getEffectiveProductPrice(prod) {
+  const base = Number(prod?.price || 0);
+  const promo = Number(prod?.promoPrice || 0);
+  return promo > 0 && promo < base ? promo : base;
+}
 
 const ORDER_STATUS_META = {
   nouvelle: {
@@ -88,6 +98,7 @@ export default function EcommerceWorkspace({
   companyInfo = {},
   userProfile = null,
   onCreateProduct,
+  onCreateProductsBulk,
   onUpdateProduct,
   onDeleteProduct,
   onCreateOrder,
@@ -130,7 +141,7 @@ export default function EcommerceWorkspace({
   const [orderSearch, setOrderSearch] = useState("");
   const [orderFilter, setOrderFilter] = useState("all");
 
-  // Modales Produit & Commande
+  // Modales Produit, Import, Étiquettes & Commande
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productForm, setProductForm] = useState({
@@ -138,12 +149,18 @@ export default function EcommerceWorkspace({
     sku: "",
     category: "Général",
     price: "",
+    promoPrice: "",
     costPrice: "",
     stock: "10",
     imageUrl: "",
+    variants: [],
     description: "",
     isActive: true,
   });
+  const [newVariantLabel, setNewVariantLabel] = useState("");
+  const [newVariantStock, setNewVariantStock] = useState("");
+  const [labelModalProducts, setLabelModalProducts] = useState(null); // null or array of products
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [orderForm, setOrderForm] = useState({
@@ -159,6 +176,7 @@ export default function EcommerceWorkspace({
   });
   const [orderCart, setOrderCart] = useState([]);
   const [selectedCartProductId, setSelectedCartProductId] = useState("");
+  const [selectedCartVariant, setSelectedCartVariant] = useState("");
   const [selectedCartQty, setSelectedCartQty] = useState("1");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [invoicingOrderId, setInvoicingOrderId] = useState(null);
@@ -434,7 +452,7 @@ export default function EcommerceWorkspace({
       if (p.isActive !== false) activeCount += 1;
       else pausedCount += 1;
       const stk = Number(p.stock || 0);
-      const pr = Number(p.price || 0);
+      const pr = getEffectiveProductPrice(p);
       const cp = Number(p.costPrice || 0);
       totalStockUnits += stk;
       stockRetailValue += stk * pr;
@@ -486,9 +504,9 @@ export default function EcommerceWorkspace({
 
     const sorted = [...list];
     if (productSort === "price_asc") {
-      sorted.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+      sorted.sort((a, b) => getEffectiveProductPrice(a) - getEffectiveProductPrice(b));
     } else if (productSort === "price_desc") {
-      sorted.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+      sorted.sort((a, b) => getEffectiveProductPrice(b) - getEffectiveProductPrice(a));
     } else if (productSort === "stock_asc") {
       sorted.sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0));
     } else if (productSort === "name_asc") {
@@ -527,12 +545,16 @@ export default function EcommerceWorkspace({
       sku: `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
       category: "Général",
       price: "",
+      promoPrice: "",
       costPrice: "",
       stock: "10",
       imageUrl: "",
+      variants: [],
       description: "",
       isActive: true,
     });
+    setNewVariantLabel("");
+    setNewVariantStock("");
     setIsProductModalOpen(true);
   };
 
@@ -543,12 +565,16 @@ export default function EcommerceWorkspace({
       sku: prod.sku || "",
       category: prod.category || "Général",
       price: String(prod.price ?? ""),
+      promoPrice: prod.promoPrice ? String(prod.promoPrice) : "",
       costPrice: prod.costPrice ? String(prod.costPrice) : "",
       stock: String(prod.stock ?? "0"),
       imageUrl: prod.imageUrl || "",
+      variants: Array.isArray(prod.variants) ? prod.variants : [],
       description: prod.description || "",
       isActive: prod.isActive !== false,
     });
+    setNewVariantLabel("");
+    setNewVariantStock("");
     setIsProductModalOpen(true);
   };
 
@@ -559,13 +585,126 @@ export default function EcommerceWorkspace({
       sku: `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
       category: prod.category || "Général",
       price: String(prod.price ?? ""),
+      promoPrice: prod.promoPrice ? String(prod.promoPrice) : "",
       costPrice: prod.costPrice ? String(prod.costPrice) : "",
       stock: String(prod.stock ?? "0"),
       imageUrl: prod.imageUrl || "",
+      variants: Array.isArray(prod.variants) ? prod.variants : [],
       description: prod.description || "",
       isActive: true,
     });
+    setNewVariantLabel("");
+    setNewVariantStock("");
     setIsProductModalOpen(true);
+  };
+
+  const handleAddVariant = () => {
+    const lbl = newVariantLabel.trim();
+    if (!lbl) return;
+    const vStk = newVariantStock !== "" ? Math.max(0, Number(newVariantStock)) : 0;
+    setProductForm((prev) => ({
+      ...prev,
+      variants: [
+        ...(prev.variants || []),
+        { id: `var-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, label: lbl, stock: vStk, price: null },
+      ],
+    }));
+    setNewVariantLabel("");
+    setNewVariantStock("");
+  };
+
+  const handleRemoveVariant = (varId) => {
+    setProductForm((prev) => ({
+      ...prev,
+      variants: (prev.variants || []).filter((v) => v.id !== varId),
+    }));
+  };
+
+  const handleShareProductWhatsApp = async (prod) => {
+    const shopName = companyInfo?.name || "Notre Boutique";
+    const shopPhone = companyInfo?.phone || companyInfo?.mobile || "";
+    const basePrice = Number(prod.price || 0);
+    const effPrice = getEffectiveProductPrice(prod);
+    const hasPromo = effPrice < basePrice;
+    const discountPct = hasPromo ? Math.round(((basePrice - effPrice) / basePrice) * 100) : 0;
+    const variantsLine =
+      Array.isArray(prod.variants) && prod.variants.length > 0
+        ? `\n🎨 *Options / Variantes :* ${prod.variants.map((v) => v.label).join(", ")}`
+        : "";
+    const priceLine = hasPromo
+      ? `🔥 *PROMO -${discountPct}% :* *${formatAmount(effPrice, currSym)}* (au lieu de ~${formatAmount(
+          basePrice,
+          currSym
+        )}~)`
+      : `💰 *Prix :* *${formatAmount(effPrice, currSym)}*`;
+
+    const message =
+      `🛍️ *${shopName}* — *${prod.name}*\n` +
+      `${priceLine}\n` +
+      (prod.sku ? `🏷️ Réf : ${prod.sku}\n` : "") +
+      `📦 Disponibilité : ${Number(prod.stock || 0) > 0 ? `${prod.stock} en stock` : "Sur commande"}` +
+      variantsLine +
+      (prod.description ? `\n📝 ${prod.description}` : "") +
+      `\n\n👉 *Pour commander rapidement :* répondez à ce message` +
+      (shopPhone ? ` ou écrivez au ${shopPhone}` : "") +
+      ` !`;
+
+    // Sur mobile, partager aussi la photo si le navigateur le permet
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.share &&
+      prod.imageUrl &&
+      prod.imageUrl.startsWith("data:image/")
+    ) {
+      try {
+        const res = await fetch(prod.imageUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `${prod.sku || "produit"}.png`, { type: blob.type || "image/png" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ title: prod.name, text: message, files: [file] });
+          return;
+        }
+      } catch {
+        // Repli classique vers WhatsApp URL
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const handleShareFullCatalogWhatsApp = () => {
+    const activeItems = filteredProducts.filter((p) => p.isActive !== false && Number(p.stock || 0) > 0);
+    if (activeItems.length === 0) {
+      if (onToast) onToast("Aucun produit actif en stock à partager.", "info");
+      return;
+    }
+    const shopName = companyInfo?.name || "Notre Boutique";
+    const shopPhone = companyInfo?.phone || companyInfo?.mobile || "";
+    const lines = activeItems.slice(0, 15).map((p, idx) => {
+      const base = Number(p.price || 0);
+      const eff = getEffectiveProductPrice(p);
+      const hasPromo = eff < base;
+      const varTxt =
+        Array.isArray(p.variants) && p.variants.length > 0
+          ? ` [${p.variants.map((v) => v.label).join("/")}]`
+          : "";
+      return `${idx + 1}. *${p.name}*${varTxt} — ${
+        hasPromo
+          ? `*${formatAmount(eff, currSym)}* (Promo ~${formatAmount(base, currSym)}~)`
+          : `*${formatAmount(eff, currSym)}*`
+      }`;
+    });
+    const text =
+      `🛍️ *CATALOGUE — ${shopName}*\n\n` +
+      lines.join("\n") +
+      `\n\n💬 Répondez avec le numéro du produit souhaité pour commander immédiatement !` +
+      (shopPhone ? `\n📞 Service client : ${shopPhone}` : "");
+
+    if (typeof window !== "undefined") {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+    }
   };
 
   const handleQuickStockDelta = async (prod, delta) => {
@@ -602,15 +741,20 @@ export default function EcommerceWorkspace({
       if (onToast) onToast(`"${prod.name}" est en rupture de stock.`, "error");
       return;
     }
+    const firstVariant =
+      Array.isArray(prod.variants) && prod.variants.length > 0 ? prod.variants[0].label : "";
+    const effPrice = getEffectiveProductPrice(prod);
     setOrderCart([
       {
         productId: prod.id,
-        description: prod.name,
+        variant: firstVariant,
+        description: firstVariant ? `${prod.name} (${firstVariant})` : prod.name,
         quantity: 1,
-        unitPrice: Number(prod.price || 0),
+        unitPrice: effPrice,
       },
     ]);
     setSelectedCartProductId(prod.id);
+    setSelectedCartVariant(firstVariant);
     setSelectedCartQty("1");
     setIsOrderModalOpen(true);
   };
@@ -645,31 +789,24 @@ export default function EcommerceWorkspace({
     if (!productForm.name.trim()) return;
     setIsSubmitting(true);
     try {
+      const payload = {
+        name: productForm.name.trim(),
+        sku: productForm.sku.trim(),
+        category: productForm.category.trim() || "Général",
+        price: Number(productForm.price || 0),
+        promoPrice: productForm.promoPrice ? Number(productForm.promoPrice) : null,
+        costPrice: Number(productForm.costPrice || 0),
+        stock: Number(productForm.stock || 0),
+        imageUrl: productForm.imageUrl.trim(),
+        variants: productForm.variants || [],
+        description: productForm.description.trim(),
+        isActive: productForm.isActive !== false,
+      };
       if (editingProduct) {
-        await onUpdateProduct(editingProduct.id, {
-          name: productForm.name.trim(),
-          sku: productForm.sku.trim(),
-          category: productForm.category.trim() || "Général",
-          price: Number(productForm.price || 0),
-          costPrice: Number(productForm.costPrice || 0),
-          stock: Number(productForm.stock || 0),
-          imageUrl: productForm.imageUrl.trim(),
-          description: productForm.description.trim(),
-          isActive: productForm.isActive !== false,
-        });
+        await onUpdateProduct(editingProduct.id, payload);
         if (onToast) onToast("Produit mis à jour dans le catalogue.", "success");
       } else {
-        await onCreateProduct({
-          name: productForm.name.trim(),
-          sku: productForm.sku.trim(),
-          category: productForm.category.trim() || "Général",
-          price: Number(productForm.price || 0),
-          costPrice: Number(productForm.costPrice || 0),
-          stock: Number(productForm.stock || 0),
-          imageUrl: productForm.imageUrl.trim(),
-          description: productForm.description.trim(),
-          isActive: productForm.isActive !== false,
-        });
+        await onCreateProduct(payload);
         if (onToast) onToast("Produit ajouté au catalogue E-Commerce !", "success");
       }
       setIsProductModalOpen(false);
@@ -689,8 +826,10 @@ export default function EcommerceWorkspace({
       return;
     }
     const qty = Math.max(1, Number(selectedCartQty || 1));
-    const existingItem = orderCart.find((i) => i.productId === prod.id);
-    const nextQtyTotal = (existingItem ? existingItem.quantity : 0) + qty;
+    const existingForProd = orderCart
+      .filter((i) => i.productId === prod.id)
+      .reduce((s, i) => s + Number(i.quantity || 0), 0);
+    const nextQtyTotal = existingForProd + qty;
     if (nextQtyTotal > availStock) {
       if (onToast) {
         onToast(
@@ -700,20 +839,29 @@ export default function EcommerceWorkspace({
       }
       return;
     }
+    const chosenVar = selectedCartVariant || "";
+    const itemDesc = chosenVar ? `${prod.name} (${chosenVar})` : prod.name;
+    const effPrice = getEffectiveProductPrice(prod);
+
     setOrderCart((prev) => {
-      const existing = prev.find((i) => i.productId === prod.id);
+      const existing = prev.find(
+        (i) => i.productId === prod.id && (i.variant || "") === chosenVar
+      );
       if (existing) {
         return prev.map((i) =>
-          i.productId === prod.id ? { ...i, quantity: i.quantity + qty } : i
+          i.productId === prod.id && (i.variant || "") === chosenVar
+            ? { ...i, quantity: i.quantity + qty }
+            : i
         );
       }
       return [
         ...prev,
         {
           productId: prod.id,
-          description: prod.name,
+          variant: chosenVar,
+          description: itemDesc,
           quantity: qty,
-          unitPrice: Number(prod.price || 0),
+          unitPrice: effPrice,
         },
       ];
     });
@@ -2293,12 +2441,43 @@ export default function EcommerceWorkspace({
 
                 <button
                   type="button"
+                  onClick={handleShareFullCatalogWhatsApp}
+                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  title="Partager le catalogue actif sur WhatsApp"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLabelModalProducts(filteredProducts)}
+                  disabled={filteredProducts.length === 0}
+                  className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                  title="Imprimer les étiquettes Code-Barres / SKU"
+                >
+                  <Barcode className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="hidden sm:inline">Code-barres</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBulkImportOpen(true)}
+                  className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  title="Importer des produits en masse (Excel / CSV)"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Importer</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleExportCatalogExcel}
                   className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                   title="Exporter le catalogue vers Excel"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Export Excel</span>
+                  <span className="hidden sm:inline">Exporter</span>
                 </button>
               </div>
             </div>
@@ -2310,17 +2489,26 @@ export default function EcommerceWorkspace({
                 </div>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   {products.length === 0
-                    ? "Aucun produit dans votre catalogue E-Commerce. Cliquez sur « Ajouter un produit » pour commencer."
+                    ? "Aucun produit dans votre catalogue E-Commerce. Cliquez sur « Ajouter un produit » ou importez un fichier Excel/CSV."
                     : "Aucun produit ne correspond à vos filtres actuels."}
                 </p>
                 {products.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={openNewProductModal}
-                    className="px-4 py-2 rounded-xl bg-[#183BB0] text-white text-xs font-bold cursor-pointer"
-                  >
-                    + Ajouter mon premier produit
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={openNewProductModal}
+                      className="px-4 py-2 rounded-xl bg-[#183BB0] text-white text-xs font-bold cursor-pointer"
+                    >
+                      + Ajouter mon premier produit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsBulkImportOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold cursor-pointer"
+                    >
+                      Importer Excel / CSV
+                    </button>
+                  </div>
                 ) : (
                   <button
                     type="button"
@@ -2340,17 +2528,23 @@ export default function EcommerceWorkspace({
                 {filteredProducts.map((prod) => {
                   const stk = Number(prod.stock || 0);
                   const priceNum = Number(prod.price || 0);
+                  const effPrice = getEffectiveProductPrice(prod);
+                  const hasPromo = effPrice < priceNum;
+                  const discountPct = hasPromo
+                    ? Math.round(((priceNum - effPrice) / priceNum) * 100)
+                    : 0;
                   const costNum = Number(prod.costPrice || 0);
-                  const unitMargin = costNum > 0 ? priceNum - costNum : 0;
+                  const unitMargin = costNum > 0 ? effPrice - costNum : 0;
                   const marginPct =
-                    costNum > 0 && priceNum > 0
-                      ? Math.round(((priceNum - costNum) / priceNum) * 100)
+                    costNum > 0 && effPrice > 0
+                      ? Math.round(((effPrice - costNum) / effPrice) * 100)
                       : 0;
                   const soldQty =
                     catalogStats.soldByProduct[prod.id] ||
                     catalogStats.soldByProduct[prod.name] ||
                     0;
                   const isPaused = prod.isActive === false;
+                  const variantsList = Array.isArray(prod.variants) ? prod.variants : [];
 
                   return (
                     <div
@@ -2364,7 +2558,7 @@ export default function EcommerceWorkspace({
                       }`}
                     >
                       {/* Haut de carte : Photo / Initiales + Titre + Badge Stock */}
-                      <div className="space-y-3">
+                      <div className="space-y-2.5">
                         <div className="flex items-start gap-3">
                           {prod.imageUrl ? (
                             <img
@@ -2379,10 +2573,17 @@ export default function EcommerceWorkspace({
                           )}
 
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-[#183BB0] border border-blue-200">
-                                {prod.category || "Général"}
-                              </span>
+                            <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-[#183BB0] border border-blue-200">
+                                  {prod.category || "Général"}
+                                </span>
+                                {hasPromo && (
+                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#FFE4E6] text-[#BE123C] border border-[#FECDD3]">
+                                    -{discountPct}%
+                                  </span>
+                                )}
+                              </div>
                               <span
                                 className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
                                   isPaused
@@ -2423,18 +2624,44 @@ export default function EcommerceWorkspace({
                           </div>
                         </div>
 
+                        {variantsList.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {variantsList.slice(0, 4).map((v) => (
+                              <span
+                                key={v.id || v.label}
+                                className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-700"
+                              >
+                                {v.label}
+                                {v.stock > 0 ? ` (${v.stock})` : ""}
+                              </span>
+                            ))}
+                            {variantsList.length > 4 && (
+                              <span className="text-[10px] font-bold text-slate-400 px-1">
+                                +{variantsList.length - 4}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
                         {prod.description && (
                           <p className="text-xs text-slate-500 line-clamp-2">{prod.description}</p>
                         )}
                       </div>
 
-                      {/* Prix, Marge & Ajustement rapide stock */}
+                      {/* Prix, Prix barré, Marge & Ajustement rapide stock */}
                       <div className="space-y-3 pt-2 border-t border-slate-200/70">
                         <div className="flex items-center justify-between gap-2">
                           <div>
-                            <span className="text-base font-extrabold text-[#183BB0]">
-                              {formatAmount(priceNum, currSym)}
-                            </span>
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <span className="text-base font-extrabold text-[#183BB0]">
+                                {formatAmount(effPrice, currSym)}
+                              </span>
+                              {hasPromo && (
+                                <span className="text-xs font-semibold text-slate-400 line-through">
+                                  {formatAmount(priceNum, currSym)}
+                                </span>
+                              )}
+                            </div>
                             {costNum > 0 && (
                               <p className="text-[10px] font-semibold text-emerald-700">
                                 Marge : +{formatAmount(unitMargin, currSym)} ({marginPct}%)
@@ -2472,19 +2699,35 @@ export default function EcommerceWorkspace({
                           </div>
                         </div>
 
-                        {/* Barre d'actions : Commander 1-clic, Pause, Dupliquer, Modifier, Supprimer */}
-                        <div className="flex items-center justify-between gap-2">
+                        {/* Barre d'actions : Commander 1-clic, WhatsApp, Code-barres, Pause, Dupliquer, Modifier, Supprimer */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <button
                             type="button"
                             onClick={() => handleQuickOrderProduct(prod)}
                             disabled={stk <= 0 || isPaused}
-                            className="flex-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer disabled:opacity-45"
+                            className="flex-1 min-w-[110px] px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer disabled:opacity-45"
                           >
                             <ShoppingBag className="w-3.5 h-3.5" />
                             <span>Commander</span>
                           </button>
 
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleShareProductWhatsApp(prod)}
+                              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                              title="Partager sur WhatsApp"
+                            >
+                              <Share2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setLabelModalProducts([prod])}
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-blue-700 hover:bg-blue-50 cursor-pointer"
+                              title="Étiquette Code-Barres / SKU"
+                            >
+                              <Barcode className="w-4 h-4" />
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleToggleProductActive(prod)}
@@ -2544,12 +2787,12 @@ export default function EcommerceWorkspace({
             ) : (
               /* VUE TABLEAU STYLE B2B */
               <div className="overflow-x-auto -mx-4 sm:mx-0">
-                <table className="w-full text-left border-collapse min-w-[680px]">
+                <table className="w-full text-left border-collapse min-w-[740px]">
                   <thead>
                     <tr className="bg-slate-50 border-y border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3 px-4">Produit</th>
+                      <th className="py-3 px-4">Produit &amp; Variantes</th>
                       <th className="py-3 px-4">Catégorie</th>
-                      <th className="py-3 px-4 text-right">Prix Vente</th>
+                      <th className="py-3 px-4 text-right">Prix / Promo</th>
                       <th className="py-3 px-4 text-right">Marge</th>
                       <th className="py-3 px-4 text-center">Stock</th>
                       <th className="py-3 px-4 text-right">Actions</th>
@@ -2559,9 +2802,12 @@ export default function EcommerceWorkspace({
                     {filteredProducts.map((prod) => {
                       const stk = Number(prod.stock || 0);
                       const priceNum = Number(prod.price || 0);
+                      const effPrice = getEffectiveProductPrice(prod);
+                      const hasPromo = effPrice < priceNum;
                       const costNum = Number(prod.costPrice || 0);
-                      const unitMargin = costNum > 0 ? priceNum - costNum : 0;
+                      const unitMargin = costNum > 0 ? effPrice - costNum : 0;
                       const isPaused = prod.isActive === false;
+                      const variantsList = Array.isArray(prod.variants) ? prod.variants : [];
                       return (
                         <tr key={prod.id} className="hover:bg-slate-50/70 transition-colors">
                           <td className="py-3 px-4">
@@ -2581,6 +2827,9 @@ export default function EcommerceWorkspace({
                                 <p className="font-bold text-slate-900">{prod.name}</p>
                                 <p className="text-[11px] font-mono text-slate-400">
                                   {prod.sku || "—"}
+                                  {variantsList.length > 0
+                                    ? ` • ${variantsList.map((v) => v.label).join(", ")}`
+                                    : ""}
                                 </p>
                               </div>
                             </div>
@@ -2590,8 +2839,15 @@ export default function EcommerceWorkspace({
                               {prod.category || "Général"}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-right font-extrabold text-slate-900">
-                            {formatAmount(priceNum, currSym)}
+                          <td className="py-3 px-4 text-right">
+                            <span className="font-extrabold text-slate-900 block">
+                              {formatAmount(effPrice, currSym)}
+                            </span>
+                            {hasPromo && (
+                              <span className="text-[10px] text-slate-400 line-through">
+                                {formatAmount(priceNum, currSym)}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-4 text-right font-semibold text-emerald-700">
                             {costNum > 0 ? `+${formatAmount(unitMargin, currSym)}` : "—"}
@@ -2637,6 +2893,22 @@ export default function EcommerceWorkspace({
                                 className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold text-[11px] cursor-pointer disabled:opacity-40"
                               >
                                 Commander
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleShareProductWhatsApp(prod)}
+                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                                title="Partager WhatsApp"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setLabelModalProducts([prod])}
+                                className="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 cursor-pointer"
+                                title="Code-barres"
+                              >
+                                <Barcode className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 type="button"
@@ -2963,10 +3235,10 @@ export default function EcommerceWorkspace({
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">
-                      Prix vente ({currSym}) *
+                      Prix normal ({currSym}) *
                     </label>
                     <input
                       type="number"
@@ -2976,6 +3248,22 @@ export default function EcommerceWorkspace({
                       value={productForm.price}
                       onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
                       className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-rose-700 mb-1">
+                      Prix promo ({currSym})
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={productForm.promoPrice}
+                      onChange={(e) =>
+                        setProductForm({ ...productForm, promoPrice: e.target.value })
+                      }
+                      placeholder="Prix barré"
+                      className="w-full px-3 py-2.5 rounded-xl border border-rose-200 bg-rose-50/40 font-bold"
                     />
                   </div>
                   <div>
@@ -3007,21 +3295,105 @@ export default function EcommerceWorkspace({
                   </div>
                 </div>
 
-                {Number(productForm.price || 0) > 0 && Number(productForm.costPrice || 0) > 0 && (
-                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-[11px] text-emerald-800 font-bold">
-                    <span>Marge unitaire estimée :</span>
-                    <span>
-                      +{formatAmount(Number(productForm.price) - Number(productForm.costPrice), currSym)}{" "}
-                      (
-                      {Math.round(
-                        ((Number(productForm.price) - Number(productForm.costPrice)) /
-                          Number(productForm.price)) *
-                          100
-                      )}
-                      %)
+                {Number(productForm.promoPrice || 0) > 0 &&
+                  Number(productForm.price || 0) > Number(productForm.promoPrice || 0) && (
+                    <div className="p-2.5 rounded-xl bg-[#FFE4E6]/60 border border-[#FECDD3] flex items-center justify-between text-[11px] text-[#BE123C] font-bold">
+                      <span>Promotion active (prix normal barré sur la fiche) :</span>
+                      <span>
+                        -
+                        {Math.round(
+                          ((Number(productForm.price) - Number(productForm.promoPrice)) /
+                            Number(productForm.price)) *
+                            100
+                        )}
+                        % de remise
+                      </span>
+                    </div>
+                  )}
+
+                {(() => {
+                  const baseP = Number(productForm.price || 0);
+                  const promoP = Number(productForm.promoPrice || 0);
+                  const effP = promoP > 0 && promoP < baseP ? promoP : baseP;
+                  const costP = Number(productForm.costPrice || 0);
+                  if (effP <= 0 || costP <= 0) return null;
+                  return (
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-[11px] text-emerald-800 font-bold">
+                      <span>Marge unitaire estimée :</span>
+                      <span>
+                        +{formatAmount(effP - costP, currSym)} (
+                        {Math.round(((effP - costP) / effP) * 100)}%)
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* Variantes produits (Tailles, Couleurs, Modèles) */}
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Variantes (Tailles, Couleurs, Modèles)</span>
+                    </label>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      {(productForm.variants || []).length} variante(s)
                     </span>
                   </div>
-                )}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newVariantLabel}
+                      onChange={(e) => setNewVariantLabel(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddVariant();
+                        }
+                      }}
+                      placeholder="Ex: Taille M - Noir, 42 Blanc..."
+                      className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      value={newVariantStock}
+                      onChange={(e) => setNewVariantStock(e.target.value)}
+                      placeholder="Qté"
+                      className="w-16 px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-center font-bold"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddVariant}
+                      className="px-3 py-2 rounded-xl bg-blue-600 text-white font-bold cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {(productForm.variants || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(productForm.variants || []).map((v) => (
+                        <span
+                          key={v.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700"
+                        >
+                          <span>
+                            {v.label}
+                            {v.stock > 0 ? ` (${v.stock})` : ""}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveVariant(v.id)}
+                            className="text-rose-500 hover:text-rose-700 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Description</label>
@@ -3250,44 +3622,81 @@ export default function EcommerceWorkspace({
                       Votre catalogue est vide. Créez d&apos;abord au moins un produit.
                     </p>
                   ) : (
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <select
-                        value={selectedCartProductId}
-                        onChange={(e) => setSelectedCartProductId(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold"
-                      >
-                        <option value="">-- Choisir un produit --</option>
-                        {products.map((p) => {
-                          const stk = Number(p.stock || 0);
-                          const isPaused = p.isActive === false;
-                          return (
-                            <option key={p.id} value={p.id} disabled={stk <= 0 || isPaused}>
-                              {p.name} ({formatAmount(p.price, currSym)} •{" "}
-                              {isPaused
-                                ? "En pause"
-                                : stk <= 0
-                                ? "Rupture de stock"
-                                : `Stock: ${stk}`})
-                            </option>
-                          );
-                        })}
-                      </select>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          min="1"
-                          value={selectedCartQty}
-                          onChange={(e) => setSelectedCartQty(e.target.value)}
-                          className="w-20 px-3 py-2 rounded-xl border border-slate-200 bg-white font-bold text-center"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddProductToCart}
-                          className="px-3.5 py-2 rounded-xl bg-indigo-600 text-white font-bold cursor-pointer"
+                    <div className="space-y-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <select
+                          value={selectedCartProductId}
+                          onChange={(e) => {
+                            const pid = e.target.value;
+                            setSelectedCartProductId(pid);
+                            const found = products.find((p) => p.id === pid);
+                            const firstVar =
+                              found && Array.isArray(found.variants) && found.variants.length > 0
+                                ? found.variants[0].label
+                                : "";
+                            setSelectedCartVariant(firstVar);
+                          }}
+                          className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold"
                         >
-                          Ajouter
-                        </button>
+                          <option value="">-- Choisir un produit --</option>
+                          {products.map((p) => {
+                            const stk = Number(p.stock || 0);
+                            const isPaused = p.isActive === false;
+                            const eff = getEffectiveProductPrice(p);
+                            return (
+                              <option key={p.id} value={p.id} disabled={stk <= 0 || isPaused}>
+                                {p.name} ({formatAmount(eff, currSym)} •{" "}
+                                {isPaused
+                                  ? "En pause"
+                                  : stk <= 0
+                                  ? "Rupture de stock"
+                                  : `Stock: ${stk}`})
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            value={selectedCartQty}
+                            onChange={(e) => setSelectedCartQty(e.target.value)}
+                            className="w-20 px-3 py-2 rounded-xl border border-slate-200 bg-white font-bold text-center"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddProductToCart}
+                            className="px-3.5 py-2 rounded-xl bg-indigo-600 text-white font-bold cursor-pointer"
+                          >
+                            Ajouter
+                          </button>
+                        </div>
                       </div>
+
+                      {(() => {
+                        const chosenProd = products.find((p) => p.id === selectedCartProductId);
+                        if (!chosenProd || !Array.isArray(chosenProd.variants) || chosenProd.variants.length === 0) {
+                          return null;
+                        }
+                        return (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-slate-600 shrink-0">
+                              Variante :
+                            </span>
+                            <select
+                              value={selectedCartVariant}
+                              onChange={(e) => setSelectedCartVariant(e.target.value)}
+                              className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white font-semibold text-xs"
+                            >
+                              {chosenProd.variants.map((v) => (
+                                <option key={v.id || v.label} value={v.label}>
+                                  {v.label} {v.stock > 0 ? `(Dispo: ${v.stock})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 
@@ -3295,7 +3704,7 @@ export default function EcommerceWorkspace({
                     <div className="space-y-1.5 pt-2 border-t border-slate-200">
                       {orderCart.map((item) => (
                         <div
-                          key={item.productId}
+                          key={`${item.productId}-${item.variant || ""}`}
                           className="flex items-center justify-between text-xs bg-white px-3 py-2 rounded-xl border border-slate-200"
                         >
                           <span>
@@ -3309,7 +3718,13 @@ export default function EcommerceWorkspace({
                               type="button"
                               onClick={() =>
                                 setOrderCart((prev) =>
-                                  prev.filter((i) => i.productId !== item.productId)
+                                  prev.filter(
+                                    (i) =>
+                                      !(
+                                        i.productId === item.productId &&
+                                        (i.variant || "") === (item.variant || "")
+                                      )
+                                  )
                                 )
                               }
                               className="text-rose-500 hover:text-rose-700 cursor-pointer"
@@ -3347,6 +3762,24 @@ export default function EcommerceWorkspace({
           </div>
         </div>
       )}
+
+      {/* MODALE ÉTIQUETTES CODE-BARRES / SKU */}
+      <BarcodeLabelModal
+        isOpen={Array.isArray(labelModalProducts)}
+        onClose={() => setLabelModalProducts(null)}
+        products={labelModalProducts || []}
+        companyName={companyInfo?.name || "Ma Boutique"}
+        currSym={currSym}
+      />
+
+      {/* MODALE IMPORT EN MASSE EXCEL / CSV */}
+      <BulkCatalogImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        currSym={currSym}
+        onImportProducts={onCreateProductsBulk}
+        onToast={onToast}
+      />
     </div>
   );
 }

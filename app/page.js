@@ -68,6 +68,7 @@ import {
   getCurrentSession,
   fetchEcommerceProducts,
   createEcommerceProduct as apiCreateEcommerceProduct,
+  createEcommerceProductsBulk as apiCreateEcommerceProductsBulk,
   updateEcommerceProduct as apiUpdateEcommerceProduct,
   deleteEcommerceProduct as apiDeleteEcommerceProduct,
   fetchEcommerceOrders,
@@ -1216,6 +1217,13 @@ export default function App() {
     const created = await apiCreateEcommerceProduct(product, activeCompId);
     setEcommerceProducts((prev) => [created, ...prev]);
     return created;
+  };
+
+  const handleCreateEcommerceProductsBulk = async (productsList) => {
+    const activeCompId = userProfile?.companyId || companyInfo?.id;
+    const createdList = await apiCreateEcommerceProductsBulk(productsList, activeCompId);
+    setEcommerceProducts((prev) => [...createdList, ...prev]);
+    return createdList;
   };
 
   const handleUpdateEcommerceProduct = async (id, patch) => {
@@ -2547,6 +2555,7 @@ export default function App() {
                 userProfile={userProfile}
                 onNavigateTab={(tab) => setActiveTab(tab)}
                 onCreateProduct={handleCreateEcommerceProduct}
+                onCreateProductsBulk={handleCreateEcommerceProductsBulk}
                 onUpdateProduct={handleUpdateEcommerceProduct}
                 onDeleteProduct={handleDeleteEcommerceProduct}
                 onCreateOrder={handleCreateEcommerceOrder}
